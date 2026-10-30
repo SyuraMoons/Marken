@@ -5,6 +5,16 @@ Built for the **Meta Global AI Developer Hackathon** (Deadline: **4 Nov 2026, 9:
 
 ---
 
+## 0. Branching & Git Workflow
+
+- **`main` (Production / Demo)**: Clean, judge-ready branch deployed to Vercel production. Never push directly to `main`. Only promote `development → main` at verified milestones (e.g., 2 Nov Gate, 3 Nov Pilot, 4 Nov Submission).
+- **`development` (Staging / Integration)**: Default target branch for all daily Pull Requests.
+- **Feature Branches (`feat/<area>-<slug>`, `fix/<slug>`, `docs/<slug>`)**:
+  - Branch off `development`: `git checkout development && git pull && git checkout -b feat/ai-gateway`
+  - Open PR against **`development`**, link the GitHub Issue (`Closes #...`), and ensure CI (`lint`, `build`, `typecheck`) passes before merging.
+
+---
+
 ## 1. Workstream Ownership
 
 Everyone can work fullstack when needed, but to move fast and avoid Git merge conflicts before the **2 Nov Gate**, module ownership is split as follows:

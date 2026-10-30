@@ -1,403 +1,380 @@
-# MARKEN — Software Requirements Document (SRD)
+# Marken SRD v2.0 (Final)
 
-v1.0 · 28 Oct 2026 · Live doc: https://claude.ai/artifact/DKRJqBPBBAky1nwdjrGUqz
+Oct 29, 2026 · @Altaf Parves
 
-## Document control
+Marken is the AI marketer that posts for you every morning, using your real product, your brand rules and today's trends. You approve with one tap.
 
-SRD v1.0 turns PRD v1.0 (20 Oct 2026) into buildable requirements for the Meta Global AI Developer Hackathon, with four changes from the PRD.
+---
 
-| Change | PRD v1.0 | SRD v1.0 | Why |
-| --- | --- | --- | --- |
-| Target user | Indonesian small sellers | Business owners: small, owner-run businesses in any country | The hackathon is international |
-| Content language | Bahasa Indonesia only | Owner picks a content language per shop; English and Bahasa Indonesia at demo | Follows from the international audience |
-| P2 features | Mentor dashboard, TikTok and Shopee publishing, Influencer matching | Removed. US-09 and the mentor persona are removed with them | Scope cut for the 10-day build |
-| Onboarding | One setup screen | Full flow: Landing page → Login → Guided onboarding tutorial → Main app | New requirement |
+## 0. Key takeaways
 
-Requirement IDs: `F-xx` = feature, `FR-<area>-xx` = functional requirement, `NFR-xx` = non-functional requirement. P0 must be in the demo; P1 is built if time allows.
+> **Objective:** a top 5 finish in the Indie Developer track of the Meta Global AI Developer Hackathon, plus at least one bonus prize. Submission closes **4 Nov 2026, 9:00 PM ET (5 Nov, 09:00 WIB)**.
 
-## 1. Introduction
+> **North Star: trusted posts per shop per week.** A post counts only when the owner approved it, it was published, and the real product was verified unchanged.
 
-### 1.1 Purpose
+| Item | Final decision |
+| :--- | :--- |
+| Who we serve | Owners who sell **physical products** and market them on Instagram |
+| Headline promise | **Your real product, never redrawn** |
+| Output | A **3 slide carousel (4:5)**, every slide uses the verified product |
+| Hackathon targets | 12 or more trusted posts across 3 or more real shops by 3 Nov |
+| The gate | The full loop works end to end on **2 Nov** |
 
-This SRD tells the build team exactly what MARKEN must do by the 4 Nov 2026 submission. Each requirement has an ID, a priority and a testable acceptance criterion.
+### Three pillars (every demo scene shows at least one)
 
-### 1.2 Product in one line
+| Pillar | What it means |
+| :--- | :--- |
+| 1. Real product, never redrawn | SAM 3.1 cuts the product, Muse Image builds only the scene, code places the original pixels and verifies them |
+| 2. Shows up every morning | A daily agent loop prepares a post without any prompt |
+| 3. Shows its work | The activity panel shows every step, model, cost and source |
 
-MARKEN is an AI marketing team for small business owners. It finds what is trending, turns it into a ready-to-post piece of content for the owner's products, and publishes it to Instagram after one tap of approval.
+**Guardrails (never break):** nothing publishes without Approve · the product is never redrawn · no invented prices or claims · style rules always pass · results are reported honestly.
 
-### 1.3 Scope
+---
 
-In scope: a mobile-first, installable web app (PWA) with a public landing page, login, a guided onboarding tutorial, and the main app (Today, Edit, Products, Results, Settings). Behind it runs a daily agent loop that learns the shop, finds trends, plans content, makes visuals, waits for approval, publishes, and learns from results.
+## 1. Document control
 
-Out of scope for the hackathon:
+v2.0 is the final SRD. It keeps the execution plan from Nalen's v1.1 and fixes its direction. Requirement IDs are kept from v1.1 so versions can be compared; a gap in numbering is a dropped requirement.
 
-- WhatsApp, Telegram or any chat-app interface
-- Payments and subscriptions
-- Paid ads management
-- Publishing to TikTok, Shopee or Facebook
-- Mentor dashboard (multi-shop view for program mentors)
-- Influencer and affiliate matching
-- Training our own ranking model
+Markers: **NEW** added in v2.0 · **CHG** changed from v1.1 · **KEPT** from v1.1, unchanged.
 
-### 1.4 Definitions
+### Kept from v1.1
+
+| Item | Why we keep it |
+| :--- | :--- |
+| Muse Spark Open replaces Llama | Whole stack on Meta models; open weight bonus |
+| Agent activity panel | Pillar 3; makes technical depth visible |
+| Carousel output | Trends are formats; a carousel follows them. Cost is trivial at USD 0.01 per image |
+| 5 step onboarding, cut list, email only reminder | Realistic scope |
+| Pilot from 30 Oct, evidence rules, scripted demo video | Impact and demo are 55% of the score |
+
+### Changed in v2.0
+
+| Area | v1.1 | v2.0 | Why |
+| :--- | :--- | :--- | :--- |
+| Target user | Any small company incl. SaaS and services | Physical product sellers | Pillar 1 needs a product to protect |
+| Positioning | Production arm of Meta AI insights | **Real product, never redrawn**; the Meta AI line stays as a secondary message | A clear, provable difference |
+| North Star | None | Trusted posts per shop per week | One number the whole team steers by |
+| Slide composition | Muse Image composes the slide with the cutout | Muse Image makes the scene only; code places the original product pixels; verified | Muse Image could alter the product |
+| Muse Wonder | Watches trend videos, extracts offerings | **Trend research agent** that browses trend sources | Muse Wonder is a coding, agent and computer use model |
+| Trend video analysis | Muse Wonder | Muse Spark | Multimodal model, cheaper |
+| Carousel length | 3 to 5 slides | 3 slides | Hook, product, call to action |
+| Cost target | USD 0.15 | USD 0.10 | Muse Image costs USD 0.01 per image |
+| Trend scoring | P1 | P0 | Needed to really use Muse Spark Open |
+
+**Cut in v2.0:** Offerings pipeline (F-21 and its FRs), LinkedIn and X export pack (F-23), peer watch (F-25), video Reel (F-20), website fetch.
+
+---
+
+## 2. Introduction
+
+**Purpose.** This SRD tells the build team exactly what Marken must do by the submission deadline. Each requirement has an ID, a priority and a testable acceptance criterion. P0 must be in the demo; P1 starts only after the 2 Nov gate.
+
+**Product in one line.** Marken is the AI marketer that posts for you every morning, using your real product, your brand rules and today's trends. You approve with one tap.
+
+**Secondary message for Meta judges.** Meta AI already tells a business how its Instagram performs. Marken is the production arm that closes the loop: trend → content → approval → publish → measure.
+
+**In scope:** a mobile first, installable web app (PWA): landing page, login, 5 step onboarding, and the main app (Today, Products, Results, Settings). Behind it runs the daily agent loop.
+
+**Out of scope:** SaaS and service businesses · video and Reels · LinkedIn, X, TikTok, Shopee or Facebook publishing · chat app interfaces · payments · paid ads · multiple shops per owner · peer watch · training our own models.
 
 | Term | Meaning |
-| --- | --- |
-| Business owner | The person who runs a small business and uses MARKEN. Called "owner" below |
-| Shop | One business profile: products, tone, style rules, content language, connected Instagram account. One owner can have several |
-| Post | One piece of suggested content: image, two caption options, hashtags, and the reason the trend fits |
-| Trend | A trending format, hashtag or sound collected from a public source |
-| Style rules | Free-text rules the owner sets once (e.g. "never show prices") that every output must follow |
-| Agent loop | The daily server-side pipeline that produces a post per shop |
-| Guided tour | Coach marks that walk the owner through the main app on their first post |
+| :--- | :--- |
+| Owner | The person who runs the business and uses Marken |
+| Shop | One business profile: products, tone, style rules, content language, Instagram account. One per owner |
+| Post | One suggested carousel: 3 slides, two caption options, hashtags, and why the trend fits |
+| Trusted post | A post that was approved, published, and passed the fidelity check. The North Star counts these |
+| Fidelity check | Proof that the product pixels in every slide match the owner's original photo |
+| Scene | The background, props and text Muse Image generates around a reserved product area |
+| Trend | A trending format, topic, hashtag or sound from a public source |
+| Style rules | Free text rules the owner sets once (for example "never show prices") |
+| Activity panel | A live view of each loop step for a post: model, status, latency, cost |
 
-### 1.5 References
+---
 
-- MARKEN PRD v1.0, 20 Oct 2026 (original PDF, written under the old name TrenToko; superseded by this SRD and no longer in the repo)
-- Meta Model API: Muse Spark, Muse Image, SAM 3.1; Llama open weights
-- Instagram Graph API, content publishing and insights
+## 3. Users and user stories
 
-## 2. Overall description
+| Persona | Context | What they need |
+| :--- | :--- | :--- |
+| Food or snack seller (primary, demo hero) | Home business; sells on Instagram and a marketplace; runs everything from a phone | A good post every day without learning new tools |
+| Fashion, craft or beauty seller | Visual products; sells through Instagram | Posts that show the product exactly as it is |
 
-### 2.1 Product perspective
-
-MARKEN is an agent, not a chat window. It runs a seven-step loop every day for each shop, and the owner joins only at the approval step.
-
-| Step | What happens | Model |
-| --- | --- | --- |
-| 1. Learn the shop | Owner uploads product photos or a short video and answers a few questions. The agent builds a shop profile: products, prices, tone, style rules | Muse Spark |
-| 2. Find trends | Collect trending formats, hashtags and sounds from public sources; score them cheaply; analyse the best ones once and cache the analysis for every shop | Muse Spark + Llama |
-| 3. Plan content | Match trends to products. Write script, shots, caption and hashtags in the shop's content language, following its style rules | Muse Spark |
-| 4. Make visuals | Cut the product out of the owner's photo and place it on a trend-matched background with promo text | SAM 3.1 + Muse Image |
-| 5. Owner approves | Post appears on the Today screen. Owner taps Approve, Edit or Skip | None |
-| 6. Publish | Post goes live on the owner's Instagram | None |
-| 7. Learn | Record views, likes, shares and orders; summarise weekly; adjust future plans | Muse Spark |
-
-### 2.2 User personas
-
-| Persona | Context | What they need from MARKEN |
-| --- | --- | --- |
-| Food or snack business owner (primary) | Home business; sells on Instagram and a marketplace; runs everything from a phone | A good post every day without learning new tools |
-| Fashion or craft business owner (secondary) | Visual products; sells through Instagram and social commerce | Clean product photos and short trend videos |
-
-Design implication: most owners use MARKEN in a phone browser. The app must be mobile-first, fast on a mid-range Android phone, and installable to the home screen.
-
-### 2.3 User stories
+Design implication: owners use Marken in a phone browser. Mobile first, fast on a mid range Android phone, installable to the home screen.
 
 | ID | As a... | I want to... | So that... |
-| --- | --- | --- | --- |
-| US-01 | owner | set up my shop by uploading photos instead of filling long forms | I can start in minutes |
-| US-02 | owner | get one ready post every morning without asking | I never have to think about what to post |
-| US-03 | owner | see why a trend fits my product | I trust the suggestion |
-| US-04 | owner | approve a post with one tap | posting takes seconds, not an hour |
-| US-05 | owner | tell the agent what to change in my own words | I don't need design skills |
-| US-06 | owner | get clean studio photos of my products | my shop looks professional |
-| US-07 | owner | set rules once (tone, slang, no prices) | every post sounds like me |
-| US-08 | owner | see which posts brought orders | I know what to do more of |
-| US-10 | new visitor | understand what MARKEN does before signing up | I know it is worth my time |
-| US-11 | new owner | be walked through setup and the app step by step | I get my first post without getting lost |
+| :--- | :--- | :--- | :--- |
+| US-01 | seller | set up my shop by uploading photos | I can start in minutes |
+| US-02 | seller | get one ready post every morning without asking | I never have to think about what to post |
+| US-03 | seller | see why a trend fits my product | I trust the suggestion |
+| US-04 | seller | approve a post with one tap | posting takes seconds, not an hour |
+| US-05 | seller | tell the agent what to change in my own words | I don't need design skills |
+| US-06 | seller | see my real product in every post | my customers get what they see |
+| US-07 | seller | set rules once (tone, slang, no prices) | every post sounds like me |
+| US-10 | new visitor | understand Marken before signing up | I know it is worth my time |
+| US-11 | new seller | be walked through setup step by step | I get my first post without getting lost |
+| US-14 | seller | see what the agent did and what it cost | I trust it to run every day |
+| US-08 (P1) | seller | see which posts brought orders | I know what to do more of |
 
-US-09 (mentor view) is removed with the mentor dashboard. US-10 and US-11 are new for the onboarding flow.
+---
 
-### 2.4 Assumptions and constraints
+## 4. The agent loop and model routing
 
-- Build window: 26 Oct to 4 Nov 2026; submission by 9:00 PM ET on 4 Nov. As of 28 Oct the repo holds only a README, so the build starts from zero.
-- Models: Meta Model API (Muse Spark, Muse Image, SAM 3.1) for all AI steps; Llama on Baseten or Modal partner credits for cheap high-volume tasks and as a text fallback.
-- Publishing needs an Instagram Business or Creator account. Graph API app review may be slow, so the demo uses an account the team owns.
-- No official trend API exists for TikTok or Instagram. Trends come from TikTok Creative Center, Google Trends and Muse Spark web search.
-- Target device: mid-range Android phone on 4G; the app must also work on desktop.
-- Nothing is ever published without the owner's explicit Approve.
+Marken is an agent, not a chat window. It runs this loop every day for each shop; the owner joins only at step 5.
 
-## 3. Feature scope
+| Step | What happens | Model |
+| :--- | :--- | :--- |
+| 1. Learn the shop | Owner uploads 3 to 10 product photos; products, prices and attributes are extracted | Muse Spark |
+| 2a. Research trends **CHG** | An agent browses TikTok Creative Center and Google Trends and collects candidates | Muse Wonder (fallback: Muse Spark web search) |
+| 2b. Score trends **CHG** | Each candidate scored 0 to 100 for fit and momentum | Muse Spark Open |
+| 2c. Analyse trends **CHG** | Top trends analysed once (video and audio where they exist); cached 7 days for all shops | Muse Spark |
+| 3. Plan content | Match one trend to one product; write 3 slide script, captions, hashtags, scene briefs | Muse Spark |
+| 4. Make visuals **CHG** | Cut out the product; generate each scene with a reserved product area; place the original product pixels in code; verify | SAM 3.1 + Muse Image + code + Muse Spark |
+| 5. Owner approves | Carousel appears on Today. Approve, Edit or Skip | None |
+| 6. Publish | Carousel goes live on Instagram | None |
+| 7. Learn (P1) | Record 24 hour metrics and owner entered orders | Muse Spark |
 
-The demo ships 15 P0 features, two of them new (Landing page, Guided onboarding). Four P1 features follow if time allows; every P2 feature is cut.
+> **Pillar 1 in one line:** Muse Image never draws the product. It draws the world around it. The product pixels come from the owner's photo and are checked before anyone sees the post.
 
-| ID | Feature | Description | Model | Priority |
-| --- | --- | --- | --- | --- |
-| F-01 | Landing page (new) | Public page that explains MARKEN and leads to sign-up | None | P0 |
-| F-02 | Account and auth | Google or email sign-in; one owner can own several shops | None | P0 |
-| F-03 | Guided onboarding tutorial (new) | Step-by-step shop setup, then a guided tour of the main app on the first real post | Muse Spark | P0 |
-| F-04 | Product extraction | Products, prices and attributes extracted from uploaded photos or video | Muse Spark | P0 |
-| F-05 | Style rules | Tone and rules saved per shop and applied to every output | Muse Spark | P0 |
-| F-06 | Trend discovery | Daily trend collection from public sources and web search | Muse Spark | P0 |
-| F-07 | Trend analysis cache | Hook, structure and length of top trend videos, shared across shops | Muse Spark | P0 |
-| F-08 | Daily post plan | Script, caption and hashtags matched to a product and a trend | Muse Spark | P0 |
-| F-09 | Product studio | Background removal and on-brand product photos | SAM 3.1 + Muse Image | P0 |
-| F-10 | Today screen and approval | Preview, Approve, Edit, Skip; nothing publishes without Approve | None | P0 |
-| F-11 | Edit by feedback | Regenerate caption or image from free-text feedback | Muse Spark, Muse Image | P0 |
-| F-12 | Instagram publishing | Publish approved posts through the Instagram Graph API | None | P0 |
-| F-13 | Push and email reminders | Morning notification that today's post is ready | None | P0 |
-| F-14 | Cost log | Every model call logged with step, model, tokens and cost | None | P0 |
-| F-15 | Settings | Edit shop profile, style rules, notification time, Instagram connection; replay the tour | None | P0 |
-| F-16 | Trend scoring | Cheap filter before any video analysis | Llama | P1 |
-| F-17 | Results tracking | Views, likes, shares, owner-entered orders | None | P1 |
-| F-18 | Weekly learning | Summary of what worked, saved to shop memory | Muse Spark | P1 |
-| F-19 | UGC-style video scripts | Customer-review style scripts in the shop's language, casual tone | Muse Spark | P1 |
-| F-20 | Video auto-cut | Cut the owner's rough clips into a vertical short following the script | SAM 3.1 + Muse Spark | P1 |
+Every model call goes through one gateway that validates JSON, logs cost and latency, and falls back to Muse Spark Open for text when the Meta Model API fails.
 
-Cut from the PRD (P2): Mentor dashboard, TikTok and Shopee publishing, Influencer matching.
+---
 
-F-15 Settings is not a separate PRD feature. It is listed because the onboarding tour must be replayable and style rules must be editable after setup.
+## 5. Feature scope
 
-## 4. User flow
+18 P0 features ship in the demo. Three P1 features start only after the 2 Nov gate.
 
-A new owner goes Landing → Login → guided onboarding → main app. A returning owner skips straight to Today; an unfinished setup resumes at its saved step.
+| ID | Feature | Model | Priority |
+| :--- | :--- | :--- | :--- |
+| F-01 | Landing page | None | P0 |
+| F-02 | Account and auth (Google, email magic link; one shop per owner) | None | P0 |
+| F-03 **CHG** | 5 step guided onboarding + tour on the first real post | Muse Spark | P0 |
+| F-04 | Product extraction from photos | Muse Spark | P0 |
+| F-05 | Style rules | Muse Spark | P0 |
+| F-06 **CHG** | Trend research agent | Muse Wonder | P0 (fallback allowed) |
+| F-16 **CHG** | Trend scoring | Muse Spark Open | P0 |
+| F-07 **CHG** | Trend analysis, cached 7 days | Muse Spark | P0 |
+| F-08 | Daily post plan (3 slides, captions, hashtags, scene briefs) | Muse Spark | P0 |
+| F-09 **CHG** | Product studio: cutout + scene + composite | SAM 3.1 + Muse Image | P0 |
+| F-26 **NEW** | Fidelity check and "Real product" badge with before and after view | Code + Muse Spark | P0 |
+| F-22 **CHG** | 3 slide carousel output at 1080×1350 | Muse Image | P0 |
+| F-10 | Today screen and approval | None | P0 |
+| F-11 | Edit caption by feedback | Muse Spark | P0 |
+| F-12 | Instagram carousel publishing (fallback: download + copy caption) | None | P0 |
+| F-13 | Email reminder | None | P0 |
+| F-24 | Agent activity panel (replaces cost log) | None | P0 |
+| F-15 | Settings | None | P0 |
+| F-17 | Results: 24 hour metrics, owner entered orders | None | P1 |
+| F-18 | Weekly learning into shop memory | Muse Spark | P1 |
+| F-11b | Regenerate a slide image from feedback | Muse Image | P1 |
 
-![User flow: landing to main app, 8 onboarding steps](images/user-flow.png)
+If time runs short before the gate, cut in this order: F-13 email, F-15 settings (keep replay tour), F-11 edit. **Never cut F-26.**
 
-Step 8 generates the owner's first real post and runs the guided tour on it, so the tutorial ends exactly where the daily habit starts. Requirements for each step are in 5.3.
+---
 
-## 5. Functional requirements
+## 6. User flow
 
-Every requirement below is P0 unless marked P1. "Shall" means the demo fails review without it.
+A new owner goes Landing → Login → 5 step onboarding → Today. A returning owner goes straight to Today; an unfinished setup resumes at its saved step.
 
-### 5.1 Landing page (F-01)
+1. **Shop basics (required):** shop name, category, country, content language, time zone.
+2. **Upload products (required):** 3 to 10 photos. SAM 3.1 cuts out each product; Muse Spark extracts name, price and attributes.
+3. **Review (required):** edit, delete or add products. Owner confirms each cutout looks right.
+4. **Voice and Instagram (optional):** tone, rules, live sample caption; connect Instagram or skip.
+5. **First post + tour (optional tour):** the first real carousel is generated; coach marks walk through Today, the "Real product" badge and the activity panel.
 
-| ID | Requirement | Acceptance criteria |
-| --- | --- | --- |
-| FR-LP-01 | The system shall serve a public landing page at `/` with: headline value proposition, a three-step "how it works" (Learn your shop → Find trends → Approve and post), a sample post preview, and a primary "Get started" button | Logged-out visitor sees all four elements on a 360 px wide screen without horizontal scroll |
-| FR-LP-02 | "Get started" and "Log in" shall open `/login` | One tap from landing to login |
-| FR-LP-03 | A logged-in owner who opens `/` shall be redirected: onboarding incomplete → their saved onboarding step; complete → `/today` | Redirect happens server-side, no landing flash |
-| FR-LP-04 | The landing page shall be static and cacheable | LCP under 2.5 s on a mid-range Android phone over 4G |
+While the first post generates, the tour runs on a sample post and swaps to the real one when ready. Target: sign up to first post in under 5 minutes.
 
-### 5.2 Account and auth (F-02)
+---
 
-| ID | Requirement | Acceptance criteria |
-| --- | --- | --- |
-| FR-AU-01 | Owners shall sign in with Google OAuth or an email magic link | Both paths create the same user record; no password is stored |
-| FR-AU-02 | First sign-in shall create the user and route to `/onboarding` | New user lands on onboarding step 1 |
-| FR-AU-03 | Sessions shall persist for 30 days on the device and support log-out | Reopening the installed PWA within 30 days skips login |
-| FR-AU-04 | All app routes shall require auth; data access shall be scoped to shops the owner owns | Requesting another owner's shop returns 403 / no rows |
-| FR-AU-05 | One owner shall be able to own several shops and switch between them | Shop switcher in Settings; "Add shop" re-runs onboarding steps 2–5 for the new shop |
+## 7. Functional requirements
 
-### 5.3 Guided onboarding tutorial (F-03)
+Every requirement is P0 unless marked P1. "Shall" means the demo fails review without it.
 
-The flow is eight steps (section 4). Steps 2–4 are required; the rest can be skipped.
+### 7.1 Landing, auth, onboarding (F-01, F-02, F-03)
 
-| ID | Requirement | Acceptance criteria |
-| --- | --- | --- |
-| FR-OB-01 | Step 1 Welcome: three swipeable cards explaining the daily loop and that nothing posts without approval | "Skip intro" jumps to step 2 |
-| FR-OB-02 | Step 2 Shop basics: shop name, business category, country, content language, time zone (auto-detected, editable) | Cannot continue until name, category and language are set |
-| FR-OB-03 | Step 3 Upload: 3–10 photos (JPG, PNG, HEIC, up to 10 MB each) or one video (up to 60 s, 100 MB). Show per-file progress | Invalid type or size is rejected with a message before upload |
-| FR-OB-04 | Step 4 Review products: show the products Muse Spark extracted (F-04); owner can edit, delete or add products | At least one product must remain to continue |
-| FR-OB-05 | Step 5 Voice and rules: pick tone (casual, friendly, formal) and write rules; show a live sample caption that uses them | Sample caption refreshes within 10 s of a change |
-| FR-OB-06 | Step 6 Connect Instagram: OAuth to an Instagram Business or Creator account; "Skip for now" allowed | Skipped owners can still approve; Approve then offers download image + copy caption |
-| FR-OB-07 | Step 7 Notifications: ask for web push permission, set daily time (default 08:00 local), prompt to install the PWA | Denying push falls back to email only |
-| FR-OB-08 | Step 8 First post + guided tour: generate the first real post, then coach marks on the Today screen (preview, why this trend, caption choice, Approve, Edit, Skip) and on the bottom nav (Products, Results, Settings) | Tour can be skipped at any mark; ends on Today with the post ready |
-| FR-OB-09 | While the first post generates, the tour shall run on a sample post and swap to the real one when ready | Owner never waits on a blank screen |
-| FR-OB-10 | A progress indicator ("Step 3 of 8") and Back shall be on every step | Back keeps entered data |
-| FR-OB-11 | Progress shall be saved server-side after each step | Closing the app at step 5 and reopening resumes at step 5 |
-| FR-OB-12 | Each step's start and finish time shall be logged | Time from sign-up to first post is measurable per owner |
-| FR-OB-13 | The tour shall be replayable from Settings | "Replay tour" restarts coach marks without changing data |
+| ID | Requirement | Acceptance |
+| :--- | :--- | :--- |
+| FR-LP-01 **CHG** | Landing at `/` shows headline ("Your real product, never redrawn"), 3 step how it works, a sample before and after carousel, and Get started | All visible at 360 px without horizontal scroll |
+| FR-LP-03 | Logged in owner on `/` is redirected to the saved onboarding step or `/today` | Server side, no landing flash |
+| FR-AU-01 | Sign in with Google OAuth or email magic link | Both create the same user; no password stored |
+| FR-AU-04 | All routes need auth; data scoped to the owner's shop | Another owner's shop returns 403 or no rows |
+| FR-OB-02 to 05, 08 **CHG** | The 5 steps in section 6 | Steps 1 to 3 required |
+| FR-OB-09 | Tour runs on a sample post while the real one generates | Owner never waits on a blank screen |
+| FR-OB-11, 12 | Progress saved server side per step; each step's start and finish logged | Reopen resumes; time to first post measurable |
 
-Acceptance for the whole flow: median time from sign-up to first suggested post under 5 minutes (PRD goal).
+### 7.2 Products and style rules (F-04, F-05)
 
-### 5.4 Shop profile: product extraction and style rules (F-04, F-05)
+| ID | Requirement | Acceptance |
+| :--- | :--- | :--- |
+| FR-SP-01 | Muse Spark extracts products as JSON: name, category, price, currency, attributes, description, source photo | 10 photos under 30 s; schema valid |
+| FR-SP-02 | Price is null when not visible | No invented prices |
+| FR-SP-09 **NEW** | SAM 3.1 cuts out each product at upload; owner confirms the cutout in step 3 | Confirmed cutout stored as transparent PNG |
+| FR-SP-04, 05 | One tone + up to 10 rules (200 chars each), injected into every prompt | Rules editable in Settings |
+| FR-SP-06 | Captions and slide text pass a rule check; fail → regenerate once, then flag | "Never show prices" shop never sees a price |
 
-| ID | Requirement | Acceptance criteria |
-| --- | --- | --- |
-| FR-SP-01 | Muse Spark shall extract products from uploads as structured JSON: name, category, price, currency, attributes, short description, source media IDs | 10 photos processed in under 30 s; output validates against the schema |
-| FR-SP-02 | Price shall be null when not visible; the owner is asked to fill it | No invented prices |
-| FR-SP-03 | Owners shall add, edit and hide products in the Products screen | Hidden products are never picked for a post |
-| FR-SP-04 | Style rules: one tone value plus up to 10 free-text rules of up to 200 characters, stored per shop | Rules editable in Settings |
-| FR-SP-05 | Tone, rules and content language shall be injected into every generation prompt | Any caption, script or image text follows them |
-| FR-SP-06 | Every generated caption shall pass a rule check before it is shown; a failed check regenerates once, then flags the post | A "never show prices" shop never sees a price in a caption |
+### 7.3 Trend engine (F-06, F-16, F-07)
 
-### 5.5 Trend engine (F-06, F-07, F-16)
+| ID | Requirement | Acceptance |
+| :--- | :--- | :--- |
+| FR-TR-01 **CHG** | Daily, Muse Wonder browses TikTok Creative Center and Google Trends per country and category with an active shop; stores source, type, title, URL, collected at | Run log shows pages visited; fallback to Muse Spark web search is logged |
+| FR-TR-05 **CHG** | Muse Spark Open scores each candidate 0 to 100 for fit and momentum | Only candidates above the threshold reach analysis |
+| FR-TR-03 **CHG** | Muse Spark analyses each top trend once: hook, structure, visual style, why it works, as a scene brief | JSON stored; video and text sources marked |
+| FR-TR-04 | Analyses cached 7 days and reused by every shop | Second shop triggers zero new analysis calls |
+| FR-TR-06 | Each analysis keeps its source link, shown on Today as "Trend source" | Every suggestion traces to a public source |
 
-| ID | Requirement | Acceptance criteria |
-| --- | --- | --- |
-| FR-TR-01 | A daily job shall collect trend candidates (format, hashtag, sound) from TikTok Creative Center, Google Trends and Muse Spark web search, per country that has an active shop | Each run stores source, type, country, title, URL, collected-at |
-| FR-TR-02 | The top candidates per country (10 by default) shall go to analysis; without F-16 they are ranked by source rank | Analysis count per run is capped |
-| FR-TR-03 | Muse Spark shall analyse each selected trend once: hook, structure, length, why it works | Analysis stored as structured JSON |
-| FR-TR-04 | Trend analyses shall be cached for 7 days and reused by every shop | A second shop using the same trend triggers zero new analysis calls (checked in the cost log) |
-| FR-TR-05 | P1 (F-16): Llama shall score each candidate 0–100 for fit and momentum before analysis | Only candidates above the threshold reach Muse Spark |
+### 7.4 Content and fidelity (F-08, F-09, F-26, F-22)
 
-### 5.6 Content generation (F-08, F-09)
+| ID | Requirement | Acceptance |
+| :--- | :--- | :--- |
+| FR-CG-01 **CHG** | Plan JSON: product ID, trend ID, fit reason, 3 slide script (hook, product, call to action), 2 captions, 5 to 15 hashtags, scene brief per slide | Schema valid; shop's content language |
+| FR-CG-02 | No same product two days running; no skipped trend | Checked against the last 7 posts |
+| FR-CG-04 **CHG** | Muse Image generates each scene at 1080×1350 with a **reserved empty product area** and slide text; it never receives an instruction to draw the product | Scene stored separately from the final slide |
+| FR-CG-09 **NEW** | Code composites the confirmed cutout into the reserved area (scale, shadow); the product pixels are never passed back through a generative model | Deterministic, same input gives same output |
+| FR-FD-01 **NEW** | Fidelity check: product region of each slide compared with the cutout; pass only if it matches within a set tolerance | Failed slide is rebuilt once, then the post is flagged |
+| FR-FD-02 **NEW** | Muse Spark checks slide text is spelled correctly and follows style rules | Fail → scene regenerated once |
+| FR-FD-03 **NEW** | Today shows a "Real product" badge on passed posts and a before and after toggle (owner photo vs slide) | Badge only when FR-FD-01 passes |
+| FR-CG-06 | Plan and all 3 slides finish in under 3 minutes per shop | Measured in the activity log |
 
-| ID | Requirement | Acceptance criteria |
-| --- | --- | --- |
-| FR-CG-01 | A daily plan job shall pick one visible product and one cached trend per shop and produce JSON: product ID, trend ID, fit reason, script and shots, two caption options, 5–15 hashtags, image brief | Output validates against the schema; text is in the shop's content language |
-| FR-CG-02 | The plan shall avoid the same product two days in a row and any trend the owner skipped | Checked against the last 7 posts |
-| FR-CG-03 | Product studio: SAM 3.1 shall cut the product out of the owner's photo using a text prompt built from the product name | Cutout PNG with transparent background |
-| FR-CG-04 | Muse Image shall place the cutout on a trend-matched background with readable promo text, at 1080×1350 (4:5) | Promo text is spelled correctly and follows style rules |
-| FR-CG-05 | Each product shall have a studio photo on the Products screen, regenerable on demand | Owner can regenerate from the product card |
-| FR-CG-06 | The post shall be ready before the owner's notification time | Plan + visuals finish in under 3 minutes per shop |
+### 7.5 Today, edit, publish, reminder, activity (F-10, F-11, F-12, F-13, F-24)
 
-### 5.7 Today screen and approval (F-10)
+| ID | Requirement | Acceptance |
+| :--- | :--- | :--- |
+| FR-TD-01 | Today: swipeable carousel, 2 captions, hashtags, why this trend fits, trend source, Approve, Edit, Skip | One scroll at most on 360 px |
+| FR-TD-02 | Nothing publishes without Approve | Only status approved moves to publishing |
+| FR-TD-03, 04 | Skip reason chips; clear states (generating, ready, publishing, published, failed, skipped) | Each state has its own UI |
+| FR-ED-01, 02 | Regenerate caption from feedback; manual caption edit | Caption under 10 s; max 5 per post per day |
+| FR-PB-01, 02, 03 | Publish carousel via Instagram Graph API as a background job, 3 retries; store media ID and permalink | Live post linked from Today |
+| FR-PB-04 **CHG** | Not connected or review pending → download slides + copy caption | Approve flow always completes |
+| FR-PB-05 | Instagram tokens encrypted and refreshed | No publish fails on an expired token |
+| FR-NT-01, 02 | Email "Your post for today is ready" at the owner's time; link opens `/today` | Sent in the owner's time zone |
+| FR-CL-01 | Every model call logged: step, model, tokens, images, latency, cost, cache hit, fallback | No call bypasses the gateway |
+| FR-AP-01 | Activity panel lists each loop step live with model, status, latency, cost, plus the fidelity result | Matches the log rows |
+| FR-CL-02 | Cost per post shown, with the share served from cache | Equals the sum of its logged calls |
 
-| ID | Requirement | Acceptance criteria |
-| --- | --- | --- |
-| FR-TD-01 | Today shall show: post image, two caption options to choose from, hashtags, "Why this trend fits", a link to the trend, and Approve, Edit, Skip | All visible on a 360 px screen with one scroll at most |
-| FR-TD-02 | Nothing shall publish without an explicit Approve tap | No code path publishes a post whose status is not approved |
-| FR-TD-03 | Skip shall offer optional reason chips (wrong product, trend doesn't fit, not today) | Reason stored on the post |
-| FR-TD-04 | Today shall show clear states: generating (with progress), ready, publishing, published (with Instagram link), failed (with Retry), skipped | Each state has its own UI |
-| FR-TD-05 | Today shall load in under 2 s on a mid-range Android phone | Measured on the pilot device |
+### 7.6 P1 (after the gate)
 
-### 5.8 Edit by feedback (F-11)
+`FR-RS-01` results (24 hour reach, likes, shares, saves, owner entered orders) · `FR-WL-01` weekly learning · `FR-ED-05` regenerate a slide image from feedback.
 
-| ID | Requirement | Acceptance criteria |
-| --- | --- | --- |
-| FR-ED-01 | Owner shall type feedback in their own words ("make it funnier", "change background") and choose to regenerate the caption only or the image only | Only the chosen part changes |
-| FR-ED-02 | Owner shall edit the caption by hand | Manual edits are kept on approve |
-| FR-ED-03 | Each revision shall be saved; the owner can go back to an earlier version | Up to 5 regenerations per post per day, to cap cost |
-| FR-ED-04 | Regeneration time: caption under 10 s, image under 30 s | Measured in the cost log latency field |
+---
 
-### 5.9 Instagram publishing (F-12)
+## 8. Non functional requirements
 
-| ID | Requirement | Acceptance criteria |
-| --- | --- | --- |
-| FR-PB-01 | On Approve, the system shall publish the image and chosen caption with hashtags through the Instagram Graph API content publishing flow | Post visible on the connected account |
-| FR-PB-02 | Publishing shall run as a background job with 3 retries and backoff; status moves queued → publishing → published or failed | Failed posts show the error and a Retry button |
-| FR-PB-03 | The Instagram media ID and permalink shall be stored | Today and Results link to the live post |
-| FR-PB-04 | If the account is not connected or app review is pending, the approved post shall be queued and the owner offered download + copy caption | Demo still shows a complete approve flow |
-| FR-PB-05 | Instagram tokens shall be stored encrypted and refreshed before expiry | No publish fails for an expired token |
+| ID | Category | Target |
+| :--- | :--- | :--- |
+| NFR-01 | Today load on a mid range Android phone over 4G | Under 2 s |
+| NFR-04 | Sign up to first suggested post | Under 5 min median |
+| NFR-05 | Owner time to review and approve | Under 2 min |
+| NFR-06 **CHG** | Model cost per finished carousel (one time extraction and cached trends reported separately) | Under USD 0.10 |
+| NFR-07 | Posts approved without edits, measured in the pilot | 50% or more, reported honestly |
+| NFR-08 | PWA | Installable on Android Chrome and iOS Safari |
+| NFR-09 | Responsive | 360 px to 1440 px |
+| NFR-10 | Accessibility | AA contrast, 44 px tap targets, alt text on every slide |
+| NFR-11 | Language | UI in English; content in English or Bahasa Indonesia |
+| NFR-12 | Security | HTTPS; secrets server side; tokens encrypted; row level security per shop |
+| NFR-13 | Uploads | Type and size checked; media through signed URLs |
+| NFR-14 | Privacy | Owner can delete the shop and all media; only public trend data collected |
+| NFR-15 | Reliability | Jobs idempotent and retried; one shop's failure never blocks another |
+| NFR-16 **CHG** | AI safety | Nothing posts without Approve; schema validated output; product never redrawn |
+| NFR-17 | Observability | Every failed post traces to its failing step in the activity panel |
+| NFR-18 | Resilience | Text calls fall back to Muse Spark Open; fallback shown in the panel |
+| NFR-19 | Licence | "Built with Muse Spark Open" in the footer and README |
+| NFR-20 | Transparency | Slides labelled as AI assisted where Instagram requires it |
 
-### 5.10 Push and email reminders (F-13)
+---
 
-| ID | Requirement | Acceptance criteria |
-| --- | --- | --- |
-| FR-NT-01 | When a post is ready, the system shall send web push and email: "Your post for today is ready" | Sent at the owner's chosen time, in their time zone |
-| FR-NT-02 | Tapping the notification shall open `/today` directly | Deep link works in the installed PWA |
-| FR-NT-03 | Owners shall choose channels (push, email) and time in Settings | Changes apply from the next day |
+## 9. Architecture, data model and routes
 
-### 5.11 Cost log (F-14)
+One Next.js app serves the PWA and its API; Inngest runs the daily loop; every model call passes through one gateway, so the activity log and cost target cannot be bypassed.
 
-| ID | Requirement | Acceptance criteria |
-| --- | --- | --- |
-| FR-CL-01 | Every model call shall be logged: shop, post, step, model, input tokens, output tokens, images, latency, cost in USD, time | No model call bypasses the logging wrapper |
-| FR-CL-02 | Cost per post shall be computed from the log and shown on the post detail | Matches the sum of its logged calls |
+| Layer | Choice |
+| :--- | :--- |
+| Web app | Next.js (App Router), TypeScript, Tailwind, PWA manifest, on Vercel |
+| Auth, DB, storage | Supabase: Auth (Google, magic link), Postgres with RLS, Storage with signed URLs |
+| Jobs | Inngest: cron (`trends.daily`, `posts.daily`) and on demand jobs, with retries; step events feed the activity panel |
+| Models | Meta Model API: Muse Spark, Muse Wonder, Muse Image, SAM 3.1. Muse Spark Open on Baseten or Modal |
+| Compositing and fidelity | Server side image library (for example `sharp`) |
+| Publishing, email | Instagram Graph API (carousel); Resend |
 
-### 5.12 P1 features (F-17 to F-20)
-
-| ID | Requirement | Acceptance criteria |
-| --- | --- | --- |
-| FR-RS-01 | Results (F-17): pull views, likes, shares and saves from Instagram insights 24 h and 7 days after publishing; owner enters orders per post | Results screen lists posts with metrics and orders |
-| FR-WL-01 | Weekly learning (F-18): Muse Spark writes a plain-language weekly summary of what worked and saves it to shop memory | Next week's plans read shop memory |
-| FR-UG-01 | UGC video scripts (F-19): customer-review style scripts in the shop's language, casual tone | Script follows style rules |
-| FR-VC-01 | Video auto-cut (F-20): SAM 3.1 tracks the product across the owner's clips; output a vertical 9:16 short of 30 s or less that follows the script | Downloadable MP4 |
-
-## 6. Non-functional requirements
-
-The hard targets are the PRD's: first post in under 5 minutes, Today in under 2 seconds, and under USD 0.10 per finished post.
-
-| ID | Category | Requirement | Target |
-| --- | --- | --- | --- |
-| NFR-01 | Performance | Today screen load on a mid-range Android phone over 4G | Under 2 s |
-| NFR-02 | Performance | Landing page Largest Contentful Paint | Under 2.5 s |
-| NFR-03 | Performance | Initial JavaScript per route | Under 200 KB gzipped |
-| NFR-04 | Onboarding speed | Sign-up to first suggested post | Under 5 min median |
-| NFR-05 | Owner time | Review and approve one post | Under 2 min |
-| NFR-06 | Cost | Model cost per finished post, from the cost log | Under USD 0.10 |
-| NFR-07 | Content quality | Posts approved without edits | 50% or more |
-| NFR-08 | PWA | Installable manifest; service worker caches the app shell and the latest Today post | Installable on Android Chrome and iOS Safari; last post readable offline |
-| NFR-09 | Responsive | Mobile-first layout | Works from 360 px to 1440 px wide |
-| NFR-10 | Accessibility | Contrast, tap targets, alt text | WCAG 2.1 AA contrast; tap targets 44 px or larger; generated images get alt text from the caption |
-| NFR-11 | Internationalisation | All UI strings externalised; currency, dates and times follow the shop's locale | UI in English at demo; content in English or Bahasa Indonesia |
-| NFR-12 | Security | HTTPS only; secrets server-side only; Instagram tokens encrypted at rest; row-level access per shop | No API key or token reaches the browser |
-| NFR-13 | Security | Uploads validated by type and size; media served through signed URLs | Unsigned media URLs return 403 |
-| NFR-14 | Privacy | Owner can delete a shop and all its media; only public trend data is collected; Meta Platform Terms followed | Delete removes rows and stored files |
-| NFR-15 | Reliability | Background jobs are idempotent and retried; one shop's failure never blocks another | Re-running the daily job creates no duplicate posts |
-| NFR-16 | AI safety | Nothing posts without Approve; captions pass the style-rule check; model output is schema-validated before use | Invalid JSON is retried once, then the step fails visibly |
-| NFR-17 | Observability | Structured logs per job and model call; job status visible to the team | Every failed post can be traced to its failing step |
-| NFR-18 | Resilience | If Meta Model API text calls fail or are rate-limited, text tasks fall back to Llama | Fallback logged in the cost log |
-
-On iOS, web push works only for a PWA installed to the home screen (iOS 16.4 and later), so onboarding step 7 shall prompt iOS owners to install first.
-
-## 7. System architecture
-
-One Next.js app serves the PWA and its API; a job runner executes the daily agent loop; every model call goes through one logging wrapper.
-
-![Architecture: app, job runner, gateway, data, external services](images/architecture.png)
-
-Because the gateway is the only path to a model, the cost log (FR-CL-01) and the per-post cost target (NFR-06) cannot be bypassed.
-
-### 7.1 Tech stack
-
-Next.js and the PWA come from the PRD. The rest is a proposal picked for build speed; confirm it on day 3.
-
-| Layer | Choice | Notes |
-| --- | --- | --- |
-| Web app | Next.js (App Router), TypeScript, Tailwind | PWA manifest + service worker; server components for fast Today load |
-| Auth | Supabase Auth (Google OAuth, email magic link) | Proposed |
-| Database | Supabase Postgres with row-level security | Proposed; RLS enforces per-shop access (NFR-12) |
-| File storage | Supabase Storage, signed URLs | Proposed; product uploads, cutouts, post images |
-| Jobs | Scheduled cron + a durable job runner with retries (e.g. Inngest) | Proposed; image and video steps outlast a normal request |
-| AI | Meta Model API: Muse Spark, Muse Image, SAM 3.1 | From PRD |
-| Cheap model | Llama on Baseten or Modal | From PRD; scoring and text fallback |
-| Publishing | Instagram Graph API | From PRD |
-| Notifications | Web Push (VAPID) + transactional email (e.g. Resend) | Proposed |
-| Hosting | Vercel | Proposed |
-
-### 7.2 Data model
+### Data model (changes from v1.1 in bold)
 
 | Table | Key fields |
-| --- | --- |
-| users | id, email, name, ui_locale, created_at |
-| shops | id, owner_id, name, category, country, content_language, time_zone, tone, notify_time, notify_channels, ig_account_id, ig_token (encrypted), onboarding_step, onboarding_completed_at, tour_completed_at |
-| onboarding_events | shop_id, step, started_at, finished_at, skipped |
-| style_rules | id, shop_id, text, position |
-| media_uploads | id, shop_id, kind (photo, video), storage_path, bytes, created_at |
-| products | id, shop_id, name, category, price, currency, attributes (json), description, hidden, studio_image_path, source_media_ids |
-| trends | id, source, type (format, hashtag, sound), country, title, url, source_rank, score, collected_at |
-| trend_analyses | trend_id, hook, structure, length_s, why_it_works, model, created_at, expires_at |
-| posts | id, shop_id, product_id, trend_id, post_date, status, fit_reason, script (json), caption_options (json), chosen_caption, hashtags, image_path, skip_reason, ig_media_id, permalink, published_at |
-| post_revisions | id, post_id, target (caption, image), feedback, output, created_at |
-| model_calls | id, shop_id, post_id, step, model, input_tokens, output_tokens, images, latency_ms, cost_usd, created_at |
-| push_subscriptions | id, user_id, endpoint, keys, created_at |
-| post_metrics (P1) | post_id, captured_at, views, likes, shares, saves, orders |
-| shop_memory (P1) | shop_id, week_start, summary, learnings (json) |
+| :--- | :--- |
+| `users` | id, email, name, ui_locale |
+| `shops` | id, owner_id (unique), name, category, country, content_language, time_zone, tone, notify_time, ig_account_id, ig_token (encrypted), onboarding_step, onboarding_completed_at, tour_completed_at |
+| `onboarding_events` | shop_id, step, started_at, finished_at, skipped |
+| `style_rules` | id, shop_id, text, position |
+| `media_uploads` | id, shop_id, storage_path, bytes |
+| `products` | id, shop_id, name, category, price, currency, attributes, description, hidden, **cutout_path**, **cutout_confirmed** |
+| `trends` | id, source, type, country, category, title, url, source_rank, **score**, collected_at |
+| `trend_analyses` | trend_id, hook, structure, **visual_style**, **scene_brief**, why_it_works, from_video, model, expires_at |
+| `posts` | id, shop_id, product_id, trend_id, post_date, status, fit_reason, **slides (json: order, text, alt, scene_path, slide_path, fidelity_score, fidelity_passed)**, caption_options, chosen_caption, hashtags, skip_reason, ig_media_id, permalink, published_at |
+| `post_revisions` | id, post_id, target, feedback, output |
+| `model_calls` | id, shop_id, post_id, step, model, tokens in/out, images, latency_ms, cost_usd, cache_hit, fallback |
 
-Post status values: `generating`, `ready`, `approved`, `publishing`, `published`, `failed`, `skipped`. Only `approved` can move to `publishing` (FR-TD-02).
+**Post status:** `generating → ready → approved → publishing → published` (or `failed`, `skipped`). Only `approved` can move to `publishing`. A **trusted post** = `published` + all slides `fidelity_passed`.
 
-### 7.3 Routes and API
+**Routes:** `/` · `/login` · `/onboarding/[step]` · `/today` · `/posts/[id]/edit` · `/products` · `/results` · `/settings`
 
-| Route | Purpose |
-| --- | --- |
-| `/` | Landing page (F-01) |
-| `/login` | Google and magic-link sign-in (F-02) |
-| `/onboarding/[step]` | Onboarding steps 1–8 (F-03) |
-| `/today` | Today screen (F-10) |
-| `/posts/[id]/edit` | Edit by feedback (F-11) |
-| `/products` | Products and studio photos (F-09) |
-| `/results` | Results (F-17, P1); cost per post (F-14) |
-| `/settings` | Shop, rules, notifications, Instagram, replay tour, shop switcher (F-15) |
-| `POST /api/uploads` | Signed upload URL for product media |
-| `POST /api/shops/:id/extract` | Run product extraction |
-| `PATCH /api/shops/:id/onboarding` | Save onboarding step |
-| `POST /api/shops/:id/posts/generate` | Generate a post now (first post, demo) |
-| `POST /api/posts/:id/approve` | Approve with chosen caption; enqueue publish |
-| `POST /api/posts/:id/skip` | Skip with optional reason |
-| `POST /api/posts/:id/regenerate` | Regenerate caption or image from feedback |
-| `GET /api/auth/instagram/callback` | Instagram OAuth callback |
-| `POST /api/push/subscribe` | Save a web push subscription |
-| Cron `trends.daily` | Collect, rank and analyse trends (F-06, F-07) |
-| Cron `posts.daily` | Plan and render one post per shop, then notify (F-08, F-09, F-13) |
+**API:** `POST /api/uploads` · `POST /api/shops/:id/extract` · `PATCH /api/shops/:id/onboarding` · `POST /api/shops/:id/posts/generate` (Run now) · `POST /api/posts/:id/approve` · `POST /api/posts/:id/skip` · `POST /api/posts/:id/regenerate` · `GET /api/posts/:id/activity` · `GET /api/auth/instagram/callback` · cron `trends.daily` · cron `posts.daily`
 
-## 8. Build plan
+---
 
-The PRD plan assumed the skeleton was done by 27 Oct; the repo is still empty on 28 Oct, so the plan is redrawn over the seven days left, with the landing page and onboarding tutorial added. The full loop must work end to end by the evening of 2 Nov, leaving 3 Nov for the pilot.
+## 10. Build plan
 
-![Build plan, 28 Oct to 4 Nov 2026](images/build-plan.png)
+> **Gate: the full loop works end to end on the evening of 2 Nov.** Any slip before the gate comes out of P1, never out of the pilot or the video.
 
-P1 features (F-16 to F-20) start only after the gate passes; any slip before it comes out of P1, never out of the pilot day.
+| Date | Build | Pilot and evidence |
+| :--- | :--- | :--- |
+| Thu 29 Oct | Skeleton, auth, DB schema, model gateway. **Smoke test the risky calls:** SAM 3.1 cutout, Muse Image scene with reserved area, Muse Wonder browsing, Instagram carousel publish | Recruit 4 sellers (keep 3) |
+| Fri 30 Oct | Landing, login, onboarding steps 1 to 3, product extraction and cutout | Manual pilot starts; baselines recorded (EV-01) |
+| Sat 31 Oct | Trend research, scoring, analysis cache. **Team meeting** | Manual pilot posts |
+| Sun 1 Nov | Daily plan, product studio, compositing, fidelity check | Manual pilot posts |
+| Mon 2 Nov | Today, approve, publish, email, activity panel. **Gate** | Manual pilot posts |
+| Tue 3 Nov | Bug fixes only; P1 if the gate passed | In app pilot; demo footage recorded |
+| Wed 4 Nov | Video, README, public repo check; submit by 9 PM ET | |
 
-## 9. Risks and open questions
+---
+
+## 11. Pilot, evidence and demo video
+
+Impact (30%) and demo (25%) are 55% of the score, so evidence starts on 30 Oct, before the app works.
+
+| Phase | Dates | How | What is recorded |
+| :--- | :--- | :--- | :--- |
+| Manual pilot | 30 Oct to 2 Nov | 3 real sellers (recruit 4). Team runs the pipeline by hand, sends the carousel by chat, owner approves and posts | Approve, edit or skip; owner minutes; fidelity result; 24 hour reach and likes; reported orders |
+| Dogfood | 30 Oct to 4 Nov | A team run demo shop with a real product (fallback if a seller drops) | Same metrics |
+| In app pilot | 3 Nov | Same sellers use the full app | Time to first post, approve without edit rate, failures |
+
+| ID | Requirement | Acceptance |
+| :--- | :--- | :--- |
+| EV-01 | Baseline per seller: how they post today and how long it takes | Written before their first Marken post |
+| EV-02 **CHG** | Pilot log of every post | 12 or more trusted posts across 3 or more shops by 3 Nov |
+| EV-03 | Honest results, including skips and failures | README and video show the real rates |
+| EV-04 | Written consent to film and quote each seller | Before any footage |
+
+### Demo video (under 3:00, English subtitles)
+
+| Time | Scene | Pillar or criterion |
+| :--- | :--- | :--- |
+| 0:00 to 0:20 | Real seller on camera: how long posting takes today | Impact |
+| 0:20 to 0:50 | Onboarding to first post in under 5 minutes (sped up, phone screen) | Works |
+| 0:50 to 1:20 **CHG** | **Before and after:** a generic AI image vs Marken with the real product and its badge | Pillar 1, creativity |
+| 1:20 to 1:50 | Activity panel: Muse Wonder browsing trends, SAM 3.1 cutout, Muse Image scene, fidelity check, cost | Pillars 2 and 3, Meta tools, depth |
+| 1:50 to 2:20 | One tap approve; carousel live on Instagram | Works |
+| 2:20 to 2:50 | Pilot numbers: trusted posts, approve rate, what did not work | Impact |
+
+Also: README with model routing and pilot results (`DM-03`); a seeded demo account for judges, login in the submission form only (`DM-04`); post the demo on X for the viral and community prizes.
+
+---
+
+## 12. Risks and open questions
 
 | Risk | Mitigation |
-| --- | --- |
-| No official trend API for TikTok or Instagram | TikTok Creative Center, Google Trends and Muse Spark web search; state the limit openly |
-| Instagram publishing review is slow | Demo on a Business account the team owns; show the approved post queued if review is pending (FR-PB-04) |
-| First post takes longer than the 5-minute target | Tour runs on a sample post while the real one generates (FR-OB-09); trend analyses are pre-cached |
-| Owners don't open the app daily | Push and email reminders; Today under 2 s; installable PWA |
-| Captions sound generic or miss local slang | Per-shop style rules, two caption options, edit by feedback |
-| Meta Model API access limits by region | Confirm access on day 3; Llama fallback for text tasks (NFR-18) |
-| Build starts two days late | Onboarding steps 6–8 and the tour move to 2 Nov; P1 only after the full loop works |
-
-- [ ] Which content languages ship at the demo: English and Bahasa Indonesia only, or more?
-- [ ] Which country is the pilot business in? It sets the trend region for the demo.
-- [ ] Email sign-in: magic link (proposed) or password?
-- [ ] Confirm the proposed stack (Supabase, Inngest, Vercel, Resend) on 28 Oct.
-- [ ] Orders for Results (P1) are entered by hand, since Shopee linking is cut. Confirm.
-
-Resolved by this SRD: Instagram is the only publishing channel (TikTok cut), and no mentor view is built (P2 cut).
+| :--- | :--- |
+| Muse Image ignores the reserved product area | Mask the area in the prompt; code always paints the product last, so fidelity holds either way |
+| Composited product looks pasted on | Shadow and scale in code; Muse Image edit pass on the scene only, then re-check fidelity |
+| Muse Wonder browsing is slow or blocked | Fallback to Muse Spark web search, logged in the panel |
+| No official trend API for TikTok or Instagram | State the limit openly in the video |
+| Instagram publishing review is slow | Accounts the team or sellers own; download + copy caption fallback |
+| Pilot sellers drop out | Recruit 4 to keep 3; the dogfood shop always runs |
+| Judges see "another caption tool" | Lead the video with the seller and the before and after shot |
+| Meta Model API limits from Indonesia | Confirm on 29 Oct; Muse Spark Open fallback for text |

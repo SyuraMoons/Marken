@@ -1,4 +1,19 @@
-import type { ProviderRawResponse, ProviderRequest } from "../types";
+import type {
+  CanonicalModelId,
+  ProviderRawResponse,
+  ProviderRequest,
+} from "../types";
+
+/**
+ * Maps internal canonical model IDs (`SRD v2.0 §4`) to live Meta Model API (`https://api.meta.ai/v1`) IDs.
+ */
+export const LIVE_META_MODEL_IDS: Record<CanonicalModelId, string> = {
+  "muse-spark": "muse-spark-1.3",
+  "muse-wonder": "muse-wonder-1.0",
+  "muse-spark-open": "muse-spark-1.3-contributor",
+  "muse-image": "muse-image-1.0",
+  "sam-3.1": "sam-3.1",
+};
 
 export class ProviderError extends Error {
   readonly provider: "meta" | "spark-open";
@@ -22,12 +37,71 @@ export class ProviderError extends Error {
   }
 }
 
+export function sanitizeBaseUrl(rawUrl: string | undefined): string | undefined {
+  if (!rawUrl) return undefined;
+  const trimmed = rawUrl.trim().replace(/^["']|["']$/g, "");
+  // Guard against accidental duplicate paste in .env (e.g., "https://api.meta.ai/v1https://api.meta.ai/v1")
+  const match = trimmed.match(/^(https?:\/\/[^\s"']+?)(?=https?:\/\/|$)/);
+  return (match ? match[1] : trimmed).replace(/\/+$/, "");
+}
+
 export function isMetaConfigured(): boolean {
   return Boolean(
     process.env.META_MODEL_API_KEY?.trim() &&
-      process.env.META_MODEL_API_BASE_URL?.trim() &&
+      sanitizeBaseUrl(process.env.META_MODEL_API_BASE_URL) &&
       process.env.GATEWAY_MODE !== "mock",
   );
+}
+
+/**
+ * Supports:
+ * 1. Plain string prompts
+ * 2. Multimodal input objects `{ prompt: string, imageUrl?: string, imageUrls?: string[] }`
+ * 3. Pre-formatted OpenAI content arrays `Array<{ type: "text" | "image_url", ... }>`
+ * 4. Arbitrary JSON objects (serialized as JSON string)
+ */
+function buildUserContent(input: unknown): unknown {
+  if (typeof input === "string") {
+    return input;
+  }
+  if (Array.isArray(input)) {
+    return input;
+  }
+  if (typeof input === "object" && input !== null) {
+    const obj = input as Record<string, unknown>;
+    const imageUrls: string[] = [];
+    if (typeof obj.imageUrl === "string" && obj.imageUrl.trim()) {
+      imageUrls.push(obj.imageUrl.trim());
+    }
+    if (Array.isArray(obj.imageUrls)) {
+      for (const u of obj.imageUrls) {
+        if (typeof u === "string" && u.trim()) imageUrls.push(u.trim());
+      }
+    }
+    if (imageUrls.length > 0) {
+      const promptText =
+        typeof obj.prompt === "string"
+          ? obj.prompt
+          : JSON.stringify(
+              Object.fromEntries(
+                Object.entries(obj).filter(
+                  ([k]) => k !== "imageUrl" && k !== "imageUrls",
+                ),
+              ),
+            );
+      return [
+        ...imageUrls.map((url) => ({
+          type: "image_url",
+          image_url: { url },
+        })),
+        {
+          type: "text",
+          text: promptText,
+        },
+      ];
+    }
+  }
+  return JSON.stringify(input);
 }
 
 function buildMessages(req: ProviderRequest): Array<{
@@ -46,31 +120,20 @@ function buildMessages(req: ProviderRequest): Array<{
     : baseSystem;
 
   messages.push({ role: "system", content: systemContent });
-
-  if (typeof req.input === "string") {
-    messages.push({ role: "user", content: req.input });
-  } else {
-    messages.push({
-      role: "user",
-      content: JSON.stringify(req.input),
-    });
-  }
+  messages.push({ role: "user", content: buildUserContent(req.input) });
 
   return messages;
 }
 
 /**
- * Calls the Meta Model API (`muse-spark`, `muse-wonder`, `muse-image`, `sam-3.1`).
+ * Calls the Meta Model API (`muse-spark-1.3`, `muse-wonder-1.0`, `muse-image-1.0`, `sam-3.1`).
  * Never import this outside `src/lib/gateway/`.
  */
 export async function callMetaProvider(
   req: ProviderRequest,
 ): Promise<ProviderRawResponse> {
   const apiKey = process.env.META_MODEL_API_KEY?.trim();
-  const baseUrl = process.env.META_MODEL_API_BASE_URL?.trim()?.replace(
-    /\/+$/,
-    "",
-  );
+  const baseUrl = sanitizeBaseUrl(process.env.META_MODEL_API_BASE_URL);
 
   if (!apiKey || !baseUrl) {
     throw new ProviderError(
@@ -79,8 +142,15 @@ export async function callMetaProvider(
     );
   }
 
-  // Image generation (Muse Image — 1080x1350 scene with reserved empty product area)
+  const liveModelId = LIVE_META_MODEL_IDS[req.model];
+
+  // Image generation (Muse Image 1.0 — 1080x1350 scene with reserved empty product area)
   if (req.model === "muse-image") {
+    const inputObj =
+      typeof req.input === "object" && req.input !== null
+        ? (req.input as Record<string, unknown>)
+        : { prompt: String(req.input) };
+
     const response = await fetch(`${baseUrl}/images/generations`, {
       method: "POST",
       headers: {
@@ -88,19 +158,16 @@ export async function callMetaProvider(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "muse-image",
-        size: "1080x1350",
-        response_format: "b64_json",
-        ...(typeof req.input === "object" && req.input !== null
-          ? req.input
-          : { prompt: String(req.input) }),
+        model: liveModelId,
+        prompt: String(inputObj.prompt ?? req.input),
+        size: String(inputObj.size ?? "1080x1350"),
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
       throw new ProviderError(
-        `Meta Model API (muse-image) failed with HTTP ${response.status}: ${errText}`,
+        `Meta Model API (${liveModelId}) failed with HTTP ${response.status}: ${errText}`,
         { provider: "meta", statusCode: response.status },
       );
     }
@@ -124,51 +191,109 @@ export async function callMetaProvider(
     };
   }
 
-  // Product cutout segmentation (SAM 3.1)
+  // Product cutout segmentation (SAM 3.1 via /v1/responses)
   if (req.model === "sam-3.1") {
-    const response = await fetch(`${baseUrl}/images/segment`, {
+    const inputObj =
+      typeof req.input === "object" && req.input !== null
+        ? (req.input as Record<string, unknown>)
+        : { imageUrl: String(req.input), prompt: "product" };
+
+    const imageUrl = String(
+      inputObj.imageUrl ?? inputObj.image ?? req.input ?? "",
+    );
+    const labelPrompt = String(
+      inputObj.prompt ?? inputObj.labelHint ?? "main product",
+    );
+
+    const response = await fetch(`${baseUrl}/responses`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "sam-3.1",
-        output_format: "png",
-        ...(typeof req.input === "object" && req.input !== null
-          ? req.input
-          : { image: String(req.input) }),
+        model: liveModelId,
+        input: [
+          {
+            role: "user",
+            content: [
+              { type: "input_image", image_url: imageUrl },
+              { type: "input_text", text: labelPrompt },
+            ],
+          },
+        ],
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
       throw new ProviderError(
-        `Meta Model API (sam-3.1) failed with HTTP ${response.status}: ${errText}`,
+        `Meta Model API (${liveModelId}) failed with HTTP ${response.status}: ${errText}`,
         { provider: "meta", statusCode: response.status },
       );
     }
 
     const payload = (await response.json()) as {
-      cutout_b64?: string;
-      bbox?: { x: number; y: number; width: number; height: number };
-      confidence?: number;
+      output?: Array<{
+        content?: Array<{ type?: string; text?: string }>;
+      }>;
+      usage?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        images_processed?: number;
+      };
     };
+
+    const outputText =
+      payload.output?.[0]?.content?.find((c) => c.type === "output_text")
+        ?.text ?? "";
+
+    // Parse `<|box;x1=...;y1=...;x2=...;y2=...;w=...;h=...|>` and `<|mask;x=...;y=...;data=...|>`
+    const boxMatch = outputText.match(
+      /<\|box;x1=(\d+);y1=(\d+);x2=(\d+);y2=(\d+);w=(\d+);h=(\d+)\|>/,
+    );
+    const maskMatch = outputText.match(
+      /<\|mask;x=(\d+);y=(\d+);data=([^|]+)\|>/,
+    );
+
+    let bbox = { x: 0.15, y: 0.15, width: 0.7, height: 0.7 };
+    let pixelBox:
+      | { x1: number; y1: number; x2: number; y2: number; w: number; h: number }
+      | undefined;
+
+    if (boxMatch) {
+      const x1 = Number(boxMatch[1]);
+      const y1 = Number(boxMatch[2]);
+      const x2 = Number(boxMatch[3]);
+      const y2 = Number(boxMatch[4]);
+      const w = Math.max(1, Number(boxMatch[5]));
+      const h = Math.max(1, Number(boxMatch[6]));
+      pixelBox = { x1, y1, x2, y2, w, h };
+      bbox = {
+        x: Number((x1 / w).toFixed(4)),
+        y: Number((y1 / h).toFixed(4)),
+        width: Number((Math.max(1, x2 - x1) / w).toFixed(4)),
+        height: Number((Math.max(1, y2 - y1) / h).toFixed(4)),
+      };
+    }
 
     return {
       rawOutput: {
-        cutoutBase64: payload.cutout_b64 ?? null,
-        bbox: payload.bbox ?? { x: 0.15, y: 0.15, width: 0.7, height: 0.7 },
-        confidence: payload.confidence ?? 0.98,
+        cutoutBase64: null,
+        rawSegmentationText: outputText,
+        maskData: maskMatch ? maskMatch[3] : null,
+        pixelBox: pixelBox ?? null,
+        bbox,
+        confidence: boxMatch ? 0.98 : 0.75,
       },
-      tokensIn: 0,
-      tokensOut: 0,
-      images: 1,
+      tokensIn: payload.usage?.input_tokens ?? 0,
+      tokensOut: payload.usage?.output_tokens ?? 0,
+      images: payload.usage?.images_processed ?? 1,
       provider: "meta",
     };
   }
 
-  // Text / Multimodal / Web Browse (Muse Spark & Muse Wonder)
+  // Text / Multimodal / Web Browse (`muse-spark-1.3` & `muse-wonder-1.0`)
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -176,9 +301,10 @@ export async function callMetaProvider(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: req.model,
+      model: liveModelId,
       messages: buildMessages(req),
-      temperature: req.step === "check_rules" || req.step === "verify_slide" ? 0.1 : 0.4,
+      temperature:
+        req.step === "check_rules" || req.step === "verify_slide" ? 0.1 : 0.4,
       ...(req.expectJson ? { response_format: { type: "json_object" } } : {}),
     }),
   });
@@ -186,7 +312,7 @@ export async function callMetaProvider(
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
     throw new ProviderError(
-      `Meta Model API (${req.model}) failed with HTTP ${response.status}: ${errText}`,
+      `Meta Model API (${liveModelId}) failed with HTTP ${response.status}: ${errText}`,
       { provider: "meta", statusCode: response.status },
     );
   }
@@ -208,4 +334,5 @@ export async function callMetaProvider(
     provider: "meta",
   };
 }
+
 

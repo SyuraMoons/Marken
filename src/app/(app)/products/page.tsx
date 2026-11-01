@@ -1,5 +1,6 @@
-import { Placeholder } from "@/components/placeholder";
+import { ProductsView } from "@/components/products-view";
 
+// Products grid + add/check/edit/delete flows (DX-07, DX-09, DX-27).
 export default function ProductsPage() {
-  return <Placeholder title="Products" refs="F-04, F-09 · products and studio photos" />;
+  return <ProductsView />;
 }

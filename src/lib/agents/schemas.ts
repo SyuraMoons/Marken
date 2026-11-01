@@ -38,11 +38,9 @@ export type ExtractedProduct = z.infer<typeof ExtractedProductSchema>;
 export const RawTrendCandidateSchema = z.object({
   source: z
     .enum(["tiktok_creative_center", "google_trends"])
-    .or(z.string().min(1))
     .default("tiktok_creative_center"),
   type: z
     .enum(["format", "topic", "hashtag", "sound"])
-    .or(z.string().min(1))
     .default("format"),
   title: z.string().min(1),
   url: z.string().min(1),
@@ -58,7 +56,6 @@ export const TrendResearchModelSchema = z.object({
  * 0-100 scoring schema returned by `Muse Spark Open` during `score_trend` (`FR-TR-05`, `F-16`).
  */
 export const TrendScoreModelSchema = z.object({
-  score: z.number().min(0).max(100).optional(),
   fitScore: z.number().min(0).max(100),
   momentumScore: z.number().min(0).max(100),
   rationale: z.string().min(1),

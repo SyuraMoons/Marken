@@ -10,6 +10,7 @@
 import type { z } from "zod";
 import { callModelWithTelemetry, type ModelCallTelemetry } from "../gateway";
 import {
+  type RawTrendCandidateSchema,
   TrendAnalysisModelSchema,
   TrendResearchModelSchema,
   TrendScoreModelSchema,
@@ -18,8 +19,8 @@ import {
 export const DEFAULT_TREND_SCORE_THRESHOLD = 60;
 export const TREND_CACHE_TTL_DAYS = 7;
 
-export type TrendSource = "tiktok_creative_center" | "google_trends" | string;
-export type TrendType = "format" | "topic" | "hashtag" | "sound" | string;
+export type TrendSource = z.infer<typeof RawTrendCandidateSchema>["source"];
+export type TrendType = z.infer<typeof RawTrendCandidateSchema>["type"];
 
 /**
  * Trend candidate matching `public.trends` table in Supabase (`SRD v2.0 §9`).
@@ -45,6 +46,8 @@ export type ScoredTrendCandidate = TrendCandidate & {
   momentumScore: number;
   /** Plain-language explanation of the score */
   rationale: string;
+  /** True when promoted by the Tier-3 guarantee despite scoring below `threshold` */
+  promotedByGuarantee?: boolean;
 };
 
 /**
@@ -70,8 +73,6 @@ export type ResearchTrendsInput = {
   category: string;
   shopId?: string;
   postId?: string;
-  /** Optional test hook to verify `Muse Wonder` -> `Muse Spark` fallback (`FR-TR-01`) */
-  simulateWonderFailure?: boolean;
 };
 
 export type ResearchTrendsResult = {
@@ -87,6 +88,8 @@ export type ScoreTrendsOptions = {
   threshold?: number;
   /** Maximum number of top passing candidates to keep for analysis (default: 3) */
   maxPassing?: number;
+  /** Caller's country used if an evergreen fallback candidate is synthesised */
+  country?: string;
   shopId?: string;
   postId?: string;
 };
@@ -117,10 +120,22 @@ export type ResearchAndScoreTrendsResult = {
 
 export type AnalyseTrendInput = {
   trend: Pick<TrendCandidate, "title" | "url"> &
-    Partial<Pick<ScoredTrendCandidate, "id" | "source" | "type" | "country" | "category" | "score" | "rationale">>;
+    Partial<
+      Pick<
+        ScoredTrendCandidate,
+        | "id"
+        | "source"
+        | "type"
+        | "country"
+        | "category"
+        | "score"
+        | "rationale"
+        | "promotedByGuarantee"
+      >
+    >;
   /**
-   * Optional existing row from `public.trend_analyses` (`FR-TR-04`).
-   * If present and `new Date(cachedAnalysis.expires_at) > now`, zero new model calls are made.
+   * Optional existing row from `public.trend_analyses` looked up by `trend_id` (`FR-TR-04`).
+   * Validated for matching `trend_id` (when provided) and `new Date(cachedAnalysis.expires_at) > now`.
    */
   cachedAnalysis?: Partial<TrendAnalysis> | null;
   shopId?: string;
@@ -137,9 +152,32 @@ const DEFAULT_TIKTOK_URL =
   "https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/en";
 const DEFAULT_GOOGLE_TRENDS_URL = "https://trends.google.com/trends/";
 
+function isAllowedTrendSourceUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return false;
+    }
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname.toLowerCase();
+    if (
+      host === "ads.tiktok.com" &&
+      path.startsWith("/business/creativecenter")
+    ) {
+      return true;
+    }
+    if (host === "trends.google.com" && path.startsWith("/trends")) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function normalizeSourceUrl(url: string | undefined, source: string): string {
   const trimmed = (url ?? "").trim();
-  if (/^https?:\/\/[^\s]+$/i.test(trimmed)) {
+  if (isAllowedTrendSourceUrl(trimmed)) {
     return trimmed;
   }
   return source.toLowerCase().includes("google")
@@ -167,7 +205,7 @@ function buildEvergreenCandidate(
  * `T-4.1` — Daily Trend Research Agent (`FR-TR-01`, `FR-TR-06`).
  * Uses `Muse Wonder` (`muse-wonder-1.0`) to collect public TikTok Creative Center and
  * Google Trends candidates for `(country, category)`. Automatically falls back to
- * `Muse Spark` (`muse-spark-1.3`) web search and logs the fallback if `Muse Wonder` fails.
+ * `Muse Spark` (`muse-spark-1.3`) web search and logs the fallback via the gateway if `Muse Wonder` fails.
  */
 export async function researchTrends(
   inputOrCountry: ResearchTrendsInput | string,
@@ -181,7 +219,10 @@ export async function researchTrends(
         }
       : inputOrCountry;
 
-  const country = input.country.trim() || "ID";
+  const country = input.country.trim();
+  if (!country) {
+    throw new Error("country is required for researchTrends");
+  }
   const category = input.category.trim() || "General Retail";
   const collectedAt = new Date().toISOString();
 
@@ -206,10 +247,6 @@ export async function researchTrends(
   let fallbackReason: string | undefined;
 
   try {
-    if (input.simulateWonderFailure) {
-      throw new Error("Simulated Muse Wonder browsing timeout");
-    }
-
     const wonderRes = await callModelWithTelemetry<
       string,
       z.infer<typeof TrendResearchModelSchema>
@@ -237,6 +274,9 @@ export async function researchTrends(
     >({
       step: "research_trends",
       model: "muse-spark",
+      requestedModel: "muse-wonder",
+      fallback: true,
+      fallbackReason: `Muse Wonder -> Muse Spark fallback: ${fallbackReason}`,
       shopId: input.shopId,
       postId: input.postId,
       systemPrompt: `${systemPrompt}\n\nFALLBACK MODE (FR-TR-01): Muse Wonder browsing failed (${fallbackReason}). Use Muse Spark web search knowledge to return current TikTok Creative Center & Google Trends candidates.`,
@@ -245,11 +285,7 @@ export async function researchTrends(
     });
 
     rawData = sparkRes.data;
-    telemetryList.push({
-      ...sparkRes.telemetry,
-      fallback: true,
-      fallbackReason: `Muse Wonder -> Muse Spark fallback: ${fallbackReason}`,
-    });
+    telemetryList.push(sparkRes.telemetry);
   }
 
   const candidates: TrendCandidate[] = rawData.candidates.map((c, idx) => ({
@@ -265,7 +301,9 @@ export async function researchTrends(
 
   const pagesVisited = Array.from(
     new Set([
-      ...rawData.pagesVisited.filter((u) => /^https?:\/\//i.test(u.trim())),
+      ...rawData.pagesVisited
+        .map((u) => u.trim())
+        .filter((u) => isAllowedTrendSourceUrl(u)),
       ...candidates.map((c) => c.url),
     ]),
   );
@@ -296,7 +334,7 @@ export async function scoreTrendCandidate(
     "Score the trend candidate from 0 to 100 on two dimensions:",
     "1. `fitScore` (0-100, 60% weight): How well can a small physical-product seller execute this trend in a 3-slide static 1080x1350 Instagram carousel using their real product cutout (without needing a dance, skit, or face-cam) in the given category?",
     "2. `momentumScore` (0-100, 40% weight): Current velocity, source rank, and commercial buyer intent (save/order potential).",
-    'Respond strictly with valid JSON: { "score": number, "fitScore": number, "momentumScore": number, "rationale": string }.',
+    'Respond strictly with valid JSON: { "fitScore": number, "momentumScore": number, "rationale": string }.',
   ].join("\n");
 
   const { data, telemetry } = await callModelWithTelemetry<
@@ -353,11 +391,13 @@ export async function scoreTrendCandidates(
 ): Promise<ScoreTrendsResult> {
   const threshold = options?.threshold ?? DEFAULT_TREND_SCORE_THRESHOLD;
   const maxPassing = options?.maxPassing ?? 3;
+  const callerCountry =
+    candidates[0]?.country?.trim() || options?.country?.trim() || "";
 
   const effectiveCandidates =
     candidates.length > 0
       ? candidates
-      : [buildEvergreenCandidate("ID", category)];
+      : [buildEvergreenCandidate(callerCountry, category)];
 
   const results = await Promise.all(
     effectiveCandidates.map((c) =>
@@ -384,11 +424,16 @@ export async function scoreTrendCandidates(
   let guaranteedFallback = false;
 
   // Tier 3 "Never Miss a Morning" Guarantee (Pillar 2 NFR-15):
-  // If no candidate met `score >= threshold`, promote the #1 highest-fit candidate so
-  // the daily carousel loop never stalls on an empty trend list.
+  // If no candidate met `score >= threshold`, promote the #1 highest-fit candidate and
+  // surface that it scored below threshold so a weak trend isn't presented as a strong one.
   if (passingCandidates.length === 0 && scored.length > 0) {
     const bestByFit = [...scored].sort((a, b) => b.fitScore - a.fitScore)[0];
-    passingCandidates = [bestByFit];
+    const promoted: ScoredTrendCandidate = {
+      ...bestByFit,
+      promotedByGuarantee: true,
+      rationale: `Closest category format fallback (scored ${bestByFit.score}/${threshold}, below strong-trend threshold): ${bestByFit.rationale}`,
+    };
+    passingCandidates = [promoted];
     guaranteedFallback = true;
   }
 
@@ -425,6 +470,7 @@ export async function researchAndScoreTrends(
     {
       threshold: input.threshold,
       maxPassing: input.maxPassing,
+      country: input.country.trim(),
       shopId: input.shopId,
       postId: input.postId,
     },
@@ -450,6 +496,7 @@ export async function researchAndScoreTrends(
 
 function isCacheEntryValid(
   cached: Partial<TrendAnalysis> | null | undefined,
+  expectedTrendId?: string,
 ): cached is Partial<TrendAnalysis> & {
   hook: string;
   structure: string;
@@ -459,6 +506,13 @@ function isCacheEntryValid(
   expires_at: string;
 } {
   if (!cached) return false;
+  if (
+    expectedTrendId &&
+    cached.trend_id &&
+    cached.trend_id !== expectedTrendId
+  ) {
+    return false;
+  }
   if (
     !cached.hook?.trim() ||
     !cached.structure?.trim() ||
@@ -475,9 +529,9 @@ function isCacheEntryValid(
 
 /**
  * `T-4.3` — 7-Day Shared Trend Multimodal Analysis (`FR-TR-03`, `FR-TR-04`, `FR-TR-06`, `F-07`).
- * If a valid unexpired `cachedAnalysis` is supplied, serves it through the gateway with
- * `cacheHit: true` and `costUsd: 0` (`FR-TR-04`). Otherwise analyses the trend once with
- * `Muse Spark` (`muse-spark-1.3`) and sets a 7-day `expires_at` timestamp.
+ * If a valid unexpired `cachedAnalysis` for the same `trend_id` is supplied, serves it through
+ * the gateway with `cacheHit: true` and `costUsd: 0` (`FR-TR-04`). Otherwise analyses the trend
+ * once with `Muse Spark` (`muse-spark-1.3`) and sets a 7-day `expires_at` timestamp.
  */
 export async function analyseTrend(
   input: AnalyseTrendInput,
@@ -486,9 +540,13 @@ export async function analyseTrend(
     input.trend.url,
     input.trend.source ?? "tiktok_creative_center",
   );
+  const isBelowThresholdFallback =
+    Boolean(input.trend.promotedByGuarantee) ||
+    (input.trend.score !== undefined &&
+      input.trend.score < DEFAULT_TREND_SCORE_THRESHOLD);
 
   // Shared 7-Day Cache Hit Path (FR-TR-04): Second shop triggers zero new model calls ($0.00)
-  if (isCacheEntryValid(input.cachedAnalysis)) {
+  if (isCacheEntryValid(input.cachedAnalysis, input.trend.id)) {
     const cached = input.cachedAnalysis;
     const { data, telemetry } = await callModelWithTelemetry<
       unknown,
@@ -521,7 +579,12 @@ export async function analyseTrend(
         why_it_works: data.why_it_works,
         from_video: data.from_video,
         model: cached.model ?? "muse-spark-1.3",
-        source_url: cached.source_url ?? sourceUrl,
+        source_url: cached.source_url
+          ? normalizeSourceUrl(
+              cached.source_url,
+              input.trend.source ?? "tiktok_creative_center",
+            )
+          : sourceUrl,
         expires_at: cached.expires_at,
       },
       cacheHit: true,
@@ -540,8 +603,13 @@ export async function analyseTrend(
     "- `scene_brief`: Background scene description for Muse Image 1.0 (1080x1350) that leaves the CENTRAL PRODUCT AREA COMPLETELY EMPTY for deterministic product cutout compositing (FR-CG-04).",
     "- `why_it_works`: Plain-language 1-sentence reason shown to the shop owner on `/today` explaining why this trend drives engagement.",
     "- `from_video`: true if originates from short-form video (TikTok), false for search/text topic.",
+    isBelowThresholdFallback
+      ? "- NOTE: Live trends scored below the strong-match threshold today, so explicitly note in `why_it_works` that this format was selected as a closest category fallback rather than a strong breakout trend."
+      : "",
     'Respond strictly with valid JSON: { "hook": string, "structure": string, "visual_style": string, "scene_brief": string, "why_it_works": string, "from_video": boolean }.',
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const { data, telemetry } = await callModelWithTelemetry<
     string,
@@ -557,11 +625,19 @@ export async function analyseTrend(
       title: input.trend.title,
       source: input.trend.source ?? "tiktok_creative_center",
       type: input.trend.type ?? "format",
-      country: input.trend.country ?? "ID",
-      category: input.trend.category ?? "General Retail",
+      country: input.trend.country?.trim() || undefined,
+      category: input.trend.category?.trim() || "General Retail",
       url: sourceUrl,
+      promotedByGuarantee: isBelowThresholdFallback,
     }),
   });
+
+  const rawWhyItWorks = data.why_it_works.trim();
+  const whyItWorks =
+    isBelowThresholdFallback &&
+    !/below|fallback|closest/i.test(rawWhyItWorks)
+      ? `Selected as the closest category format fallback today (live trends scored below threshold): ${rawWhyItWorks}`
+      : rawWhyItWorks;
 
   const expiresAt = new Date(
     Date.now() + TREND_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000,
@@ -574,7 +650,7 @@ export async function analyseTrend(
       structure: data.structure.trim(),
       visual_style: data.visual_style.trim(),
       scene_brief: data.scene_brief.trim(),
-      why_it_works: data.why_it_works.trim(),
+      why_it_works: whyItWorks,
       from_video: data.from_video,
       model: "muse-spark-1.3",
       source_url: sourceUrl,
@@ -584,4 +660,3 @@ export async function analyseTrend(
     telemetry,
   };
 }
-

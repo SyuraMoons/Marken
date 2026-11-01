@@ -103,7 +103,6 @@ export async function callMockProvider(
     case "score_trend":
       return {
         rawOutput: {
-          score: 86,
           fitScore: 88,
           momentumScore: 84,
           rationale:

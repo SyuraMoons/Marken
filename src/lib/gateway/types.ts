@@ -63,6 +63,18 @@ export type ModelCall<TInput = unknown, TOutput = unknown> = {
    * Override automatic fallback to `muse-spark-open` on text steps (defaults to true for text steps).
    */
   allowFallback?: boolean;
+  /**
+   * Optional original model requested before a caller-managed fallback (e.g. `muse-wonder` -> `muse-spark`).
+   */
+  requestedModel?: ModelId;
+  /**
+   * Mark true when this gateway call is already executing as a caller-managed fallback.
+   */
+  fallback?: boolean;
+  /**
+   * Reason for a caller-managed fallback, persisted on `model_calls` at emit time.
+   */
+  fallbackReason?: string;
 };
 
 /**

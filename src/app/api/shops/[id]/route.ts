@@ -6,7 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // Delete the shop and all its media (NFR-14). Row deletes cascade through the schema,
 // but Storage files do not, so they are removed first. If a file delete fails the shop
 // row stays, and the owner can simply retry.
-const FOLDERS = ["uploads", "cutouts", "scenes", "slides"] as const;
+// `publish` holds the JPEG copies made for Instagram, so it must go too.
+const FOLDERS = ["uploads", "cutouts", "scenes", "slides", "publish"] as const;
 const PAGE = 100;
 
 const Body = z.object({ confirm: z.literal(true) });

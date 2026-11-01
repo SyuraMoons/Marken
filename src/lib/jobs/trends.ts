@@ -52,7 +52,7 @@ export const trendsDaily = inngest.createFunction(
   },
 );
 
-async function collectPair(pair: Pair) {
+export async function collectPair(pair: Pair) {
   const admin = createAdminClient();
   const candidates = await researchAndScoreTrends(pair);
   if (!candidates.length) return { analysed: 0, cached: 0 };

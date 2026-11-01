@@ -97,11 +97,12 @@ export async function planDailyCarousel(input: PlanInput): Promise<CarouselPlan>
   };
 }
 
-export async function renderAndVerifySlide(_input: {
+export async function renderAndVerifySlide(input: {
   order: number;
   text: string;
   sceneBrief: string;
 }): Promise<RenderedSlide> {
+  void input; // mock ignores the brief; the real port renders it
   const png = await sharp({
     create: { width: 1080, height: 1350, channels: 3, background: { r: 245, g: 240, b: 232 } },
   })

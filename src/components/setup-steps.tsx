@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Button } from "./button";
+import { AnchorButton, Button } from "./button";
 import { Carousel } from "./carousel";
 import { ActivityPanel } from "./activity-panel";
 import { ProductCheck } from "./product-check";
@@ -370,6 +370,7 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
 }
 
 function Step4({ ctx, initialRules }: { ctx: Ctx; initialRules: string[] }) {
+  const igResult = useSearchParams().get("ig");
   const [tone, setTone] = useState<Tone>(asTone(ctx.shop.tone));
   const [rules, setRules] = useState<string[]>(initialRules);
   const [draft, setDraft] = useState("");
@@ -436,7 +437,17 @@ function Step4({ ctx, initialRules }: { ctx: Ctx; initialRules: string[] }) {
             <span aria-hidden="true">✓</span> {t("ob4.connected")}
           </p>
         ) : (
-          <p className="text-sm text-muted">{t("settings.igSoon")}</p>
+          <>
+            {igResult === "error" && (
+              <p role="alert" className="text-sm text-danger">
+                {t("settings.igError")}
+              </p>
+            )}
+            <p className="text-sm text-muted">{t("settings.igHint")}</p>
+            <AnchorButton variant="secondary" href="/api/auth/instagram?next=onboarding">
+              {t("settings.igConnect")}
+            </AnchorButton>
+          </>
         )}
       </div>
 

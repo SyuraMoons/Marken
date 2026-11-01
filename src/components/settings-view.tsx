@@ -1,10 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { signOut } from "@/app/login/actions";
 import { saveBrand, saveReminder, saveShop } from "@/app/(app)/settings/actions";
-import { Button, ButtonLink } from "./button";
+import { AnchorButton, Button, ButtonLink } from "./button";
 import { InstallMarken } from "./install-marken";
 import { ListRow } from "./list-row";
 import { StatusScreen } from "./status-screen";
@@ -49,7 +49,8 @@ export function SettingsView({ email, igConnected, rules: savedRules, shop }: Pr
   const router = useRouter();
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
-  const [view, setView] = useState<View>("main");
+  const igResult = useSearchParams().get("ig");
+  const [view, setView] = useState<View>(igResult ? "instagram" : "main");
   const [name, setName] = useState(shop.name);
   const [category, setCategory] = useState(shop.category);
   const [country, setCountry] = useState(shop.country);
@@ -219,7 +220,15 @@ export function SettingsView({ email, igConnected, rules: savedRules, shop }: Pr
                 <span aria-hidden="true">✓</span> {t("settings.connected", { name: t("settings.instagram") })}
               </p>
             ) : (
-              <p className="text-sm text-muted">{t("settings.igSoon")}</p>
+              <>
+                {igResult === "error" && (
+                  <p role="alert" className="text-sm text-danger">
+                    {t("settings.igError")}
+                  </p>
+                )}
+                <p className="text-sm text-muted">{t("settings.igHint")}</p>
+                <AnchorButton href="/api/auth/instagram?next=settings">{t("settings.igConnect")}</AnchorButton>
+              </>
             )}
           </div>
         )}

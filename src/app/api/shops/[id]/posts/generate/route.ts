@@ -1,6 +1,61 @@
-import { notImplemented } from "@/lib/http";
+import { getOwnedShop, shopToday } from "@/lib/api/owner";
+import { apiError, conflict } from "@/lib/http";
+import { enqueue } from "@/lib/jobs/client";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
-// Generate a post now (F-08)
-export async function POST() {
-  return notImplemented("Generate a post now (F-08)");
+// Run now: create today's post and hand generation to the job (F-08, FR-CG-06).
+export async function POST(_req: Request, ctx: RouteContext<"/api/shops/[id]/posts/generate">) {
+  const { id } = await ctx.params;
+  const guard = await getOwnedShop(id);
+  if (!guard.ok) return guard.response;
+  const shop = guard.value;
+
+  const supabase = await createClient();
+  const { data: products } = await supabase
+    .from("products")
+    .select("id")
+    .eq("shop_id", shop.id)
+    .eq("hidden", false)
+    .eq("cutout_confirmed", true)
+    .limit(1);
+  if (!products?.length) return conflict("no_confirmed_product");
+
+  const admin = createAdminClient();
+  const postDate = shopToday(shop.time_zone);
+
+  const created = await admin
+    .from("posts")
+    .insert({ shop_id: shop.id, post_date: postDate, status: "generating" })
+    .select("*")
+    .single();
+
+  if (created.error) {
+    // One live post per shop per day: a repeat tap returns today's post.
+    if (created.error.code === "23505") {
+      const { data: live } = await admin
+        .from("posts")
+        .select("*")
+        .eq("shop_id", shop.id)
+        .eq("post_date", postDate)
+        .not("status", "in", "(skipped,failed)")
+        .maybeSingle();
+      if (live) return Response.json({ post: live, created: false });
+    }
+    return apiError("post_create_failed", 500);
+  }
+
+  const post = created.data;
+  const queued = await enqueue(
+    "post/generate.requested",
+    { shopId: shop.id, postId: post.id },
+    post.id,
+  );
+  if (!queued) {
+    // Nothing will run it, so free the day's slot instead of leaving a post stuck.
+    await admin.from("posts").update({ status: "failed" }).eq("id", post.id);
+    return apiError("queue_unavailable", 503);
+  }
+
+  return Response.json({ post, created: true }, { status: 202 });
 }

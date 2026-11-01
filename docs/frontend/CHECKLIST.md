@@ -115,6 +115,7 @@ Mobile node IDs; every screen also has a Desktop frame (verified on Today only).
 ## Not ours / waiting
 - ✅ Auth, API routes and activity route live on `development`; Today, edit, products, settings and onboarding read and write real data
 - ⛔ Instagram connect (`/api/auth/instagram/callback` still 501) and the generate/regenerate/publish jobs — Harfi
+- ⛔ Resume screen is built but nothing sends owners to it: `src/proxy.ts` redirects unfinished setups straight to `/onboarding/N` — Harfi
 - ⛔ Live Figma frame check per screen (RULES §5) — no Figma access in this setup yet
 - ⛔ Login "Resend link" (Figma 97:2016) — needs the email kept server-side after the redirect; removed rather than faked
 

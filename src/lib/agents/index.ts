@@ -42,4 +42,15 @@ export {
   type TrendSource,
   type TrendType,
 } from "./trends";
-
+export {
+  compositeProductSlide,
+  computePixelFidelity,
+  cutoutProduct,
+  generateSlideScene,
+  renderAndVerifySlide,
+  verifySlideFidelity,
+  type RenderAndVerifySlideInput,
+  type RenderAndVerifySlideResult,
+  type VerifySlideFidelityInput,
+  type VerifySlideFidelityResult,
+} from "../studio";

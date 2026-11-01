@@ -37,7 +37,7 @@ export function ResultsView() {
       {METRICS.map((k) => (
         <div key={k} className="flex flex-col gap-0.5">
           <dt className="text-xs text-muted">{t(`results.${k}` as MessageKey)}</dt>
-          <dd className="font-medium">{r[k].toLocaleString()}</dd>
+          <dd className="font-medium">{r[k].toLocaleString("en-US")}</dd>
         </div>
       ))}
     </dl>
@@ -53,6 +53,9 @@ export function ResultsView() {
           <h1 className="text-3xl font-semibold tracking-tight">{t("results.learn")}</h1>
           <p className="text-muted">{t("results.learnBody")}</p>
         </header>
+        <p role="note" className="rounded-control border border-border bg-powder/50 p-3 text-sm text-muted">
+          {t("results.sample")}
+        </p>
         {mockLearning.map((l) => (
           <article key={l.id} className="flex flex-col gap-3 rounded-card border border-border bg-white p-5">
             <h2 className="font-semibold">{l.title}</h2>
@@ -60,6 +63,7 @@ export function ResultsView() {
             <Button
               variant={added.includes(l.id) ? "secondary" : "primary"}
               aria-pressed={added.includes(l.id)}
+              disabled
               onClick={() => setAdded(added.includes(l.id) ? added.filter((x) => x !== l.id) : [...added, l.id])}
             >
               {added.includes(l.id) ? `✓ ${t("results.learnAdded")}` : t("results.learnAdd")}
@@ -104,10 +108,14 @@ export function ResultsView() {
         <p className="text-muted">{t("results.body")}</p>
       </header>
 
+      <p role="note" className="rounded-control border border-border bg-powder/50 p-3 text-sm text-muted">
+        {t("results.sample")}
+      </p>
+
       <section aria-label={t("results.summary")} className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {[...METRICS, "orders" as const].map((k) => (
           <div key={k} className="flex flex-col gap-1 rounded-card border border-border bg-white p-4">
-            <p className="text-2xl font-semibold">{sum(k).toLocaleString()}</p>
+            <p className="text-2xl font-semibold">{sum(k).toLocaleString("en-US")}</p>
             <p className="text-sm text-muted">{t(`results.${k}` as MessageKey)}</p>
           </div>
         ))}

@@ -88,7 +88,7 @@ export function SettingsView({ email, igConnected, rules: savedRules, shop }: Pr
     });
 
   useEffect(() => {
-    document.documentElement.dataset.motion = reduceMotion ? "reduce" : "";
+    document.documentElement.dataset.motion = reduceMotion ? "reduce" : "full";
   }, [reduceMotion]);
 
   const head = (key: string) => <h1 className="text-3xl font-semibold tracking-tight">{t(key as MessageKey)}</h1>;

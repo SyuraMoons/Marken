@@ -24,31 +24,9 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
   const [pending, start] = useTransition();
   const seen = useRef(captions.join("\n"));
 
-  const [slideList, setSlideList] = useState(slides);
-  const [slideOrder, setSlideOrder] = useState(1);
-  const [slideFeedback, setSlideFeedback] = useState("");
-  const [remade, setRemade] = useState<number | null>(null);
-  const [slideFailed, setSlideFailed] = useState(false);
-  const [slidePending, startSlide] = useTransition();
+  // Slide remake (FR-ED-05, F-11b) is P1: the regenerate route only accepts target "caption", so the panel stays hidden until it ships.
+  const slideList = slides;
   const unchecked = slideList.some((s) => !s.fidelity_passed);
-
-  // Slide remake (FR-ED-05): scene only, then the product check must pass again (FR-FD-01).
-  const remake = () =>
-    startSlide(async () => {
-      setSlideFailed(false);
-      const res = await fetch(`/api/posts/${postId}/regenerate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: "slide", slide: slideOrder, feedback: slideFeedback.trim() }),
-      }).catch(() => null);
-      // The route only accepts target "caption" so far (F-11b is P1); until it ships this shows the error.
-      if (res?.ok) {
-        setSlideList(slideList.map((s) => (s.order === slideOrder ? { ...s, fidelity_passed: false } : s)));
-        setRemade(slideOrder);
-        return;
-      }
-      setSlideFailed(true);
-    });
 
   const choose = (i: number) => {
     setIndex(i);
@@ -165,48 +143,6 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
               </p>
             )}
             {failed && (
-              <p role="alert" className="text-sm text-danger">
-                {t("common.error")}
-              </p>
-            )}
-          </section>
-
-          <section className="flex flex-col gap-3 rounded-card border border-border bg-white p-5">
-            <h2 className="text-xl font-semibold">{t("imageEdit.title")}</h2>
-            <p className="text-sm text-muted">{t("imageEdit.body")}</p>
-            <div className="flex gap-2" role="group" aria-label={t("imageEdit.title")}>
-              {slideList.map((s) => (
-                <button
-                  key={s.order}
-                  type="button"
-                  onClick={() => setSlideOrder(s.order)}
-                  aria-pressed={slideOrder === s.order}
-                  className={`flex h-11 items-center rounded-full border px-4 text-sm font-medium ${slideOrder === s.order ? "border-blue bg-powder text-blue" : "border-border bg-white text-ink"}`}
-                >
-                  {t("imageEdit.slide", { n: s.order })}
-                </button>
-              ))}
-            </div>
-            <label className="flex flex-col gap-1.5 text-sm font-medium">
-              {t("imageEdit.feedback")}
-              <textarea
-                value={slideFeedback}
-                onChange={(e) => setSlideFeedback(e.target.value)}
-                rows={3}
-                maxLength={200}
-                placeholder={t("imageEdit.feedbackPlaceholder")}
-                className="rounded-control border border-border bg-white p-3 font-normal placeholder:text-muted focus:outline-2 focus:outline-blue"
-              />
-            </label>
-            <Button variant="secondary" onClick={remake} disabled={slidePending || !slideFeedback.trim()} aria-busy={slidePending}>
-              {t("imageEdit.regenerate")}
-            </Button>
-            {remade !== null && (
-              <p role="alert" className="text-sm text-danger">
-                {t("imageEdit.remade", { n: remade })}
-              </p>
-            )}
-            {slideFailed && (
               <p role="alert" className="text-sm text-danger">
                 {t("common.error")}
               </p>

@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { signOut } from "@/app/login/actions";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { Button } from "./button";
 
-// Save and exit (FR-OB-11): PATCH step save, exit only when the save actually lands.
+// Save and exit (FR-OB-11): confirm the step is saved, then sign out; sign back in resumes at this step.
 export function SaveAndExit({ shopId, step }: { shopId: string; step: number }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -17,12 +18,13 @@ export function SaveAndExit({ shopId, step }: { shopId: string; step: number }) 
     const res = await fetch(`/api/shops/${shopId}/onboarding`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ step }),
+      body: JSON.stringify({ step, action: "start" }),
     }).catch(() => null);
     setPending(false);
     if (res?.status === 401) return router.push("/login");
     if (!res?.ok) return setError(true);
-    router.push("/");
+    // Progress is saved per step server-side; "/" would bounce a signed-in owner back, so sign out to leave.
+    await signOut();
   };
 
   return (

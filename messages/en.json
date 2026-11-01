@@ -294,5 +294,6 @@
   "ob2.badFile": "Use a JPG, PNG or WebP photo under 10 MB.",
   "ob2.have": "Your photos are already uploaded. Continue to review them.",
   "ob2.choose": "Choose photos",
-  "ob1.tzAuto": "Use this device's time zone"
+  "ob1.tzAuto": "Use this device's time zone",
+  "results.sample": "Sample data. Results from your published posts will appear here once Instagram metrics are connected."
 }

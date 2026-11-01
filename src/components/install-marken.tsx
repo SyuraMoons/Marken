@@ -1,28 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { t } from "@/lib/i18n";
 import { Button } from "./button";
+import { INSTALL_EVENT } from "./root-prefs";
 
-type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+const subscribe = (cb: () => void) => {
+  window.addEventListener(INSTALL_EVENT, cb);
+  return () => window.removeEventListener(INSTALL_EVENT, cb);
+};
 
-// Install Marken (NFR-08): shown only when the browser offers an install prompt.
+// Install Marken (NFR-08): shown only when the browser offers an install prompt (kept by RootPrefs).
 export function InstallMarken() {
-  const [deferred, setDeferred] = useState<InstallEvent | null>(null);
-
-  useEffect(() => {
-    const onPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as InstallEvent);
-    };
-    const onInstalled = () => setDeferred(null);
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onPrompt);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
-  }, []);
+  const deferred = useSyncExternalStore(
+    subscribe,
+    () => window.__markenInstall ?? null,
+    () => null,
+  );
 
   if (!deferred) return null;
 
@@ -30,9 +24,10 @@ export function InstallMarken() {
     <Button
       variant="secondary"
       onClick={async () => {
-        await deferred.prompt();
-        const choice = await deferred.userChoice;
-        if (choice.outcome === "accepted") setDeferred(null);
+        // The prompt is one-shot: drop it whatever the owner chooses.
+        window.__markenInstall = null;
+        window.dispatchEvent(new Event(INSTALL_EVENT));
+        await deferred.prompt().catch(() => {});
       }}
     >
       {t("settings.install")}

@@ -197,7 +197,7 @@ function ProductForm({
   const [name, setName] = useState(product.name);
   const [category, setCategory] = useState(product.category ?? "Other");
   const [price, setPrice] = useState(product.price != null ? String(Number(product.price)) : "");
-  const [currency, setCurrency] = useState(product.currency ?? "IDR");
+  const [currency, setCurrency] = useState(product.currency ?? "");
   const [attributes, setAttributes] = useState(attributesText(product.attributes));
   const [description, setDescription] = useState(product.description ?? "");
   const [invalid, setInvalid] = useState(false);

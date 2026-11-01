@@ -228,7 +228,7 @@ function Step2({ ctx, hasProducts }: { ctx: Ctx; hasProducts: boolean }) {
       {!ok && !hasProducts && <p className="text-sm text-muted">{t("ob2.need")}</p>}
       {pending && <p role="status" className="text-sm text-muted">{t("ob2.uploading")}</p>}
       {error === "ob2.failed" ? (
-        <UploadError onRetry={submit} onChoose={() => { setError(null); pick.current?.click(); }} />
+        <UploadError pending={pending} onRetry={submit} onChoose={() => { setError(null); pick.current?.click(); }} />
       ) : (
         <Err show={Boolean(error)} text={error ?? undefined} />
       )}
@@ -266,8 +266,15 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
   };
 
   // currency, attributes and description save as soon as the owner leaves the field.
-  const saveField = (p: ProductView, change: { currency?: string; attributes?: ReturnType<typeof parseAttributes>; description?: string | null }) =>
+  const saveField = (p: ProductView, change: { currency?: string; attributes?: ReturnType<typeof parseAttributes>; description?: string | null }) => {
+    // Skip no-op blurs: they would disable the next tap and write the product for nothing.
+    const same =
+      (change.currency === undefined || change.currency === p.currency) &&
+      (change.attributes === undefined || JSON.stringify(change.attributes) === JSON.stringify(parseAttributes(attributesText(p.attributes)))) &&
+      (change.description === undefined || change.description === (p.description ?? null));
+    if (same) return;
     act(() => saveProduct({ id: p.id, name: p.name, ...change }), () => patch(p.id, change));
+  };
 
   const reprice = (p: ProductView, raw: string) => {
     const price = raw.trim() === "" ? null : Number(raw);
@@ -318,8 +325,9 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
           <div className="grid gap-3 sm:grid-cols-2">
             <label className={label}>
               {t("products.currency")}
-              <select defaultValue={p.currency ?? "IDR"} onChange={(e) => saveField(p, { currency: e.target.value })} disabled={pending} className={input}>
-                {["IDR", "USD", "SGD", "MYR", "THB", "PHP"].map((c) => (
+              <select defaultValue={p.currency ?? ""} onChange={(e) => saveField(p, { currency: e.target.value })} disabled={pending} className={input}>
+                <option value="">—</option>
+                {[...new Set([...(p.currency ? [p.currency] : []), "IDR", "USD", "SGD", "MYR", "THB", "PHP", "EUR", "GBP", "AUD"])].map((c) => (
                   <option key={c}>{c}</option>
                 ))}
               </select>

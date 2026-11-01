@@ -12,6 +12,7 @@ const REASONS = ["not_my_style", "wrong_product", "bad_timing", "other"] as cons
 export function ReviewPanel({ postId, captions, hashtags }: { postId: string; captions: string[]; hashtags: string[] }) {
   const [index, setIndex] = useState(0);
   const [picking, setPicking] = useState(false);
+  const [before, setBefore] = useState(0);
   const [skipping, setSkipping] = useState(false);
   const [reason, setReason] = useState<(typeof REASONS)[number] | null>(null);
   const [note, setNote] = useState("");
@@ -41,7 +42,7 @@ export function ReviewPanel({ postId, captions, hashtags }: { postId: string; ca
         <ButtonLink href={`/posts/${postId}/edit`} variant="secondary">
           {t("captionAlt.editManually")}
         </ButtonLink>
-        <Button variant="text" onClick={() => setPicking(false)}>
+        <Button variant="text" onClick={() => { setIndex(before); setPicking(false); }}>
           {t("captionAlt.cancel")}
         </Button>
       </section>
@@ -91,7 +92,7 @@ export function ReviewPanel({ postId, captions, hashtags }: { postId: string; ca
         </div>
         <p className="whitespace-pre-line">{caption}</p>
         {captions.length > 1 && (
-          <Button variant="text" className="justify-start! px-0!" onClick={() => setPicking(true)}>
+          <Button variant="text" className="justify-start! px-0!" onClick={() => { setBefore(index); setPicking(true); }}>
             {t("today.chooseCaption", { n: index + 1, total: captions.length })}
           </Button>
         )}

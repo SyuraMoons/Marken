@@ -39,7 +39,7 @@ export async function updateSession(request: NextRequest) {
   // Nothing may run between client creation and getClaims().
   const { data } = await supabase.auth.getClaims();
   const userId = data?.claims?.sub ?? null;
-  const { pathname } = request.nextUrl;
+  const { pathname, search, searchParams } = request.nextUrl;
 
   // Redirects must carry the refreshed cookies and cache headers.
   const redirectTo = (path: string) => {
@@ -48,6 +48,12 @@ export async function updateSession(request: NextRequest) {
     for (const [k, v] of Object.entries(cacheHeaders)) res.headers.set(k, v);
     return res;
   };
+
+  // Supabase falls back to the Site URL when a redirect isn't allow-listed, and
+  // the landing page would ignore the result, leaving the owner signed out.
+  if (pathname === "/" && (searchParams.has("code") || searchParams.has("error_code"))) {
+    return redirectTo(`/auth/callback${search}`);
+  }
 
   const isPublic = pathname === "/" || pathname === "/login";
   const isAuthRoute = pathname.startsWith("/auth/");

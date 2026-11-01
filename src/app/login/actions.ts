@@ -27,7 +27,7 @@ export async function sendMagicLink(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: true },
+    options: { shouldCreateUser: true, emailRedirectTo: `${await siteOrigin()}/auth/callback` },
   });
   if (error) redirect("/login?error=generic");
   redirect("/login?sent=1");

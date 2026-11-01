@@ -14,6 +14,32 @@ export {
 export {
   ExtractedProductSchema,
   RawProductExtractionModelSchema,
+  RawTrendCandidateSchema,
+  TrendAnalysisModelSchema,
+  TrendResearchModelSchema,
+  TrendScoreModelSchema,
   type ExtractedProduct,
 } from "./schemas";
+export {
+  analyseTrend,
+  DEFAULT_TREND_SCORE_THRESHOLD,
+  researchAndScoreTrends,
+  researchTrends,
+  scoreTrendCandidate,
+  scoreTrendCandidates,
+  TREND_CACHE_TTL_DAYS,
+  type AnalyseTrendInput,
+  type AnalyseTrendResult,
+  type ResearchAndScoreTrendsInput,
+  type ResearchAndScoreTrendsResult,
+  type ResearchTrendsInput,
+  type ResearchTrendsResult,
+  type ScoredTrendCandidate,
+  type ScoreTrendsOptions,
+  type ScoreTrendsResult,
+  type TrendAnalysis,
+  type TrendCandidate,
+  type TrendSource,
+  type TrendType,
+} from "./trends";
 

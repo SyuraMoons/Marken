@@ -8,6 +8,7 @@ export {
   type ExtractProductsAndCutoutsInput,
   type ExtractProductsAndCutoutsResult,
   type ExtractedProductWithCutout,
+  type PhotoExtractionFailure,
   type PhotoInputItem,
 } from "./extract";
 export {

@@ -2,24 +2,34 @@
 // Extracts structured product metadata with `Muse Spark` (`muse-spark-1.3`) and cuts out
 // each product into a transparent PNG with `SAM 3.1` in parallel (< 30s for 3-10 photos).
 
-import sharp from "sharp";
 import { callModelWithTelemetry, type ModelCallTelemetry } from "../gateway";
 import {
+  CutoutFailedError,
   cutoutProduct,
-  type CutoutProductResult,
   type NormalizedBBox,
 } from "../studio/cutout";
+import {
+  normalizePhoto,
+  photoToModelDataUrl,
+  type PhotoInput,
+  type PhotoSource,
+} from "../studio/photo";
 import {
   ExtractedProductSchema,
   RawProductExtractionModelSchema,
   type ExtractedProduct,
 } from "./schemas";
 
+// Each photo makes two model calls, so this allows at most 10 in flight
+const MAX_CONCURRENT_PHOTOS = 5;
+
+const EXTRACT_INPUT_MAX_SIDE = 1024;
+
 export type PhotoInputItem = {
   /**
    * Raw image bytes (`Buffer` / `Uint8Array`), base64, data URL, or signed URL.
    */
-  photo: Buffer | Uint8Array | string;
+  photo: PhotoSource;
   /**
    * Identifier or storage path of the uploaded source photo (e.g., `uploads/shop_1/photo_1.jpg`).
    */
@@ -30,7 +40,8 @@ export type PhotoInputItem = {
   labelHint?: string;
 };
 
-export type ExtractProductFromPhotoInput = PhotoInputItem & {
+export type ExtractProductFromPhotoInput = Omit<PhotoInputItem, "photo"> & {
+  photo: PhotoInput;
   shopId?: string;
   postId?: string;
   contentLanguage?: "en" | "id";
@@ -64,35 +75,20 @@ export type ExtractProductsAndCutoutsInput = {
   contentLanguage?: "en" | "id";
 };
 
+export type PhotoExtractionFailure = {
+  sourcePhotoId: string;
+  error: string;
+  /** Model calls this photo still made, which count towards the batch cost. */
+  telemetry: ModelCallTelemetry[];
+};
+
 export type ExtractProductsAndCutoutsResult = {
   items: ExtractedProductWithCutout[];
+  /** Photos the owner needs to retry. The rest of the batch is unaffected. */
+  failures: PhotoExtractionFailure[];
   totalLatencyMs: number;
   totalCostUsd: number;
 };
-
-async function photoToDataUrl(
-  photo: Buffer | Uint8Array | string,
-): Promise<string> {
-  if (Buffer.isBuffer(photo)) {
-    const jpegBuf = await sharp(photo)
-      .resize({ width: 1024, height: 1024, fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer();
-    return `data:image/jpeg;base64,${jpegBuf.toString("base64")}`;
-  }
-  if (photo instanceof Uint8Array) {
-    const jpegBuf = await sharp(Buffer.from(photo))
-      .resize({ width: 1024, height: 1024, fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer();
-    return `data:image/jpeg;base64,${jpegBuf.toString("base64")}`;
-  }
-  const trimmed = photo.trim();
-  if (trimmed.startsWith("data:image/") || /^https?:\/\//i.test(trimmed)) {
-    return trimmed;
-  }
-  return `data:image/jpeg;base64,${trimmed}`;
-}
 
 const EXTRACT_SYSTEM_PROMPT = `You are MARKEN's Product Catalog Extraction Agent (SRD v2.0 FR-SP-01 & FR-SP-02).
 Examine the uploaded product photo and return strictly valid JSON matching this structure:
@@ -118,7 +114,10 @@ STRICT TRUTH GUARDRAIL (FR-SP-02):
 export async function extractProductFromPhoto(
   input: ExtractProductFromPhotoInput,
 ): Promise<ExtractProductFromPhotoResult> {
-  const imageUrl = await photoToDataUrl(input.photo);
+  const imageUrl = await photoToModelDataUrl(
+    await normalizePhoto(input.photo),
+    EXTRACT_INPUT_MAX_SIDE,
+  );
   const langInstruction =
     input.contentLanguage === "id"
       ? "Write name, attributes, and description in Bahasa Indonesia."
@@ -155,70 +154,132 @@ export async function extractProductFromPhoto(
   return { product, telemetry };
 }
 
+function errorMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : String(reason);
+}
+
+async function processPhoto(
+  item: PhotoInputItem,
+  input: ExtractProductsAndCutoutsInput,
+): Promise<ExtractedProductWithCutout | PhotoExtractionFailure> {
+  const { sourcePhotoId } = item;
+
+  let photo: PhotoInput;
+  try {
+    photo = await normalizePhoto(item.photo);
+  } catch (reason) {
+    return { sourcePhotoId, error: errorMessage(reason), telemetry: [] };
+  }
+
+  // Run Muse Spark vision extraction and SAM 3.1 cutout concurrently per photo
+  const [extractRes, cutoutRes] = await Promise.allSettled([
+    extractProductFromPhoto({
+      ...item,
+      photo,
+      shopId: input.shopId,
+      postId: input.postId,
+      contentLanguage: input.contentLanguage,
+    }),
+    cutoutProduct({
+      photo,
+      labelHint: item.labelHint ?? "main product",
+      shopId: input.shopId,
+      postId: input.postId,
+    }),
+  ]);
+
+  if (extractRes.status === "fulfilled" && cutoutRes.status === "fulfilled") {
+    const { telemetry: cutoutTelemetry, ...cutout } = cutoutRes.value;
+    return {
+      product: extractRes.value.product,
+      cutout,
+      telemetry: {
+        extract: extractRes.value.telemetry,
+        cutout: cutoutTelemetry,
+      },
+    };
+  }
+
+  const telemetry: ModelCallTelemetry[] = [];
+  const errors: string[] = [];
+  if (extractRes.status === "fulfilled") {
+    telemetry.push(extractRes.value.telemetry);
+  } else {
+    errors.push(errorMessage(extractRes.reason));
+  }
+  if (cutoutRes.status === "fulfilled") {
+    telemetry.push(cutoutRes.value.telemetry);
+  } else {
+    errors.push(errorMessage(cutoutRes.reason));
+    if (cutoutRes.reason instanceof CutoutFailedError) {
+      telemetry.push(cutoutRes.reason.telemetry);
+    }
+  }
+
+  return { sourcePhotoId, error: errors.join("; "), telemetry };
+}
+
+/**
+ * Maps with a concurrency cap, keeping input order.
+ */
+async function mapWithLimit<T, R>(
+  values: T[],
+  limit: number,
+  fn: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < values.length) {
+      const index = next++;
+      results[index] = await fn(values[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: limit }, worker));
+  return results;
+}
+
 /**
  * Batch pipeline (`FR-SP-01`, `FR-SP-02`, `FR-SP-09`) consumed by `POST /api/shops/:id/extract`.
- * Runs `Muse Spark` metadata extraction and `SAM 3.1` product cutout in parallel across all
- * uploaded photos (3-10 photos under 30 seconds).
+ * Runs `Muse Spark` metadata extraction and `SAM 3.1` product cutout in parallel across the
+ * uploaded photos (3-10 photos under 30 seconds). A photo that fails lands in `failures`
+ * and never costs the owner the rest of the batch.
  */
 export async function extractProductsAndCutouts(
   input: ExtractProductsAndCutoutsInput,
 ): Promise<ExtractProductsAndCutoutsResult> {
   const startedAt = performance.now();
 
-  const items = await Promise.all(
-    input.photos.map(async (item): Promise<ExtractedProductWithCutout> => {
-      // Run Muse Spark vision extraction and SAM 3.1 cutout concurrently per photo
-      const [extractRes, cutoutRes]: [
-        ExtractProductFromPhotoResult,
-        CutoutProductResult,
-      ] = await Promise.all([
-        extractProductFromPhoto({
-          ...item,
-          shopId: input.shopId,
-          postId: input.postId,
-          contentLanguage: input.contentLanguage,
-        }),
-        cutoutProduct({
-          photo: item.photo,
-          labelHint: item.labelHint ?? "main product",
-          shopId: input.shopId,
-          postId: input.postId,
-        }),
-      ]);
-
-      return {
-        product: extractRes.product,
-        cutout: {
-          cutoutBuffer: cutoutRes.cutoutBuffer,
-          cutoutDataUrl: cutoutRes.cutoutDataUrl,
-          bbox: cutoutRes.bbox,
-          width: cutoutRes.width,
-          height: cutoutRes.height,
-          confidence: cutoutRes.confidence,
-        },
-        telemetry: {
-          extract: extractRes.telemetry,
-          cutout: cutoutRes.telemetry,
-        },
-      };
-    }),
+  const results = await mapWithLimit(
+    input.photos,
+    MAX_CONCURRENT_PHOTOS,
+    (item) => processPhoto(item, input),
   );
+
+  const items: ExtractedProductWithCutout[] = [];
+  const failures: PhotoExtractionFailure[] = [];
+  for (const result of results) {
+    if ("error" in result) failures.push(result);
+    else items.push(result);
+  }
 
   const totalLatencyMs = Math.max(1, Math.round(performance.now() - startedAt));
   const totalCostUsd = Number(
-    items
-      .reduce(
-        (sum, item) =>
-          sum + item.telemetry.extract.costUsd + item.telemetry.cutout.costUsd,
-        0,
-      )
+    [
+      ...items.flatMap((item) => [
+        item.telemetry.extract,
+        item.telemetry.cutout,
+      ]),
+      ...failures.flatMap((failure) => failure.telemetry),
+    ]
+      .reduce((sum, telemetry) => sum + telemetry.costUsd, 0)
       .toFixed(6),
   );
 
   return {
     items,
+    failures,
     totalLatencyMs,
     totalCostUsd,
   };
 }
-

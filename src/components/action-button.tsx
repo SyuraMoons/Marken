@@ -11,12 +11,14 @@ export function ActionButton({
   body,
   variant,
   disabled,
+  then,
   children,
 }: {
   url: string;
   body?: unknown;
   variant?: "primary" | "secondary" | "text" | "danger";
   disabled?: boolean;
+  then?: string;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -33,6 +35,7 @@ export function ActionButton({
       }).catch(() => null);
       if (res?.status === 401) return router.push("/login");
       if (!res?.ok) return setError(true);
+      if (then) return router.push(then);
       router.refresh();
     });
 

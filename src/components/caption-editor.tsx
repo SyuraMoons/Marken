@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Carousel } from "./carousel";
 import { CopyButton } from "./copy-button";
 import { ActionButton } from "./action-button";
@@ -8,22 +9,48 @@ import { Button, ButtonLink } from "./button";
 import { t } from "@/lib/i18n";
 import type { Slide } from "@/lib/posts/slides";
 
-const MAX_REWRITES = 5;
+const POLL_MS = 3000;
+const GIVE_UP_MS = 60_000;
 
 // Manual caption edit + rewrite from feedback (F-11, FR-ED-01/02, DX-32). Manual edit is sent with Approve, not saved on its own.
 export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: string; slides: Slide[]; captions: string[]; hashtags: string[] }) {
+  const router = useRouter();
   const [index, setIndex] = useState(0);
   const [text, setText] = useState(captions[0] ?? "");
   const [feedback, setFeedback] = useState("");
-  const [count, setCount] = useState(0);
+  const [limited, setLimited] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [waiting, setWaiting] = useState(false);
   const [pending, start] = useTransition();
-  const limited = count >= MAX_REWRITES;
+  const seen = useRef(captions.join("\n"));
 
   const choose = (i: number) => {
     setIndex(i);
     setText(captions[i] ?? "");
   };
+
+  // The rewrite runs as a job; re-read the page until new options arrive.
+  useEffect(() => {
+    if (!waiting) return;
+    const poll = setInterval(() => router.refresh(), POLL_MS);
+    const giveUp = setTimeout(() => {
+      setWaiting(false);
+      setFailed(true);
+    }, GIVE_UP_MS);
+    return () => {
+      clearInterval(poll);
+      clearTimeout(giveUp);
+    };
+  }, [waiting, router]);
+
+  useEffect(() => {
+    const now = captions.join("\n");
+    if (!waiting || now === seen.current) return;
+    seen.current = now;
+    setWaiting(false);
+    setIndex(0);
+    setText(captions[0] ?? "");
+  }, [captions, waiting]);
 
   const rewrite = () =>
     start(async () => {
@@ -33,19 +60,11 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target: "caption", feedback: feedback.trim() }),
       }).catch(() => null);
-      setCount(count + 1);
-      if (res?.ok) {
-        const data = (await res.json()) as { caption_options?: string[] };
-        if (data.caption_options?.[0]) setText(data.caption_options[0]);
-        return;
-      }
-      if (res?.status === 429) return setCount(MAX_REWRITES);
-      // shortcut: endpoint is still 501, so rotate the mock options until it ships.
-      if (process.env.NODE_ENV !== "production" && captions.length > 1) {
-        choose((index + 1) % captions.length);
-        return;
-      }
-      setFailed(true);
+      if (res?.status === 429) return setLimited(true);
+      if (!res?.ok) return setFailed(true);
+      const data = (await res.json().catch(() => ({}))) as { remaining?: number };
+      if (data.remaining === 0) setLimited(true);
+      setWaiting(true);
     });
 
   return (
@@ -111,7 +130,7 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
                 className="rounded-control border border-border bg-white p-3 font-normal placeholder:text-muted focus:outline-2 focus:outline-blue"
               />
             </label>
-            <Button variant="secondary" onClick={rewrite} disabled={limited || pending || !feedback.trim()} aria-busy={pending}>
+            <Button variant="secondary" onClick={rewrite} disabled={limited || pending || waiting || !feedback.trim()} aria-busy={pending || waiting}>
               {t("edit.rewrite")}
             </Button>
             {limited && (
@@ -126,7 +145,7 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
             )}
           </section>
 
-          <ActionButton url={`/api/posts/${postId}/approve`} body={{ caption: text }}>
+          <ActionButton url={`/api/posts/${postId}/approve`} body={{ caption: text }} then="/today">
             {t("edit.approve")}
           </ActionButton>
           <ButtonLink href="/today" variant="text">

@@ -13,6 +13,8 @@ Guidance for AI coding agents (Claude Code, Codex, Cursor, Antigravity, etc.) wo
 - **Source of truth:** `docs/SRD.md` (**SRD v2.0 Final**). If anything from v1.0/v1.1 disagrees with v2.0, **v2.0 wins**.
 - **Team & Workstreams:** See `docs/TEAM.md` for workstream boundaries between **Altaf** (AI Engine, Gateway, Studio/Fidelity), **Harfi** (Supabase, Inngest Jobs, IG API, API Routes), and **Nalen & Akhnaf** (UI/UX, Frontend Flows, Pilot & Video).
 
+- **Frontend rules:** Anyone touching UI reads `docs/frontend/` first (`RULES.md`, `DESIGN.md`, `DESIGN_FIXES.md`, `DECISIONS.md`, `API_CONTRACT.md`).
+
 ## Status and commands
 
 Scaffold state: pages render placeholders; the issue #11 API routes are live (Instagram callback still returns 501, jobs are queued as Inngest events that #12/#13 consume); and `src/lib/*` modules are being implemented by workstream (`src/lib/gateway/*`, `src/lib/studio/cutout.ts`, and `src/lib/agents/extract.ts` are live against `https://api.meta.ai/v1`).

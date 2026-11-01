@@ -1,32 +1,29 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { Placeholder } from "@/components/placeholder";
+import { SETUP_STEPS, SetupShell } from "@/components/setup-shell";
+import { SetupSteps } from "@/components/setup-steps";
 
-const STEPS = [
-  "Welcome",
-  "Shop basics",
-  "Upload",
-  "Review products",
-  "Voice and rules",
-  "Connect Instagram",
-  "Notifications",
-  "First post + tour",
-] as const;
-
+// 5 steps per SRD §6 (FD-03); DB checks onboarding_step between 1 and 5.
 export function generateStaticParams() {
-  return STEPS.map((_, i) => ({ step: String(i + 1) }));
+  return Array.from({ length: SETUP_STEPS }, (_, i) => ({ step: String(i + 1) }));
 }
 
-export default async function OnboardingStepPage({
-  params,
-}: PageProps<"/onboarding/[step]">) {
-  const { step } = await params;
-  const index = Number(step) - 1;
-  if (!(index in STEPS)) notFound();
+export default function OnboardingStepPage({ params }: PageProps<"/onboarding/[step]">) {
+  // params must be read inside Suspense for instant navigation (cacheComponents).
+  return (
+    <Suspense fallback={<div className="bg-atmosphere min-h-dvh" />}>
+      <Step params={params} />
+    </Suspense>
+  );
+}
+
+async function Step({ params }: Pick<PageProps<"/onboarding/[step]">, "params">) {
+  const step = Number((await params).step);
+  if (!Number.isInteger(step) || step < 1 || step > SETUP_STEPS) notFound();
 
   return (
-    <Placeholder
-      title={`Step ${index + 1} of ${STEPS.length}: ${STEPS[index]}`}
-      refs={`F-03 · FR-OB-0${index + 1}`}
-    />
+    <SetupShell step={step}>
+      <SetupSteps step={step} />
+    </SetupShell>
   );
 }

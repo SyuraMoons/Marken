@@ -71,7 +71,7 @@ export const publishPost = inngest.createFunction(
       const admin = createAdminClient();
       const { data: post } = await admin
         .from("posts")
-        .select("status, slides, chosen_caption, hashtags")
+        .select("status, slides, chosen_caption, hashtags, ig_media_id")
         .eq("id", postId)
         .eq("shop_id", shopId)
         .single();
@@ -103,9 +103,28 @@ export const publishPost = inngest.createFunction(
       return {
         slides: slides.map((s) => ({ order: s.order, path: s.slide_path, alt: s.alt })),
         caption: buildCaption(post.chosen_caption, post.hashtags),
+        mediaId: post.ig_media_id,
       };
     });
     if (!input) return { skipped: "not_approved" };
+
+    const finish = (mediaId: string) =>
+      step.run("finish", async () => {
+        const permalink = await guard(shopId, async () => getPermalink(await getValidToken(shopId), mediaId));
+        const { error } = await createAdminClient()
+          .from("posts")
+          .update({ status: "published", ig_media_id: mediaId, permalink, published_at: new Date().toISOString() })
+          .eq("id", postId)
+          .eq("status", "publishing");
+        if (error) throw new Error(error.message);
+      });
+
+    // An earlier run already published this carousel and only failed afterwards, so
+    // finish the record instead of posting a second copy.
+    if (input.mediaId) {
+      await finish(input.mediaId);
+      return { postId, mediaId: input.mediaId, resumed: true };
+    }
 
     // One container per slide. Tokens and signed URLs stay inside the step: Inngest stores
     // step results, so only container ids are returned.
@@ -138,26 +157,24 @@ export const publishPost = inngest.createFunction(
       withStep(ctx, "ig_publish", null, () =>
         guard(shopId, async () => {
           const token = await getValidToken(shopId);
+          let id: string;
           if ((await containerStatus(token, carousel)) === "PUBLISHED") {
             const found = await findRecentMedia(token, input.caption);
-            if (found) return found;
-            throw new NonRetriableError("container already published but media not found");
+            if (!found) throw new NonRetriableError("container already published but media not found");
+            id = found;
+          } else {
+            id = await publishContainer(token, carousel);
           }
-          return publishContainer(token, carousel);
+          // Record the media id the moment it exists. If a later step fails, Approve resumes
+          // at finish instead of publishing the carousel a second time.
+          const { error } = await createAdminClient().from("posts").update({ ig_media_id: id }).eq("id", postId);
+          if (error) console.error("store ig_media_id failed", postId, error.message);
+          return id;
         }),
       ),
     );
 
-    await step.run("finish", async () => {
-      const permalink = await guard(shopId, async () => getPermalink(await getValidToken(shopId), mediaId));
-      const { error } = await createAdminClient()
-        .from("posts")
-        .update({ status: "published", ig_media_id: mediaId, permalink, published_at: new Date().toISOString() })
-        .eq("id", postId)
-        .eq("status", "publishing");
-      if (error) throw new Error(error.message);
-    });
-
+    await finish(mediaId);
     return { postId, mediaId };
   },
 );

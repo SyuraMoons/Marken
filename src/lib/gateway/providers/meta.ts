@@ -3,6 +3,7 @@ import type {
   ProviderRawResponse,
   ProviderRequest,
 } from "../types";
+import { parseSamOutput } from "./sam-output";
 
 /**
  * Maps internal canonical model IDs (`SRD v2.0 §4`) to live Meta Model API (`https://api.meta.ai/v1`) IDs.
@@ -269,46 +270,15 @@ export async function callMetaProvider(
     };
 
     const outputText =
-      payload.output?.[0]?.content?.find((c) => c.type === "output_text")
-        ?.text ?? "";
-
-    // Parse `<|box;x1=...;y1=...;x2=...;y2=...;w=...;h=...|>` and `<|mask;x=...;y=...;data=...|>`
-    const boxMatch = outputText.match(
-      /<\|box;x1=(\d+);y1=(\d+);x2=(\d+);y2=(\d+);w=(\d+);h=(\d+)\|>/,
-    );
-    const maskMatch = outputText.match(
-      /<\|mask;x=(\d+);y=(\d+);data=([^|]+)\|>/,
-    );
-
-    let bbox = { x: 0.15, y: 0.15, width: 0.7, height: 0.7 };
-    let pixelBox:
-      | { x1: number; y1: number; x2: number; y2: number; w: number; h: number }
-      | undefined;
-
-    if (boxMatch) {
-      const x1 = Number(boxMatch[1]);
-      const y1 = Number(boxMatch[2]);
-      const x2 = Number(boxMatch[3]);
-      const y2 = Number(boxMatch[4]);
-      const w = Math.max(1, Number(boxMatch[5]));
-      const h = Math.max(1, Number(boxMatch[6]));
-      pixelBox = { x1, y1, x2, y2, w, h };
-      bbox = {
-        x: Number((x1 / w).toFixed(4)),
-        y: Number((y1 / h).toFixed(4)),
-        width: Number((Math.max(1, x2 - x1) / w).toFixed(4)),
-        height: Number((Math.max(1, y2 - y1) / h).toFixed(4)),
-      };
-    }
+      payload.output
+        ?.flatMap((item) => item.content ?? [])
+        .find((c) => c.type === "output_text")?.text ?? "";
 
     return {
       rawOutput: {
         cutoutBase64: null,
         rawSegmentationText: outputText,
-        maskData: maskMatch ? maskMatch[3] : null,
-        pixelBox: pixelBox ?? null,
-        bbox,
-        confidence: boxMatch ? 0.98 : 0.75,
+        ...(await parseSamOutput(outputText)),
       },
       tokensIn: payload.usage?.input_tokens ?? 0,
       tokensOut: payload.usage?.output_tokens ?? 0,

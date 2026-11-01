@@ -3,9 +3,14 @@
 // mask via Meta's official `@meta-sam/parser`, and returns a transparent RGBA PNG buffer
 // ready for deterministic compositing.
 
-import { decodeMaskToRaster } from "@meta-sam/parser";
+import { decodeMaskToRaster, type SegmentationMask } from "@meta-sam/parser";
 import sharp from "sharp";
 import { callModelWithTelemetry, type ModelCallTelemetry } from "../gateway";
+import { normalizePhoto, photoToModelDataUrl, type PhotoInput } from "./photo";
+
+// Larger than the extraction image: the mask is upscaled onto full-resolution pixels,
+// so this sets how clean the cutout edge is.
+const SAM_INPUT_MAX_SIDE = 2048;
 
 export type NormalizedBBox = {
   x: number;
@@ -15,11 +20,7 @@ export type NormalizedBBox = {
 };
 
 export type CutoutProductInput = {
-  /**
-   * Raw image bytes (`Buffer` / `Uint8Array`), base64 string, `data:image/...;base64,...` URI,
-   * or an HTTP(S) signed URL.
-   */
-  photo: Buffer | Uint8Array | string;
+  photo: PhotoInput;
   /**
    * Optional text hint for `sam-3.1` segmentation (e.g. "ceramic mug", "leather bag").
    * Defaults to "main product".
@@ -51,9 +52,9 @@ export type CutoutProductResult = {
    */
   height: number;
   /**
-   * Segmentation confidence `[0..1]`.
+   * Segmentation confidence `[0..1]` from `sam-3.1`, or `null` when it did not report one.
    */
-  confidence: number;
+  confidence: number | null;
   /**
    * Gateway telemetry record (`step: "cutout"`, `model: "sam-3.1"`).
    */
@@ -63,7 +64,7 @@ export type CutoutProductResult = {
 type SamGatewayOutput = {
   cutoutBase64?: string | null;
   rawSegmentationText?: string;
-  maskData?: string | null;
+  mask?: SegmentationMask | null;
   pixelBox?: {
     x1: number;
     y1: number;
@@ -72,116 +73,38 @@ type SamGatewayOutput = {
     w: number;
     h: number;
   } | null;
-  bbox?: NormalizedBBox;
-  confidence?: number;
+  bbox?: NormalizedBBox | null;
+  confidence?: number | null;
+  issue?: string | null;
 };
 
 /**
- * Decodes `sam-3.1` `<|mask;x=...;y=...;data=<height>,<width>,<payload>|>` using
- * `@meta-sam/parser`'s official `decodeMaskToRaster` into a `0 | 255` alpha `Buffer`.
+ * Thrown when `sam-3.1` gives no usable segmentation. A plain crop would keep the
+ * background and pass as a real cutout, so the step fails visibly instead (`FR-SP-09`).
+ * Carries the telemetry because the call was still made and paid for.
  */
-export function decodeSamMaskToAlphaBuffer(maskData: string): {
-  alpha: Buffer;
-  width: number;
-  height: number;
-} | null {
-  try {
-    const firstComma = maskData.indexOf(",");
-    const secondComma = maskData.indexOf(",", firstComma + 1);
-    if (firstComma === -1 || secondComma === -1) return null;
+export class CutoutFailedError extends Error {
+  readonly telemetry: ModelCallTelemetry;
 
-    const height = Number(maskData.slice(0, firstComma));
-    const width = Number(maskData.slice(firstComma + 1, secondComma));
-    const payload = maskData.slice(secondComma + 1).trim();
-
-    if (
-      !Number.isSafeInteger(height) ||
-      !Number.isSafeInteger(width) ||
-      height <= 0 ||
-      width <= 0 ||
-      !payload
-    ) {
-      return null;
-    }
-
-    const encoding = payload.startsWith("~")
-      ? "lossless"
-      : payload.startsWith("!")
-        ? "one_bit"
-        : null;
-    if (!encoding) return null;
-
-    const raster01 = decodeMaskToRaster({
-      encoding,
-      payload,
-      width,
-      height,
-    });
-
-    const alpha = Buffer.allocUnsafe(raster01.length);
-    for (let i = 0; i < raster01.length; i++) {
-      alpha[i] = raster01[i] ? 255 : 0;
-    }
-
-    return { alpha, width, height };
-  } catch {
-    return null;
+  constructor(reason: string, telemetry: ModelCallTelemetry) {
+    super(`Product cutout failed: ${reason}`);
+    this.name = "CutoutFailedError";
+    this.telemetry = telemetry;
   }
 }
 
-async function resolvePhotoInput(photo: Buffer | Uint8Array | string): Promise<{
-  photoBuffer: Buffer;
-  dataUrl: string;
-}> {
-  if (Buffer.isBuffer(photo)) {
-    const pngBuf = await sharp(photo).png().toBuffer();
-    return {
-      photoBuffer: pngBuf,
-      dataUrl: `data:image/png;base64,${pngBuf.toString("base64")}`,
-    };
+/**
+ * Decodes a `sam-3.1` mask into a `0 | 255` alpha `Buffer`. Returns `null` for an empty mask.
+ */
+function maskToAlpha(mask: SegmentationMask): Buffer | null {
+  const raster01 = decodeMaskToRaster(mask);
+  const alpha = Buffer.allocUnsafe(raster01.length);
+  let foreground = false;
+  for (let i = 0; i < raster01.length; i++) {
+    alpha[i] = raster01[i] ? 255 : 0;
+    foreground ||= raster01[i] !== 0;
   }
-
-  if (photo instanceof Uint8Array) {
-    const pngBuf = await sharp(Buffer.from(photo)).png().toBuffer();
-    return {
-      photoBuffer: pngBuf,
-      dataUrl: `data:image/png;base64,${pngBuf.toString("base64")}`,
-    };
-  }
-
-  const trimmed = photo.trim();
-  if (trimmed.startsWith("data:image/")) {
-    const base64Part = trimmed.split(",")[1] ?? "";
-    const buf = Buffer.from(base64Part, "base64");
-    const pngBuf = await sharp(buf).png().toBuffer();
-    return {
-      photoBuffer: pngBuf,
-      dataUrl: `data:image/png;base64,${pngBuf.toString("base64")}`,
-    };
-  }
-
-  if (/^https?:\/\//i.test(trimmed)) {
-    const res = await fetch(trimmed);
-    if (!res.ok) {
-      throw new Error(
-        `Failed to fetch product photo from URL (${res.status}): ${trimmed}`,
-      );
-    }
-    const arrayBuf = await res.arrayBuffer();
-    const pngBuf = await sharp(Buffer.from(arrayBuf)).png().toBuffer();
-    return {
-      photoBuffer: pngBuf,
-      dataUrl: `data:image/png;base64,${pngBuf.toString("base64")}`,
-    };
-  }
-
-  // Assume raw base64 string
-  const buf = Buffer.from(trimmed, "base64");
-  const pngBuf = await sharp(buf).png().toBuffer();
-  return {
-    photoBuffer: pngBuf,
-    dataUrl: `data:image/png;base64,${pngBuf.toString("base64")}`,
-  };
+  return foreground ? alpha : null;
 }
 
 /**
@@ -191,10 +114,9 @@ async function resolvePhotoInput(photo: Buffer | Uint8Array | string): Promise<{
 export async function cutoutProduct(
   input: CutoutProductInput,
 ): Promise<CutoutProductResult> {
-  const { photoBuffer, dataUrl } = await resolvePhotoInput(input.photo);
-  const metadata = await sharp(photoBuffer).metadata();
-  const origWidth = metadata.width ?? 800;
-  const origHeight = metadata.height ?? 800;
+  const photo = await normalizePhoto(input.photo);
+  const dataUrl = await photoToModelDataUrl(photo, SAM_INPUT_MAX_SIDE);
+  const { uprightPng, width: origWidth, height: origHeight } = photo;
 
   const { data: samOut, telemetry } = await callModelWithTelemetry<
     { imageUrl: string; labelHint: string },
@@ -211,64 +133,46 @@ export async function cutoutProduct(
   });
 
   // Fast path: if mock provider returned a pre-rendered PNG base64
-  if (samOut.cutoutBase64) {
+  if (samOut.cutoutBase64 && samOut.bbox) {
     const rawBuf = Buffer.from(samOut.cutoutBase64, "base64");
     const cutoutBuffer = await sharp(rawBuf).ensureAlpha().png().toBuffer();
     const cutMeta = await sharp(cutoutBuffer).metadata();
     return {
       cutoutBuffer,
       cutoutDataUrl: `data:image/png;base64,${cutoutBuffer.toString("base64")}`,
-      bbox: samOut.bbox ?? { x: 0.15, y: 0.15, width: 0.7, height: 0.7 },
+      bbox: samOut.bbox,
       width: cutMeta.width ?? origWidth,
       height: cutMeta.height ?? origHeight,
-      confidence: samOut.confidence ?? 0.98,
+      confidence: samOut.confidence ?? null,
       telemetry,
     };
   }
 
-  // Determine pixel crop box from SAM 3.1 `<|box;x1=...;y1=...;x2=...;y2=...;w=...;h=|>`
-  const bbox: NormalizedBBox = samOut.bbox ?? {
-    x: 0.15,
-    y: 0.15,
-    width: 0.7,
-    height: 0.7,
-  };
-
-  let cropLeft: number;
-  let cropTop: number;
-  let cropWidth: number;
-  let cropHeight: number;
-
-  if (samOut.pixelBox) {
-    const scaleX = origWidth / Math.max(1, samOut.pixelBox.w);
-    const scaleY = origHeight / Math.max(1, samOut.pixelBox.h);
-    cropLeft = Math.max(0, Math.round(samOut.pixelBox.x1 * scaleX));
-    cropTop = Math.max(0, Math.round(samOut.pixelBox.y1 * scaleY));
-    const right = Math.min(
-      origWidth,
-      Math.round((samOut.pixelBox.x2 + 1) * scaleX),
-    );
-    const bottom = Math.min(
-      origHeight,
-      Math.round((samOut.pixelBox.y2 + 1) * scaleY),
-    );
-    cropWidth = Math.max(1, right - cropLeft);
-    cropHeight = Math.max(1, bottom - cropTop);
-  } else {
-    cropLeft = Math.max(0, Math.round(bbox.x * origWidth));
-    cropTop = Math.max(0, Math.round(bbox.y * origHeight));
-    cropWidth = Math.max(
-      1,
-      Math.min(origWidth - cropLeft, Math.round(bbox.width * origWidth)),
-    );
-    cropHeight = Math.max(
-      1,
-      Math.min(origHeight - cropTop, Math.round(bbox.height * origHeight)),
+  const { mask, pixelBox, bbox } = samOut;
+  if (!mask || !pixelBox || !bbox) {
+    throw new CutoutFailedError(
+      samOut.issue ?? "sam-3.1 returned no segmentation",
+      telemetry,
     );
   }
 
+  const decodedAlpha = maskToAlpha(mask);
+  if (!decodedAlpha) {
+    throw new CutoutFailedError("sam-3.1 returned an empty mask", telemetry);
+  }
+
+  // Scale SAM 3.1 `<|box;x1=...;y1=...;x2=...;y2=...;w=...;h=...|>` onto the full-size photo
+  const scaleX = origWidth / Math.max(1, pixelBox.w);
+  const scaleY = origHeight / Math.max(1, pixelBox.h);
+  const cropLeft = Math.max(0, Math.round(pixelBox.x1 * scaleX));
+  const cropTop = Math.max(0, Math.round(pixelBox.y1 * scaleY));
+  const right = Math.min(origWidth, Math.round((pixelBox.x2 + 1) * scaleX));
+  const bottom = Math.min(origHeight, Math.round((pixelBox.y2 + 1) * scaleY));
+  const cropWidth = Math.max(1, right - cropLeft);
+  const cropHeight = Math.max(1, bottom - cropTop);
+
   // Extract RGB pixels of the bounding box crop (3 channels)
-  const croppedRgbBuffer = await sharp(photoBuffer)
+  const croppedRgbBuffer = await sharp(uprightPng)
     .extract({
       left: cropLeft,
       top: cropTop,
@@ -279,32 +183,16 @@ export async function cutoutProduct(
     .raw()
     .toBuffer();
 
-  // Decode SAM 3.1 mask via `@meta-sam/parser`
-  let alphaChannel: Buffer | null = null;
-  if (samOut.maskData) {
-    const decoded = decodeSamMaskToAlphaBuffer(samOut.maskData);
-    if (decoded) {
-      if (decoded.width === cropWidth && decoded.height === cropHeight) {
-        alphaChannel = decoded.alpha;
-      } else {
-        alphaChannel = await sharp(decoded.alpha, {
-          raw: {
-            width: decoded.width,
-            height: decoded.height,
-            channels: 1,
-          },
+  // The mask covers the box exactly, at its own resolution
+  const alphaChannel =
+    mask.width === cropWidth && mask.height === cropHeight
+      ? decodedAlpha
+      : await sharp(decodedAlpha, {
+          raw: { width: mask.width, height: mask.height, channels: 1 },
         })
           .resize(cropWidth, cropHeight, { fit: "fill" })
           .raw()
           .toBuffer();
-      }
-    }
-  }
-
-  // Fallback alpha mask if maskData was absent
-  if (!alphaChannel || alphaChannel.length !== cropWidth * cropHeight) {
-    alphaChannel = Buffer.alloc(cropWidth * cropHeight, 255);
-  }
 
   // Combine 3-channel RGB crop + 1-channel Alpha mask into transparent RGBA PNG
   const cutoutBuffer = await sharp(croppedRgbBuffer, {
@@ -322,7 +210,7 @@ export async function cutoutProduct(
     bbox,
     width: cropWidth,
     height: cropHeight,
-    confidence: samOut.confidence ?? 0.98,
+    confidence: samOut.confidence ?? null,
     telemetry,
   };
 }

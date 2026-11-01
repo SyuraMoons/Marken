@@ -49,7 +49,7 @@ export type ExtractedProductWithCutout = {
     bbox: NormalizedBBox;
     width: number;
     height: number;
-    confidence: number;
+    confidence: number | null;
   };
   telemetry: {
     extract: ModelCallTelemetry;

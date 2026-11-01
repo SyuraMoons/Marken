@@ -16,4 +16,16 @@ export {
   RawProductExtractionModelSchema,
   type ExtractedProduct,
 } from "./schemas";
+export {
+  compositeProductSlide,
+  computePixelFidelity,
+  cutoutProduct,
+  generateSlideScene,
+  renderAndVerifySlide,
+  verifySlideFidelity,
+  type RenderAndVerifySlideInput,
+  type RenderAndVerifySlideResult,
+  type VerifySlideFidelityInput,
+  type VerifySlideFidelityResult,
+} from "../studio";
 

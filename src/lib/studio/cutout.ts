@@ -94,17 +94,92 @@ export class CutoutFailedError extends Error {
 }
 
 /**
+ * Cleans up small specular-highlight holes and 1-2px gaps inside a binary `0 | 1` mask
+ * via morphological dilation -> border flood-fill (hole filling).
+ */
+function fillMaskHolesAndSpeckles(
+  raster01: Uint8Array,
+  width: number,
+  height: number,
+): Buffer {
+  const total = width * height;
+  const closed = new Uint8Array(raster01);
+
+  const radius = 2;
+  const dilated = new Uint8Array(total);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (closed[y * width + x]) {
+        const yMin = Math.max(0, y - radius);
+        const yMax = Math.min(height - 1, y + radius);
+        const xMin = Math.max(0, x - radius);
+        const xMax = Math.min(width - 1, x + radius);
+        for (let ny = yMin; ny <= yMax; ny++) {
+          const rowOff = ny * width;
+          for (let nx = xMin; nx <= xMax; nx++) {
+            dilated[rowOff + nx] = 1;
+          }
+        }
+      }
+    }
+  }
+
+  const exterior = new Uint8Array(total);
+  const queue = new Int32Array(total);
+  let head = 0;
+  let tail = 0;
+
+  const enqueueIfZero = (idx: number) => {
+    if (!dilated[idx] && !exterior[idx]) {
+      exterior[idx] = 1;
+      queue[tail++] = idx;
+    }
+  };
+
+  const cornerSpanX = Math.max(4, Math.round(width * 0.18));
+  for (let x = 0; x < width; x++) {
+    if (x < cornerSpanX || x >= width - cornerSpanX) {
+      enqueueIfZero(x);
+      enqueueIfZero((height - 1) * width + x);
+    }
+  }
+  for (let y = 0; y < height; y++) {
+    enqueueIfZero(y * width);
+    enqueueIfZero(y * width + (width - 1));
+  }
+
+  while (head < tail) {
+    const idx = queue[head++];
+    const x = idx % width;
+    const y = (idx - x) / width;
+
+    if (x > 0) enqueueIfZero(idx - 1);
+    if (x + 1 < width) enqueueIfZero(idx + 1);
+    if (y > 0) enqueueIfZero(idx - width);
+    if (y + 1 < height) enqueueIfZero(idx + width);
+  }
+
+  const alpha = Buffer.allocUnsafe(total);
+  for (let i = 0; i < total; i++) {
+    alpha[i] = exterior[i] ? 0 : 255;
+  }
+  return alpha;
+}
+
+/**
  * Decodes a `sam-3.1` mask into a `0 | 255` alpha `Buffer`. Returns `null` for an empty mask.
  */
 function maskToAlpha(mask: SegmentationMask): Buffer | null {
   const raster01 = decodeMaskToRaster(mask);
-  const alpha = Buffer.allocUnsafe(raster01.length);
   let foreground = false;
   for (let i = 0; i < raster01.length; i++) {
-    alpha[i] = raster01[i] ? 255 : 0;
-    foreground ||= raster01[i] !== 0;
+    if (raster01[i] !== 0) {
+      foreground = true;
+      break;
+    }
   }
-  return foreground ? alpha : null;
+  if (!foreground) return null;
+  return fillMaskHolesAndSpeckles(raster01, mask.width, mask.height);
 }
 
 /**

@@ -7,10 +7,13 @@ import {
   sanitizeBaseUrl,
 } from "./meta";
 
+let warnedSharedCredentials = false;
+
 function resolveSparkOpenConfig(): {
   apiKey: string | undefined;
   baseUrl: string | undefined;
   modelId: string;
+  sharesMetaCredentials: boolean;
 } {
   const dedicatedKey =
     process.env.MUSE_SPARK_OPEN_API_KEY?.trim() ||
@@ -24,6 +27,7 @@ function resolveSparkOpenConfig(): {
       apiKey: dedicatedKey,
       baseUrl: dedicatedUrl,
       modelId: "muse-spark-open",
+      sharesMetaCredentials: false,
     };
   }
 
@@ -32,6 +36,7 @@ function resolveSparkOpenConfig(): {
     apiKey: process.env.META_MODEL_API_KEY?.trim(),
     baseUrl: sanitizeBaseUrl(process.env.META_MODEL_API_BASE_URL),
     modelId: LIVE_META_MODEL_IDS["muse-spark-open"],
+    sharesMetaCredentials: true,
   };
 }
 
@@ -49,7 +54,15 @@ export function isSparkOpenConfigured(): boolean {
 export async function callSparkOpenProvider(
   req: ProviderRequest,
 ): Promise<ProviderRawResponse> {
-  const { apiKey, baseUrl, modelId } = resolveSparkOpenConfig();
+  const { apiKey, baseUrl, modelId, sharesMetaCredentials } =
+    resolveSparkOpenConfig();
+
+  if (sharesMetaCredentials && !warnedSharedCredentials) {
+    warnedSharedCredentials = true;
+    console.warn(
+      "Muse Spark Open is using the Meta Model API URL and key, so the text fallback will not survive a Meta outage or a revoked key. Set MUSE_SPARK_OPEN_API_KEY and MUSE_SPARK_OPEN_BASE_URL for an independent fallback (NFR-18).",
+    );
+  }
 
   if (!apiKey || !baseUrl) {
     throw new ProviderError(

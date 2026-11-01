@@ -105,3 +105,11 @@ export const CarouselPlanModelSchema = z.object({
   hashtags: z.array(z.string().min(1)).min(5).max(15),
 });
 
+/**
+ * Schema for caption regeneration output (`FR-ED-01`).
+ */
+export const RegenerateCaptionModelSchema = z.object({
+  caption: z.string().min(1),
+  options: z.array(z.string().min(1)).min(1).max(3).optional(),
+});
+

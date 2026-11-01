@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { Placeholder } from "@/components/placeholder";
 import { SETUP_STEPS, SetupShell } from "@/components/setup-shell";
+import { SetupSteps } from "@/components/setup-steps";
 
 // 5 steps per SRD §6 (FD-03); DB checks onboarding_step between 1 and 5.
 export function generateStaticParams() {
@@ -23,7 +23,7 @@ async function Step({ params }: Pick<PageProps<"/onboarding/[step]">, "params">)
 
   return (
     <SetupShell step={step}>
-      <Placeholder title={`Step ${step}`} refs={`F-03 · FR-OB · step ${step}`} />
+      <SetupSteps step={step} />
     </SetupShell>
   );
 }

@@ -8,7 +8,7 @@ const NAV = [
   { href: "/settings", label: t("nav.settings") },
 ];
 
-// Main app shell. Auth guard comes with Supabase Auth (FR-AU-04).
+// Main app shell. Auth guard (FR-AU-04) is enforced in src/proxy.ts.
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-dvh flex-col">

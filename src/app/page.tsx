@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 
-// Landing page (F-01). Static; logged-in redirect (FR-LP-03) comes with auth.
+// Landing page (F-01). Static; the logged-in redirect (FR-LP-03) happens in src/proxy.ts.
 export default function LandingPage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 px-4 py-12">

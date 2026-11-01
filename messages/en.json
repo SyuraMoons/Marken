@@ -4,5 +4,14 @@
   "nav.today": "Today",
   "nav.products": "Products",
   "nav.results": "Results",
-  "nav.settings": "Settings"
+  "nav.settings": "Settings",
+  "login.title": "Log in",
+  "login.google": "Continue with Google",
+  "login.or": "or",
+  "login.email": "Email address",
+  "login.sendLink": "Email me a login link",
+  "login.sent": "Check your email for a login link.",
+  "login.error.generic": "Sign in failed. Please try again.",
+  "login.error.link": "That login link is invalid or has expired. Request a new one.",
+  "login.error.email": "Enter a valid email address."
 }

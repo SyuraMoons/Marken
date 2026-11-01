@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ActionButton } from "@/components/action-button";
 import { ActivityPanel } from "@/components/activity-panel";
@@ -9,25 +10,23 @@ import { ProductCheck } from "@/components/product-check";
 import { ReviewPanel } from "@/components/review-panel";
 import { StatusScreen } from "@/components/status-screen";
 import { t } from "@/lib/i18n";
-import { mockCalls, mockPostWith, mockProductPhoto, mockShop, mockSteps, mockTrend } from "@/lib/mock";
-import { allSlidesPassed, asSlides } from "@/lib/posts/slides";
+import { getTodayData } from "@/lib/data/today";
+import { allSlidesPassed } from "@/lib/posts/slides";
 
 // Today (F-10, FR-TD-01..04, FR-FD-03, F-24). One screen per post status.
-export default function TodayPage({ searchParams }: PageProps<"/today">) {
+export default function TodayPage() {
   return (
     <Suspense fallback={<div className="aspect-[4/5] max-w-120 animate-pulse rounded-card bg-white" />}>
-      <Today searchParams={searchParams} />
+      <Today />
     </Suspense>
   );
 }
 
-async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">) {
-  const q = await searchParams;
-  const preview = process.env.NODE_ENV !== "production";
-  // shortcut: mock reads, swap to the owner's shop + today's post via the RLS server client.
-  const post = mockPostWith(preview ? String(q.status ?? "") || undefined : undefined);
-  const shop = preview && q.ig === "none" ? { ...mockShop, ig_account_id: null } : mockShop;
-  const activity = <ActivityPanel steps={mockSteps} calls={mockCalls} />;
+async function Today() {
+  const data = await getTodayData();
+  if (!data) redirect("/login");
+  const { shop, post, steps, calls } = data;
+  const activity = <ActivityPanel steps={steps} calls={calls} />;
 
   if (!post) {
     return (
@@ -37,16 +36,27 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
     );
   }
 
-  const slides = asSlides(post.slides);
+  const { slides, downloads, trend, photo } = data;
   const captions = (post.caption_options as string[]) ?? [];
   const caption = post.chosen_caption ?? captions[0] ?? "";
+
+  // A ready post with a failed product check never offers Approve (FR-FD-01).
+  const unchecked = post.status === "ready" ? slides.find((s) => !s.fidelity_passed) : undefined;
+  if (unchecked || (post.status === "ready" && slides.length === 0)) {
+    return (
+      <StatusScreen icon="!" title={t("status.fidelity.title")} body={t("status.fidelity.body", { n: unchecked?.order ?? 1 })}>
+        <ActionButton url={`/api/shops/${shop.id}/posts/generate`}>{t("status.fidelity.action")}</ActionButton>
+        <ActivityPanel steps={steps} calls={calls} open />
+      </StatusScreen>
+    );
+  }
 
   switch (post.status) {
     case "generating":
       return (
         <StatusScreen icon="✦" title={t("status.generating.title")} body={t("status.generating.body")}>
           <AutoRefresh />
-          <ActivityPanel steps={mockSteps} calls={mockCalls} open />
+          <ActivityPanel steps={steps} calls={calls} open />
           <p className="text-sm text-muted">{t("status.control")}</p>
         </StatusScreen>
       );
@@ -58,7 +68,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
         return (
           <StatusScreen icon="↓" title={t("status.download.title")} body={t("status.download.body")}>
             {slides.map((s) => (
-              <ButtonLink key={s.order} href={s.slide_path} download={`slide-${s.order}.png`} variant={s.order === 1 ? "primary" : "secondary"}>
+              <ButtonLink key={s.order} href={downloads[s.order - 1] ?? s.slide_path} download={`slide-${s.order}.png`} variant={s.order === 1 ? "primary" : "secondary"}>
                 {t("status.download.slide", { n: s.order })}
               </ButtonLink>
             ))}
@@ -97,7 +107,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
             body={bad ? t("status.fidelity.body", { n: bad.order }) : t("status.genFailed.body")}
           >
             <ActionButton url={`/api/shops/${shop.id}/posts/generate`}>{t("status.fidelity.action")}</ActionButton>
-            <ActivityPanel steps={mockSteps} calls={mockCalls} open />
+            <ActivityPanel steps={steps} calls={calls} open />
           </StatusScreen>
         );
       }
@@ -130,9 +140,9 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
         <section aria-label={t("today.carousel")} className="flex flex-col gap-3 lg:rounded-card lg:border lg:border-border lg:bg-white lg:p-5">
           <Carousel slides={slides} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} />
-          {allSlidesPassed(slides) && (
+          {allSlidesPassed(slides) && photo?.src && (
             <ProductCheck
-              photo={mockProductPhoto}
+              photo={photo}
               slide={slides[1]}
               labels={{ badge: t("today.badge"), before: t("today.before"), after: t("today.after") }}
             />
@@ -144,9 +154,9 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
           <section className="flex flex-col gap-2 rounded-card border border-border bg-white p-5">
             <h2 className="text-xl font-semibold">{t("today.why")}</h2>
             <p className="text-muted">{post.fit_reason}</p>
-            {mockTrend.url && (
-              <a href={mockTrend.url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center text-sm font-medium text-blue hover:underline">
-                {t("today.trendSource", { title: mockTrend.title })}
+            {trend?.url && (
+              <a href={trend.url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center text-sm font-medium text-blue hover:underline">
+                {t("today.trendSource", { title: trend.title })}
               </a>
             )}
           </section>

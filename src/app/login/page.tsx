@@ -1,7 +1,14 @@
 import { Suspense } from "react";
 import { Button, ButtonLink } from "@/components/button";
 import { Logo } from "@/components/logo";
-import { t } from "@/lib/i18n";
+import { t, type MessageKey } from "@/lib/i18n";
+import { sendMagicLink, signInWithGoogle } from "./actions";
+
+const ERRORS: Record<string, MessageKey> = {
+  generic: "login.error.generic",
+  link: "login.error.link",
+  email: "login.error.email",
+};
 
 // Login UI only (F-02); Google + magic-link logic is Harfi's (API_CONTRACT §3).
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
@@ -29,10 +36,6 @@ async function Login({ searchParams }: Pick<PageProps<"/login">, "searchParams">
             </span>
             <h1 className="text-2xl font-semibold">{t("login.sentTitle")}</h1>
             <p className="text-muted">{t("login.sentBody")}</p>
-            {/* Resend re-enters the sent state until Harfi's magic-link action lands. */}
-            <ButtonLink href="/login?sent=1" variant="secondary">
-              {t("login.resend")}
-            </ButtonLink>
             <ButtonLink href="/login" variant="text">
               {t("login.useAnother")}
             </ButtonLink>
@@ -46,11 +49,13 @@ async function Login({ searchParams }: Pick<PageProps<"/login">, "searchParams">
 
             {q.error && (
               <p role="alert" className="text-sm text-danger">
-                {t("common.error")}
+                {t(ERRORS[String(q.error)] ?? "login.error.generic")}
               </p>
             )}
 
-            <Button type="button">{t("login.google")}</Button>
+            <form action={signInWithGoogle}>
+              <Button type="submit">{t("login.google")}</Button>
+            </form>
 
             <div className="flex items-center gap-3 text-xs font-medium text-muted" aria-hidden="true">
               <span className="h-px flex-1 bg-border" />
@@ -58,7 +63,7 @@ async function Login({ searchParams }: Pick<PageProps<"/login">, "searchParams">
               <span className="h-px flex-1 bg-border" />
             </div>
 
-            <form className="flex flex-col gap-3">
+            <form action={sendMagicLink} className="flex flex-col gap-3">
               <label className="flex flex-col gap-1.5 text-sm font-medium">
                 {t("login.email")}
                 <input

@@ -60,7 +60,13 @@ const TEXT_FALLBACK_STEPS: ReadonlySet<Step> = new Set<Step>([
 
 const MAX_RECENT_TELEMETRY = 200;
 const recentTelemetryLog: ModelCallTelemetry[] = [];
-const telemetryListeners = new Set<TelemetryLogger>();
+// Kept on globalThis: instrumentation and route handlers can be bundled separately,
+// and a module-level Set would then drop every registered logger.
+const globalTelemetry = globalThis as typeof globalThis & {
+  __marken_telemetry_listeners?: Set<TelemetryLogger>;
+};
+const telemetryListeners = (globalTelemetry.__marken_telemetry_listeners ??=
+  new Set<TelemetryLogger>());
 
 /**
  * Registers a persistence callback (e.g. Harfi's `model_calls` Supabase writer or Inngest step logger).

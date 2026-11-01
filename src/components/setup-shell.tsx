@@ -3,12 +3,11 @@ import { t, type MessageKey } from "@/lib/i18n";
 import { ButtonLink } from "./button";
 import { Logo } from "./logo";
 import { SaveAndExit } from "./save-and-exit";
-import { mockShop } from "@/lib/mock";
 
 export const SETUP_STEPS = 5;
 
 // Onboarding frame: eyebrow + 5-segment bar + Back (DX-08, DX-29).
-export function SetupShell({ step, children }: { step: number; children: ReactNode }) {
+export function SetupShell({ step, shopId, children }: { step: number; shopId: string; children: ReactNode }) {
   const name = t(`setup.step${step}` as MessageKey);
   return (
     <div className="bg-atmosphere flex min-h-dvh flex-col">
@@ -34,8 +33,7 @@ export function SetupShell({ step, children }: { step: number; children: ReactNo
           ) : (
             <span />
           )}
-          {/* shortcut: mock shop id, swap with the saved step's shop when reads land. */}
-          <SaveAndExit shopId={mockShop.id} step={step} />
+          <SaveAndExit shopId={shopId} step={step} />
         </div>
 
         <main className="flex flex-1 flex-col">{children}</main>

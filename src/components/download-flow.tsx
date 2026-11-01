@@ -8,7 +8,7 @@ import { t } from "@/lib/i18n";
 import type { Slide } from "@/lib/posts/slides";
 
 // Download fallback (FR-PB-04, 98:1340): ready only after every slide is downloaded, and ready is not published.
-export function DownloadFlow({ slides, captionText }: { slides: Slide[]; captionText: string }) {
+export function DownloadFlow({ slides, downloads = [], captionText }: { slides: Slide[]; downloads?: string[]; captionText: string }) {
   const [done, setDone] = useState<number[]>([]);
   const ready = slides.length > 0 && done.length === slides.length;
 
@@ -28,7 +28,7 @@ export function DownloadFlow({ slides, captionText }: { slides: Slide[]; caption
       {slides.map((s) => (
         <ButtonLink
           key={s.order}
-          href={s.slide_path}
+          href={downloads[s.order - 1] ?? s.slide_path}
           download={`slide-${s.order}.png`}
           variant={s.order === 1 ? "primary" : "secondary"}
           onClick={() => setDone((d) => (d.includes(s.order) ? d : [...d, s.order]))}

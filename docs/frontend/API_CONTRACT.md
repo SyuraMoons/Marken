@@ -112,7 +112,7 @@ Step 1 `data` = `{ name, category, country, content_language, time_zone }`. Step
 ```
 
 ### `GET /api/posts/:id/activity` — activity panel (FR-AP-01, FR-CL-02) **[confirm: Harfi]**
-*Route does not exist on `main` yet.*
+*Live. The real response is `{ post, steps, modelCalls, fidelity, realProduct, totals }`; its code wins over the shape below.*
 ```ts
 // 200
 {
@@ -128,8 +128,8 @@ Not required by Today any more (FD-12: server reads + page refresh). Keep for ot
 ### `GET /api/auth/instagram/callback` (FR-OB-06, F-12)
 Browser navigation only. Returns a redirect to `/onboarding/4?ig=connected|error` or `/settings?ig=...` **[confirm: Harfi]**.
 
-### Auth **[confirm: Harfi]** — not built yet
-No `src/app/login/actions.ts`, `src/proxy.ts` or `/auth/callback` exists yet, so the frontend builds the login UI presentational only. Expected once Harfi ships it: server actions in `src/app/login/actions.ts`: `signInWithGoogle`, `sendMagicLink` (→ `/login?sent=1` or `?error=generic|link|email`), `signOut`. OAuth returns to `/auth/callback`. `src/proxy.ts` handles the logged-in redirect from `/` and `/login` (FR-LP-03).
+### Auth
+Live on `development`: server actions in `src/app/login/actions.ts` (`signInWithGoogle`, `sendMagicLink`, `signOut`), OAuth return at `/auth/callback`, `src/proxy.ts` redirects: logged-out → `/login`, logged-in `/` and `/login` → `/today` or the saved onboarding step, unfinished setup → `/onboarding/N`.
 
 ## 4. Writes without an SRD route
 
@@ -138,8 +138,17 @@ Plain CRUD on the owner's own rows goes through **server actions** with the RLS 
 - style rules + tone, shop basics, notify time (`/onboarding/4`, `/settings`)
 - manual caption edit is sent with Approve (`caption` field), not saved separately
 
-Open: delete shop (NFR-14) needs storage cleanup → needs a backend route. Ask Harfi.
+Delete shop (NFR-14) uses `DELETE /api/shops/:id` with `{ "confirm": true }` (removes Storage files first).
 
 ## 5. Not used by the frontend
 
 - `POST /api/push/subscribe` — web push is out of SRD v2.0 (email only). Don't build UI for it.
+
+## 6. Real response shapes (override the proposals above)
+
+- `POST /api/uploads` body `{ mimeType, bytes }` → `201 { uploadId, path, token, signedUrl }`; upload with `uploadToSignedUrl(path, token, file)`.
+- `POST /api/shops/:id/extract` body `{ uploadIds }` → `200 { products, failures }` (synchronous).
+- `PATCH /api/shops/:id/onboarding` body `{ step, action: "start"|"finish"|"skip", data?, tour_completed? }` → `{ shop }`.
+- `POST /api/posts/:id/approve` body `{ caption? }` → `{ post, publish: "queued"|"manual"|"publishing"|"published" }`; `409 fidelity_failed` when a slide did not pass.
+- `POST /api/posts/:id/skip` body `{ reason?, note? }`; both are stored in `skip_reason`.
+- `POST /api/posts/:id/regenerate` → `202 { revisionId, remaining }`; the job writes new `caption_options`, the editor re-reads the page until they change.

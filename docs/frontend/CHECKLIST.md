@@ -102,22 +102,23 @@ Mobile node IDs; every screen also has a Desktop frame (verified on Today only).
 | resume | 97:2638 | `/onboarding/resume` | ✅ |
 
 ### Across all screens
-- 🟡 Save and exit (setup shell, all 5 steps) — PATCH wired, needs Harfi's route
+- 🟡 Save and exit (setup shell, all 5 steps) — PATCH `/api/shops/:id/onboarding` is live, unverified end to end
 - ⬜ PWA icons 192/512 px (NFR-08) — need the logo from Nalen. `favicon.ico` restored, so the manifest icon works again until real icons are added
 - ⬜ "AI assisted" slide label (NFR-20) — wording and placement need Nalen's decision
 - ⬜ Desktop frame check for every screen except Today (53 desktop frames)
 - ⬜ Live side-by-side Figma pass per screen (RULES §5)
-- ⛔ Real data instead of `src/lib/mock` (waiting on Harfi's routes and auth)
+- 🟡 Live data: Today, Edit, Products, Settings and Onboarding are wired (#34). Results, its detail and learning screens, and the tour sample post still use `src/lib/mock`. Slide remake (image-edit) needs the regenerate route to accept `target: "slide"` and shows an error until then
 
 ### Summary (1 Nov)
-50 screens: done 41 · built but unverified 8 · intentionally different 1 · not built 0. Open PRs: #28-#32; the Missing states work is uncommitted on `feat/fe-missing-states`.
+50 screens: done 41 · built but unverified 8 · intentionally different 1 · not built 0. The missing-states work was merged with `development` (live data) in the `feat/fe-missing-states` PR.
 
 ## Not ours / waiting
-- ⛔ Auth logic (Google, magic link, `login/actions.ts`, `proxy.ts`) — Harfi
-- ⛔ API routes still 501 (approve/skip/extract/generate…) — Harfi; `GET /api/posts/:id/activity` doesn't exist yet
+- ✅ Auth, API routes and activity route live on `development`; Today, edit, products, settings and onboarding read and write real data
+- ⛔ Instagram connect (`/api/auth/instagram/callback` still 501) and the generate/regenerate/publish jobs — Harfi
 - ⛔ Live Figma frame check per screen (RULES §5) — no Figma access in this setup yet
+- ⛔ Login "Resend link" (Figma 97:2016) — needs the email kept server-side after the redirect; removed rather than faked
 
 ## Verification
 - ✅ `pnpm lint`, `pnpm build`, `pnpm typecheck` all pass (1 Nov, after motion-preference lint fix in `settings-view.tsx`)
 - ✅ Visual check at 360 px and 1440 px — code-level audit done (widths, tap targets ≥44px, contrast, reduced motion; carousel smooth-scroll fixed), browser eyeball done by Nalen (1 Nov)
-- ⬜ No commit/push until Nalen says "push" (solo commits, no AI attribution)
+- ⬜ Push only when Nalen says "push" (solo commits, no AI attribution)

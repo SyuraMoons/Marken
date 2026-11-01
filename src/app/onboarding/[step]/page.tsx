@@ -1,7 +1,10 @@
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { SETUP_STEPS, SetupShell } from "@/components/setup-shell";
 import { SetupSteps } from "@/components/setup-steps";
+import { getProducts } from "@/lib/data/products";
+import { getCurrentUser } from "@/lib/supabase/auth";
+import { createClient } from "@/lib/supabase/server";
 
 // 5 steps per SRD §6 (FD-03); DB checks onboarding_step between 1 and 5.
 export function generateStaticParams() {
@@ -17,13 +20,51 @@ export default function OnboardingStepPage({ params }: PageProps<"/onboarding/[s
   );
 }
 
+// One shop per owner: created on first visit, or returned if it already exists.
+async function ensureShop(ownerId: string) {
+  const supabase = await createClient();
+  const found = await supabase.from("shops").select("*").eq("owner_id", ownerId).maybeSingle();
+  if (found.data) return found.data;
+  const created = await supabase.from("shops").insert({ owner_id: ownerId }).select("*").single();
+  if (created.data) return created.data;
+  const again = await supabase.from("shops").select("*").eq("owner_id", ownerId).single();
+  return again.data;
+}
+
 async function Step({ params }: Pick<PageProps<"/onboarding/[step]">, "params">) {
   const step = Number((await params).step);
   if (!Number.isInteger(step) || step < 1 || step > SETUP_STEPS) notFound();
 
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  const shop = await ensureShop(user.id);
+  if (!shop) throw new Error("shop_unavailable");
+  // No jumping ahead of the saved step (the PATCH route enforces the same).
+  if (step > shop.onboarding_step) redirect(`/onboarding/${shop.onboarding_step}`);
+
+  const supabase = await createClient();
+  const [products, rules] = await Promise.all([
+    getProducts(shop.id),
+    supabase.from("style_rules").select("text").eq("shop_id", shop.id).order("position"),
+  ]);
+
   return (
-    <SetupShell step={step}>
-      <SetupSteps step={step} />
+    <SetupShell step={step} shopId={shop.id}>
+      <SetupSteps
+        step={step}
+        shop={{
+          id: shop.id,
+          name: shop.name ?? "",
+          category: shop.category,
+          country: shop.country,
+          content_language: shop.content_language === "id" ? "id" : "en",
+          time_zone: shop.time_zone,
+          tone: shop.tone,
+          igConnected: Boolean(shop.ig_account_id),
+        }}
+        products={products}
+        rules={(rules.data ?? []).map((r) => r.text)}
+      />
     </SetupShell>
   );
 }

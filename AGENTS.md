@@ -17,7 +17,7 @@ Guidance for AI coding agents (Claude Code, Codex, Cursor, Antigravity, etc.) wo
 
 ## Status and commands
 
-Scaffold state: routes exist and render placeholders, API routes return 501, and `src/lib/*` modules are being implemented by workstream (`src/lib/gateway/*`, `src/lib/studio/cutout.ts`, and `src/lib/agents/extract.ts` are live against `https://api.meta.ai/v1`).
+Scaffold state: pages render placeholders; the issue #11 API routes are live (Instagram callback still returns 501, jobs are queued as Inngest events that #12/#13 consume); and `src/lib/*` modules are being implemented by workstream (`src/lib/gateway/*`, `src/lib/studio/cutout.ts`, and `src/lib/agents/extract.ts` are live against `https://api.meta.ai/v1`).
 
 ```bash
 pnpm dev          # local dev server
@@ -68,7 +68,7 @@ Breaking any of these fails SRD v2.0 acceptance criteria:
   4. Voice & Instagram (optional): tone, rules, live sample caption; connect IG or skip.
   5. First post + tour (optional tour): coach marks run on a sample post while the real 3-slide carousel generates, swapping to the real post when ready.
 - **Routes:** `/` · `/login` · `/onboarding/[step]` · `/today` · `/posts/[id]/edit` · `/products` · `/results` (P1) · `/settings`
-- **API:** `POST /api/uploads` · `POST /api/shops/:id/extract` · `PATCH /api/shops/:id/onboarding` · `POST /api/shops/:id/posts/generate` · `POST /api/posts/:id/approve` · `POST /api/posts/:id/skip` · `POST /api/posts/:id/regenerate` · `GET /api/posts/:id/activity` · `GET /api/auth/instagram/callback` · cron `trends.daily` · cron `posts.daily`
+- **API:** `POST /api/shops` · `DELETE /api/shops/:id` · `POST /api/uploads` (returns a signed upload URL; the browser uploads straight to Storage) · `POST /api/shops/:id/extract` · `PATCH /api/shops/:id/onboarding` · `POST /api/shops/:id/posts/generate` · `POST /api/posts/:id/approve` · `POST /api/posts/:id/skip` · `POST /api/posts/:id/regenerate` · `GET /api/posts/:id/activity` · `GET /api/auth/instagram/callback` · cron `trends.daily` · cron `posts.daily`
 
 <!-- BEGIN:nextjs-agent-rules -->
 

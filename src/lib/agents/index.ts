@@ -18,6 +18,7 @@ export {
   StyleRuleCheckModelSchema,
   CarouselPlanModelSchema,
   CarouselSlidePlanSchema,
+  RegenerateCaptionModelSchema,
   TrendAnalysisModelSchema,
   TrendResearchModelSchema,
   TrendScoreModelSchema,
@@ -29,6 +30,14 @@ export {
   type CheckStyleRulesInput,
   type CheckStyleRulesResult,
 } from "./rules";
+export {
+  MAX_REVISIONS_PER_DAY,
+  regenerateCaptionFromFeedback,
+  RevisionLimitExceededError,
+  type RegenerateCaptionInput,
+  type RegenerateCaptionResult,
+  type RegeneratedCaptionOption,
+} from "./caption";
 export {
   planDailyCarousel,
   selectEligibleProductsAndTrends,

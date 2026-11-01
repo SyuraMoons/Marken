@@ -19,8 +19,8 @@ Updated by whoever slices a screen. States: ✅ done+verified · 🟡 sliced, no
 - ⬜ Results `/results` — P1, stays placeholder until after 2 Nov gate
 
 ## Not ours / waiting
-- ⛔ Auth logic (Google, magic link, `login/actions.ts`, `proxy.ts`) — Harfi
-- ⛔ API routes still 501 (approve/skip/extract/generate…) — Harfi; `GET /api/posts/:id/activity` doesn't exist yet
+- ✅ Auth, API routes and activity route live on `development`; Today, edit, products, settings and onboarding read and write real data
+- ⛔ Instagram connect (`/api/auth/instagram/callback` still 501) and the generate/regenerate/publish jobs — Harfi
 - ⛔ Live Figma frame check per screen (RULES §5) — no Figma access in this setup yet
 
 ## Verification

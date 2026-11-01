@@ -37,7 +37,7 @@ async function Login({ searchParams }: Pick<PageProps<"/login">, "searchParams">
             <h1 className="text-2xl font-semibold">{t("login.sentTitle")}</h1>
             <p className="text-muted">{t("login.sentBody")}</p>
             <ButtonLink href="/login" variant="text">
-              {t("login.back")}
+              {t("login.useAnother")}
             </ButtonLink>
           </section>
         ) : (

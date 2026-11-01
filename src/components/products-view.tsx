@@ -7,8 +7,10 @@ import { deleteProduct, saveProduct, setCutoutConfirmed } from "@/lib/actions/pr
 import type { ProductView } from "@/lib/data/products";
 import { t } from "@/lib/i18n";
 import { CATEGORIES } from "@/lib/options";
+import { attributesText, parseAttributes, type Attributes } from "@/lib/product-fields";
 import { ACCEPT, uploadAndExtract, validPhoto } from "@/lib/upload";
 import { Button } from "./button";
+import { UploadError } from "./upload-error";
 
 const input = "h-13 w-full rounded-control border border-border bg-white px-4 text-base font-normal placeholder:text-muted focus:outline-2 focus:outline-blue";
 const label = "flex flex-col gap-1.5 text-sm font-medium";
@@ -143,9 +145,11 @@ function AddProduct({ shopId, onDone, onCancel }: { shopId: string; onDone: (id:
   const pick = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
   const [error, setError] = useState<"type" | "failed" | null>(null);
+  const last = useRef<File | undefined>(undefined);
 
   const submit = (file: File | undefined) => {
     if (!file) return;
+    last.current = file;
     if (!validPhoto(file)) return setError("type");
     start(async () => {
       setError(null);
@@ -161,11 +165,12 @@ function AddProduct({ shopId, onDone, onCancel }: { shopId: string; onDone: (id:
       <p className="text-muted">{t("products.addBody")}</p>
       <input ref={pick} type="file" accept={ACCEPT} className="sr-only" aria-label={t("products.addPhoto")} onChange={(e) => submit(e.target.files?.[0])} />
       {pending && <p role="status" className="text-sm text-muted">{t("ob2.uploading")}</p>}
-      {error && (
+      {error === "type" && (
         <p role="alert" className="text-sm text-danger">
-          {t(error === "type" ? "ob2.badFile" : "ob2.failed")}
+          {t("ob2.badFile")}
         </p>
       )}
+      {error === "failed" && <UploadError onRetry={() => submit(last.current)} onChoose={() => { setError(null); pick.current?.click(); }} />}
       <Button onClick={() => pick.current?.click()} disabled={pending} aria-busy={pending}>
         {t("products.addPhoto")}
       </Button>
@@ -186,18 +191,21 @@ function ProductForm({
   product: ProductView;
   pending: boolean;
   failed: boolean;
-  onSave: (draft: { name: string; category: string; price: number | null }) => void;
+  onSave: (draft: { name: string; category: string; price: number | null; currency: string | null; attributes: Attributes; description: string | null }) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(product.name);
   const [category, setCategory] = useState(product.category ?? "Other");
   const [price, setPrice] = useState(product.price != null ? String(Number(product.price)) : "");
+  const [currency, setCurrency] = useState(product.currency ?? "");
+  const [attributes, setAttributes] = useState(attributesText(product.attributes));
+  const [description, setDescription] = useState(product.description ?? "");
   const [invalid, setInvalid] = useState(false);
 
   const submit = () => {
     const n = price.trim() === "" ? null : Number(price);
     if (!name.trim() || (n !== null && !(n > 0))) return setInvalid(true);
-    onSave({ name: name.trim(), category, price: n });
+    onSave({ name: name.trim(), category, price: n, currency: currency.trim() || null, attributes: parseAttributes(attributes), description: description.trim() || null });
   };
 
   return (
@@ -222,6 +230,18 @@ function ProductForm({
         <label className={label}>
           {t("products.price")}
           <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className={input} />
+        </label>
+        <label className={label}>
+          {t("products.currency")}
+          <input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 10))} className={input} />
+        </label>
+        <label className={label}>
+          {t("products.attributes")}
+          <input value={attributes} onChange={(e) => setAttributes(e.target.value)} placeholder={t("products.attributesPlaceholder")} className={input} />
+        </label>
+        <label className={label}>
+          {t("products.description")}
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} maxLength={2000} className="rounded-control border border-border bg-white p-3 font-normal placeholder:text-muted focus:outline-2 focus:outline-blue" />
         </label>
       </div>
       {(invalid || failed) && (

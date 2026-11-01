@@ -7,8 +7,8 @@ import type { Slide } from "@/lib/posts/slides";
 type Labels = { badge: string; before: string; after: string };
 
 // "Real product" badge + before/after toggle (FR-FD-03). Parent renders it only when every slide passed.
-export function ProductCheck({ photo, slide, labels }: { photo: { src: string; name: string }; slide: Slide; labels: Labels }) {
-  const [open, setOpen] = useState(false);
+export function ProductCheck({ photo, slide, labels, expanded = false }: { photo: { src: string; name: string }; slide: Slide; labels: Labels; expanded?: boolean }) {
+  const [open, setOpen] = useState(expanded);
 
   return (
     <div className="flex flex-col gap-3">

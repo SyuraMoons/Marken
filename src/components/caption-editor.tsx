@@ -24,6 +24,10 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
   const [pending, start] = useTransition();
   const seen = useRef(captions.join("\n"));
 
+  // Slide remake (FR-ED-05, F-11b) is P1: the regenerate route only accepts target "caption", so the panel stays hidden until it ships.
+  const slideList = slides;
+  const unchecked = slideList.some((s) => !s.fidelity_passed);
+
   const choose = (i: number) => {
     setIndex(i);
     setText(captions[i] ?? "");
@@ -79,7 +83,7 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
         <section aria-label={t("today.carousel")} className="lg:rounded-card lg:border lg:border-border lg:bg-white lg:p-5">
-          <Carousel slides={slides} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} />
+          <Carousel slides={slideList} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} />
         </section>
 
         <div className="flex flex-col gap-4">
@@ -145,7 +149,7 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
             )}
           </section>
 
-          <ActionButton url={`/api/posts/${postId}/approve`} body={{ caption: text }} then="/today">
+          <ActionButton url={`/api/posts/${postId}/approve`} body={{ caption: text }} then="/today" disabled={unchecked}>
             {t("edit.approve")}
           </ActionButton>
           <ButtonLink href="/today" variant="text">

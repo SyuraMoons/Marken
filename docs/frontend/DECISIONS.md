@@ -58,3 +58,6 @@ No "0", no placeholder price, no "Price on request" invented copy (FR-SP-02).
 
 **FD-18 · Approve is one tap from Today.**
 The `approve` confirm frame is only used as the "Instagram not connected → download" choice (DX-01, US-04).
+
+**FD-19 · Results P1 starts before the 2 Nov gate.**
+Team permission granted 1 Nov; this replaces the timing in FD-13. Results, result-detail, learning and image-edit are built on typed mocks (FD-09) until a metrics/orders backend shape exists.

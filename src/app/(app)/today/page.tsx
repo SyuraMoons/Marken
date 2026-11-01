@@ -5,7 +5,7 @@ import { ActivityPanel } from "@/components/activity-panel";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { ButtonLink } from "@/components/button";
 import { Carousel } from "@/components/carousel";
-import { CopyButton } from "@/components/copy-button";
+import { DownloadFlow } from "@/components/download-flow";
 import { ProductCheck } from "@/components/product-check";
 import { ReviewPanel } from "@/components/review-panel";
 import { StatusScreen } from "@/components/status-screen";
@@ -14,15 +14,16 @@ import { getTodayData } from "@/lib/data/today";
 import { allSlidesPassed } from "@/lib/posts/slides";
 
 // Today (F-10, FR-TD-01..04, FR-FD-03, F-24). One screen per post status.
-export default function TodayPage() {
+export default function TodayPage({ searchParams }: PageProps<"/today">) {
   return (
     <Suspense fallback={<div className="aspect-[4/5] max-w-120 animate-pulse rounded-card bg-white" />}>
-      <Today />
+      <Today searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function Today() {
+async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">) {
+  const q = await searchParams;
   const data = await getTodayData();
   if (!data) redirect("/login");
   const { shop, post, steps, calls } = data;
@@ -39,6 +40,34 @@ async function Today() {
   const { slides, downloads, trend, photo } = data;
   const captions = (post.caption_options as string[]) ?? [];
   const caption = post.chosen_caption ?? captions[0] ?? "";
+
+  // Activity full page (97:478): opened from the post, never a nav item (DX-11).
+  if (q.view === "activity") {
+    return (
+      <section className="flex max-w-xl flex-col gap-5">
+        <ButtonLink href="/today" variant="text" className="w-auto! self-start px-0">
+          ← {t("activity.back")}
+        </ButtonLink>
+        <h1 className="text-3xl font-semibold tracking-tight">{t("activity.title")}</h1>
+        <ActivityPanel steps={steps} calls={calls} open />
+        <p className="text-sm text-muted">{t("status.control")}</p>
+      </section>
+    );
+  }
+
+  // Compare full page (97:567, FR-FD-03): only exists when the badge does, all slides passed.
+  if (q.view === "compare" && allSlidesPassed(slides) && photo?.src) {
+    return (
+      <section className="flex max-w-xl flex-col gap-5">
+        <ButtonLink href="/today" variant="text" className="w-auto! self-start px-0">
+          ← {t("activity.back")}
+        </ButtonLink>
+        <h1 className="text-3xl font-semibold tracking-tight">{t("landing.compare")}</h1>
+        <p className="text-muted">{t("compare.body")}</p>
+        <ProductCheck photo={photo} slide={slides[1]} labels={{ badge: t("today.badge"), before: t("today.before"), after: t("today.after") }} expanded />
+      </section>
+    );
+  }
 
   // A ready post with a failed product check never offers Approve (FR-FD-01).
   const unchecked = post.status === "ready" ? slides.find((s) => !s.fidelity_passed) : undefined;
@@ -65,17 +94,9 @@ async function Today() {
     case "publishing":
       // Not connected → download + copy caption, approve still completes (FR-PB-04).
       if (!shop.ig_account_id) {
-        return (
-          <StatusScreen icon="↓" title={t("status.download.title")} body={t("status.download.body")}>
-            {slides.map((s) => (
-              <ButtonLink key={s.order} href={downloads[s.order - 1] ?? s.slide_path} download={`slide-${s.order}.png`} variant={s.order === 1 ? "primary" : "secondary"}>
-                {t("status.download.slide", { n: s.order })}
-              </ButtonLink>
-            ))}
-            <CopyButton text={`${caption}\n\n${post.hashtags.join(" ")}`} variant="secondary" />
-            <p className="text-sm text-muted">{t("status.download.note")}</p>
-          </StatusScreen>
-        );
+        return <DownloadFlow slides={slides} downloads={downloads} captionText={`${caption}
+
+${post.hashtags.join(" ")}`} />;
       }
       return (
         <StatusScreen icon="↗" title={t("status.publishing.title")} body={t("status.publishing.body")}>
@@ -141,11 +162,9 @@ async function Today() {
         <section aria-label={t("today.carousel")} className="flex flex-col gap-3 lg:rounded-card lg:border lg:border-border lg:bg-white lg:p-5">
           <Carousel slides={slides} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} />
           {allSlidesPassed(slides) && photo?.src && (
-            <ProductCheck
-              photo={photo}
-              slide={slides[1]}
-              labels={{ badge: t("today.badge"), before: t("today.before"), after: t("today.after") }}
-            />
+            <ButtonLink href="/today?view=compare" variant="secondary">
+              <span aria-hidden="true" className="text-blue">✓</span> {t("today.badge")}
+            </ButtonLink>
           )}
         </section>
 
@@ -160,7 +179,9 @@ async function Today() {
               </a>
             )}
           </section>
-          {activity}
+          <ButtonLink href="/today?view=activity" variant="secondary">
+            {t("today.activity")}
+          </ButtonLink>
         </div>
       </div>
     </div>

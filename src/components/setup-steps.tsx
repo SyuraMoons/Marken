@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "./button";
 import { Carousel } from "./carousel";
+import { ActivityPanel } from "./activity-panel";
 import { ProductCheck } from "./product-check";
+import { UploadError } from "./upload-error";
 import { deleteProduct, saveProduct, setCutoutConfirmed } from "@/lib/actions/products";
 import type { ProductView } from "@/lib/data/products";
 import { t, type MessageKey } from "@/lib/i18n";
-import { mockPost, mockProductPhoto } from "@/lib/mock";
+import { mockCalls, mockPost, mockProductPhoto, mockSteps } from "@/lib/mock";
+import { attributesText, parseAttributes } from "@/lib/product-fields";
 import { asTone, CATEGORIES, COUNTRIES, TIME_ZONES, TONES, type Tone } from "@/lib/options";
 import { allSlidesPassed, asSlides } from "@/lib/posts/slides";
 import { ACCEPT, patchOnboarding, uploadAndExtract, validPhoto } from "@/lib/upload";
@@ -224,7 +227,11 @@ function Step2({ ctx, hasProducts }: { ctx: Ctx; hasProducts: boolean }) {
       )}
       {!ok && !hasProducts && <p className="text-sm text-muted">{t("ob2.need")}</p>}
       {pending && <p role="status" className="text-sm text-muted">{t("ob2.uploading")}</p>}
-      <Err show={Boolean(error)} text={error ?? undefined} />
+      {error === "ob2.failed" ? (
+        <UploadError pending={pending} onRetry={submit} onChoose={() => { setError(null); pick.current?.click(); }} />
+      ) : (
+        <Err show={Boolean(error)} text={error ?? undefined} />
+      )}
       {ok || photos.length === 0 ? (
         <Button onClick={ok ? submit : () => ctx.go(3)} disabled={pending || (!ok && !hasProducts)} aria-busy={pending}>
           {t("ob.continue")}
@@ -256,6 +263,17 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
     const clean = name.trim();
     if (!clean || clean === p.name) return;
     act(() => saveProduct({ id: p.id, name: clean }), () => patch(p.id, { name: clean }));
+  };
+
+  // currency, attributes and description save as soon as the owner leaves the field.
+  const saveField = (p: ProductView, change: { currency?: string; attributes?: ReturnType<typeof parseAttributes>; description?: string | null }) => {
+    // Skip no-op blurs: they would disable the next tap and write the product for nothing.
+    const same =
+      (change.currency === undefined || change.currency === p.currency) &&
+      (change.attributes === undefined || JSON.stringify(change.attributes) === JSON.stringify(parseAttributes(attributesText(p.attributes)))) &&
+      (change.description === undefined || change.description === (p.description ?? null));
+    if (same) return;
+    act(() => saveProduct({ id: p.id, name: p.name, ...change }), () => patch(p.id, change));
   };
 
   const reprice = (p: ProductView, raw: string) => {
@@ -304,6 +322,25 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
               />
             </div>
           </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={label}>
+              {t("products.currency")}
+              <select defaultValue={p.currency ?? ""} onChange={(e) => saveField(p, { currency: e.target.value })} disabled={pending} className={input}>
+                <option value="">—</option>
+                {[...new Set([...(p.currency ? [p.currency] : []), "IDR", "USD", "SGD", "MYR", "THB", "PHP", "EUR", "GBP", "AUD"])].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            <label className={label}>
+              {t("products.attributes")}
+              <input defaultValue={attributesText(p.attributes)} onBlur={(e) => saveField(p, { attributes: parseAttributes(e.target.value) })} placeholder={t("products.attributesPlaceholder")} className={input} />
+            </label>
+          </div>
+          <label className={label}>
+            {t("products.description")}
+            <textarea defaultValue={p.description ?? ""} onBlur={(e) => saveField(p, { description: e.target.value.trim() || null })} rows={2} maxLength={500} className="rounded-control border border-border bg-white p-3 font-normal placeholder:text-muted focus:outline-2 focus:outline-blue" />
+          </label>
           <div className="grid grid-cols-2 gap-2">
             <Button
               variant={p.cutout_confirmed ? "secondary" : "primary"}
@@ -443,7 +480,7 @@ function Step5({ ctx }: { ctx: Ctx }) {
         <span className="absolute top-3 left-3 z-10 rounded-full bg-ink px-2.5 py-1 text-xs font-medium text-white">{t("ob5.sample")}</span>
         <Carousel slides={slides} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} />
         {allSlidesPassed(slides) && (
-          <ProductCheck photo={mockProductPhoto} slide={slides[1]} labels={{ badge: t("today.badge"), before: t("today.before"), after: t("today.after") }} />
+          <ProductCheck key={tour === 2 ? "tour-open" : "tour-closed"} photo={mockProductPhoto} slide={slides[1]} labels={{ badge: t("today.badge"), before: t("today.before"), after: t("today.after") }} expanded={tour === 2} />
         )}
       </section>
 
@@ -456,6 +493,18 @@ function Step5({ ctx }: { ctx: Ctx }) {
           </Button>
         )}
       </div>
+
+      {tour === 2 && (
+        <section className="flex flex-col gap-2 rounded-card border border-border bg-white p-5">
+          <p className="flex items-center gap-2 font-semibold">
+            <span aria-hidden="true" className="flex size-8 items-center justify-center rounded-full bg-danger/10 text-danger">!</span>
+            {t("tour.failedTitle")}
+          </p>
+          <p className="text-sm text-muted">{t("tour.failedBody")}</p>
+        </section>
+      )}
+
+      {tour === 3 && <ActivityPanel steps={mockSteps} calls={mockCalls} open />}
 
       <Err show={failed} />
       <Button onClick={() => finish("finish")} disabled={pending} aria-busy={pending}>

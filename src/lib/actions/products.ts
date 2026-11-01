@@ -13,6 +13,9 @@ const Edit = z.object({
   category: z.string().trim().max(120).nullable().optional(),
   // null means the price is not shown anywhere: never invent one (FR-SP-02).
   price: z.number().positive().nullable().optional(),
+  currency: z.string().trim().max(10).nullable().optional(),
+  attributes: z.union([z.array(z.string().max(120)).max(30), z.record(z.string().max(60), z.string().max(120))]).optional(),
+  description: z.string().trim().max(2000).nullable().optional(),
 });
 
 export async function saveProduct(input: unknown): Promise<Result> {

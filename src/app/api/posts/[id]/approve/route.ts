@@ -12,6 +12,15 @@ const Body = z.object({
   caption: z.string().trim().min(1).max(2200).optional(),
 });
 
+// A post is only publishable when it has slides and every one passed the product check (FR-FD-01).
+function allSlidesPassed(slides: unknown) {
+  return (
+    Array.isArray(slides) &&
+    slides.length > 0 &&
+    slides.every((s) => (s as { fidelity_passed?: unknown } | null)?.fidelity_passed === true)
+  );
+}
+
 export async function POST(req: Request, ctx: RouteContext<"/api/posts/[id]/approve">) {
   const { id } = await ctx.params;
   const guard = await getOwnedPost(id);
@@ -34,7 +43,15 @@ export async function POST(req: Request, ctx: RouteContext<"/api/posts/[id]/appr
     return Response.json({ post, publish: post.status });
   }
 
-  if (post.status === "ready") {
+  // A failed publish retries through Approve; a post that never got approved cannot (trigger rule).
+  if (post.status === "failed" && !post.approved_at) {
+    return conflict("invalid_status", { status: post.status });
+  }
+  if ((post.status === "ready" || post.status === "failed") && !allSlidesPassed(post.slides)) {
+    return conflict("fidelity_failed");
+  }
+
+  if (post.status === "ready" || post.status === "failed") {
     const chosen = caption ?? post.chosen_caption;
     if (!chosen) return apiError("caption_required", 400);
 
@@ -43,7 +60,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/posts/[id]/appr
       .from("posts")
       .update({ status: "approved", chosen_caption: chosen })
       .eq("id", post.id)
-      .eq("status", "ready")
+      .eq("status", post.status)
       .select("*")
       .maybeSingle();
     if (!updated) {

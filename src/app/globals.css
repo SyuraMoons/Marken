@@ -1,26 +1,42 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Marken tokens, see docs/frontend/DESIGN.md §2. Light theme only (FD-04). */
+@theme {
+  --color-ink: #111b36;
+  --color-muted: #64708a;
+  --color-blue: #2456db;
+  --color-white: #ffffff;
+  --color-surface: #f4f6fc;
+  --color-border: #e5e9f4;
+  --color-pink: #f2b1e6;
+  --color-powder: #dbe9ff;
+  --color-danger: #b42318;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 20px;
+  --radius-control: 14px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Public + setup screens only (DX-24). */
+@utility bg-atmosphere {
+  background:
+    radial-gradient(60% 50% at 0% 0%, color-mix(in srgb, var(--color-powder) 80%, transparent), transparent),
+    radial-gradient(60% 60% at 100% 100%, color-mix(in srgb, var(--color-pink) 45%, transparent), transparent),
+    var(--color-white);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -10,11 +10,13 @@ const CACHE_DAYS = 7;
 
 type Pair = { country: string; category: string };
 
+// Runs at 20:00 UTC: 03:00 in Jakarta, 16:00 the day before in California, so every shop
+// has fresh trends before its morning post (default notify time 08:00 local).
 // Cron trends.daily (F-06, F-16, F-07): research and score once per (country, category),
 // then analyse the best trends. An analysis is cached 7 days for every shop (FR-TR-04),
 // so a second shop on the same trend triggers zero new analysis calls.
 export const trendsDaily = inngest.createFunction(
-  { id: "trends-daily", retries: 2, triggers: [{ cron: "0 3 * * *" }] },
+  { id: "trends-daily", retries: 2, triggers: [{ cron: "0 20 * * *" }] },
   async ({ step }) => {
     const pairs = await step.run("list-pairs", async (): Promise<Pair[]> => {
       const { data, error } = await createAdminClient()

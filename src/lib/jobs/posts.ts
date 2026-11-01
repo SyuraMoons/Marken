@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { NonRetriableError } from "inngest";
 import { sendPostReadyEmail } from "@/lib/notify";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -15,7 +16,21 @@ import {
 import { withStep } from "./steps";
 import { collectPair } from "./trends";
 
-const MAX_FIDELITY_ATTEMPTS = 2;
+// A post still generating after this long is dead: free the day's slot so Run now works.
+const STUCK_AFTER_MINUTES = 15;
+// FR-CG-02: a trend the shop already posted is not suggested again within this many posts.
+const TREND_MEMORY = 7;
+
+// Stable UUID from a string, so a replayed step upserts the same row instead of adding one.
+function deterministicUuid(seed: string) {
+  const h = createHash("sha256").update(seed).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
+const hashtag = (h: string) => {
+  const clean = h.trim().replace(/^#+/, "").replace(/\s+/g, "");
+  return clean ? `#${clean}` : "";
+};
 
 // Event post/generate.requested (F-08, FR-CG-06): plan, render, verify, mark ready, notify.
 // Every unit is a memoised step, so a retry resumes where it stopped instead of repaying
@@ -95,7 +110,7 @@ export const generatePost = inngest.createFunction(
     });
     if (!input) return { skipped: "not_generating" };
 
-    const trend = await step.run("pick-trend", () => pickTrend(input.shop));
+    const trend = await step.run("pick-trend", () => pickTrend(input.shop, postId));
 
     const plan = await step.run("plan", () =>
       withStep(ctx, "plan_post", "muse-spark", () =>
@@ -132,7 +147,7 @@ export const generatePost = inngest.createFunction(
           slides: slides as unknown as Json,
           caption_options: plan.captions as unknown as Json,
           chosen_caption: plan.captions[0]?.text ?? null,
-          hashtags: plan.hashtags,
+          hashtags: plan.hashtags.map(hashtag).filter(Boolean),
           status: "ready",
         })
         .eq("id", postId)
@@ -140,20 +155,34 @@ export const generatePost = inngest.createFunction(
       if (error) throw new Error(error.message);
     });
 
+    // The post is already ready here, so a mail failure must not fail the run (F-13 is
+    // the first feature cut): log it as a skipped step and move on.
     await step.run("notify", async () => {
       const admin = createAdminClient();
       const { data: owner } = await admin.from("users").select("email").eq("id", input.shop.ownerId).single();
       if (!owner?.email) return false;
-      return sendPostReadyEmail({ to: owner.email, shopName: input.shop.name, postId });
+      try {
+        return await sendPostReadyEmail({ to: owner.email, shopName: input.shop.name, postId });
+      } catch (error) {
+        await admin.from("post_steps").insert({
+          post_id: postId,
+          shop_id: shopId,
+          step: "notify",
+          status: "skipped",
+          finished_at: new Date().toISOString(),
+          detail: { error: error instanceof Error ? error.message : String(error) },
+        });
+        return false;
+      }
     });
 
     return { postId, slides: slides.length };
   },
 );
 
-type ShopPick = { country: string; category: string };
+type ShopPick = { id: string; country: string; category: string };
 
-async function pickTrend(shop: ShopPick) {
+async function pickTrend(shop: ShopPick, postId: string) {
   const admin = createAdminClient();
   const query = () =>
     admin
@@ -164,13 +193,46 @@ async function pickTrend(shop: ShopPick) {
       .eq("trends.category", shop.category);
 
   let { data } = await query();
+  let cacheHit = true;
   if (!data?.length) {
     // The morning research has not covered this shop yet, so collect it now.
+    cacheHit = false;
     await collectPair(shop);
     ({ data } = await query());
   }
-  const best = [...(data ?? [])].sort((a, b) => (b.trends.score ?? 0) - (a.trends.score ?? 0))[0];
+
+  // FR-CG-02: prefer a trend this shop has not used in its last posts, but repeat one
+  // rather than fail when every analysed trend was already used.
+  const { data: recent } = await admin
+    .from("posts")
+    .select("trend_id")
+    .eq("shop_id", shop.id)
+    .neq("id", postId)
+    .not("trend_id", "is", null)
+    .order("post_date", { ascending: false })
+    .limit(TREND_MEMORY);
+  const used = new Set((recent ?? []).map((r) => r.trend_id));
+  const fresh = (data ?? []).filter((a) => !used.has(a.trends.id));
+  const pool = fresh.length ? fresh : (data ?? []);
+
+  const best = [...pool].sort((a, b) => (b.trends.score ?? 0) - (a.trends.score ?? 0))[0];
   if (!best) throw new Error("no trend available");
+
+  // FR-TR-04 / FR-CL-02: an analysis served from the 7-day cache is logged at zero cost,
+  // so the Activity Panel can show the cache share. A replayed step may log it twice, so
+  // the id is derived from the post to keep it to one row.
+  if (cacheHit) {
+    await admin.from("model_calls").upsert({
+      id: deterministicUuid(`${postId}:analyse_trend`),
+      shop_id: shop.id,
+      post_id: postId,
+      step: "analyse_trend",
+      model: best.model ?? "muse-spark",
+      provider: "cache",
+      cache_hit: true,
+      cost_usd: 0,
+    });
+  }
   return {
     id: best.trends.id,
     title: best.trends.title,
@@ -190,11 +252,9 @@ async function renderSlide(
   s: CarouselPlan["slides"][number],
 ): Promise<Slide> {
   const admin = createAdminClient();
-  // One re-render on a failed fidelity check, then keep the last result as failed.
-  let result = await renderAndVerifySlide(s);
-  for (let i = 1; i < MAX_FIDELITY_ATTEMPTS && !result.fidelityPassed; i++) {
-    result = await renderAndVerifySlide(s);
-  }
+  // The studio rebuilds a failed slide once (FR-FD-01), then flags it. Retrying here too
+  // would multiply paid image calls past the USD 0.10 per carousel target (NFR-06).
+  const result = await renderAndVerifySlide(s);
   const scene_path = `${shopId}/scenes/${postId}-${s.order}.png`;
   const slide_path = `${shopId}/slides/${postId}-${s.order}.png`;
   for (const [path, body] of [
@@ -304,6 +364,39 @@ export const postsDaily = inngest.createFunction(
       );
     }
     return { started: due.length };
+  },
+);
+
+// Cron posts.sweep (NFR-15, NFR-17): a generate run that died without its onFailure hook
+// (deploy, crash, lost event) would hold the day's slot forever. Fail it visibly so the
+// owner can tap Run now again and the Activity Panel shows where it stopped.
+export const postsSweep = inngest.createFunction(
+  { id: "posts-sweep", retries: 1, triggers: [{ cron: "*/10 * * * *" }] },
+  async ({ step }) => {
+    return step.run("fail-stuck", async () => {
+      const admin = createAdminClient();
+      const cutoff = new Date(Date.now() - STUCK_AFTER_MINUTES * 60_000).toISOString();
+      const { data, error } = await admin
+        .from("posts")
+        .update({ status: "failed" })
+        .eq("status", "generating")
+        .lt("created_at", cutoff)
+        .select("id, shop_id");
+      if (error) throw new Error(error.message);
+      if (data?.length) {
+        await admin.from("post_steps").insert(
+          data.map((p) => ({
+            post_id: p.id,
+            shop_id: p.shop_id,
+            step: "generate",
+            status: "failed" as const,
+            finished_at: new Date().toISOString(),
+            detail: { error: `no progress after ${STUCK_AFTER_MINUTES} minutes` },
+          })),
+        );
+      }
+      return { failed: data?.length ?? 0 };
+    });
   },
 );
 

@@ -23,10 +23,13 @@ export const isUuid = (value: string) => UUID_RE.test(value);
 export async function parseJson<T extends z.ZodType>(
   req: Request,
   schema: T,
+  options: { allowEmpty?: boolean } = {},
 ): Promise<{ data: z.infer<T> } | { response: Response }> {
   let body: unknown;
   try {
-    body = await req.json();
+    const text = await req.text();
+    // An empty body counts as {} when every field is optional (approve, skip).
+    body = text.trim() === "" && options.allowEmpty ? {} : JSON.parse(text);
   } catch {
     return { response: apiError("invalid_json", 400) };
   }

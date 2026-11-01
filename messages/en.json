@@ -140,11 +140,8 @@
   "settings.removeRule": "Remove rule: {rule}",
   "settings.rulesValue": "{tone} · {n} rules",
   "settings.igBody": "Marken publishes your approved carousels to this account. Nothing posts without your approval.",
-  "settings.connect": "Connect Instagram",
-  "settings.disconnect": "Disconnect",
   "settings.remindBody": "One email when today's post is ready for your review.",
   "settings.remindTime": "Email me at",
-  "settings.remindOn": "Email reminders",
   "settings.email": "Email",
   "settings.deleteTitle": "Delete your shop?",
   "settings.deleteBody": "This permanently deletes {name}, its products, photos and posts. This cannot be undone.",
@@ -236,5 +233,6 @@
   "step.fidelity_check": "Product check",
   "login.error.generic": "Sign in failed. Please try again.",
   "login.error.link": "That login link is invalid or has expired. Request a new one.",
-  "login.error.email": "Enter a valid email address."
+  "login.error.email": "Enter a valid email address.",
+  "settings.igSoon": "Instagram connect is coming soon. Until then, download your slides from Today and post them yourself."
 }

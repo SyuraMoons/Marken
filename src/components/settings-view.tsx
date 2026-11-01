@@ -1,30 +1,72 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { signOut } from "@/app/login/actions";
+import { saveBrand, saveReminder, saveShop } from "@/app/(app)/settings/actions";
 import { Button, ButtonLink } from "./button";
 import { ListRow } from "./list-row";
 import { StatusScreen } from "./status-screen";
 import { t, type MessageKey } from "@/lib/i18n";
-import { mockShop, mockUser } from "@/lib/mock";
+import { asTone, CATEGORIES, COUNTRIES, TIME_ZONES, TONES, type Tone } from "@/lib/options";
 
 const input = "h-13 w-full rounded-control border border-border bg-white px-4 text-base font-normal placeholder:text-muted focus:outline-2 focus:outline-blue";
 const label = "flex flex-col gap-1.5 text-sm font-medium";
-const TONES = ["Warm", "Playful", "Elegant", "Casual"] as const;
 
 type View = "main" | "shop" | "brand" | "instagram" | "reminders" | "account" | "delete" | "deleted";
 
-// Settings and sub-views (F-15, DX-06, DX-27). Mock state until settings writes land.
-export function SettingsView() {
+type Props = {
+  email: string;
+  igConnected: boolean;
+  rules: string[];
+  shop: { id: string; name: string; category: string; country: string; time_zone: string; tone: string | null; notify_time: string };
+};
+
+// Settings and sub-views (F-15, DX-06, DX-27). Saves go through owner-scoped server actions.
+export function SettingsView({ email, igConnected, rules: savedRules, shop }: Props) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [failed, setFailed] = useState(false);
   const [view, setView] = useState<View>("main");
-  const [tone, setTone] = useState<(typeof TONES)[number]>("Warm");
-  const [rules, setRules] = useState<string[]>(["Never show prices"]);
+  const [name, setName] = useState(shop.name);
+  const [category, setCategory] = useState(shop.category);
+  const [country, setCountry] = useState(shop.country);
+  const [zone, setZone] = useState(shop.time_zone);
+  const [tone, setTone] = useState<Tone>(asTone(shop.tone));
+  const [rules, setRules] = useState<string[]>(savedRules);
   const [draft, setDraft] = useState("");
-  const [ig, setIg] = useState(true);
-  const igName = "rani.studio";
+  const [time, setTime] = useState(shop.notify_time);
+
+  const run = (job: () => Promise<{ ok: boolean }>) =>
+    start(async () => {
+      setFailed(false);
+      const res = await job().catch(() => ({ ok: false }));
+      if (!res.ok) return setFailed(true);
+      router.refresh();
+      setView("main");
+    });
+
+  const save = () => {
+    if (view === "shop") return run(() => saveShop({ name, category, country, time_zone: zone }));
+    if (view === "brand") return run(() => saveBrand({ tone, rules }));
+    return run(() => saveReminder({ notify_time: time }));
+  };
+
+  const remove = () =>
+    start(async () => {
+      setFailed(false);
+      const res = await fetch(`/api/shops/${shop.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: true }),
+      }).catch(() => null);
+      if (!res?.ok) return setFailed(true);
+      setView("deleted");
+    });
 
   const head = (key: string) => <h1 className="text-3xl font-semibold tracking-tight">{t(key as MessageKey)}</h1>;
   const back = (
-    <Button variant="text" className="w-auto! self-start px-0" onClick={() => setView("main")}>
+    <Button variant="text" className="w-auto! self-start px-0" onClick={() => { setFailed(false); setView("main"); }}>
       ← {t("settings.back")}
     </Button>
   );
@@ -42,8 +84,13 @@ export function SettingsView() {
       <section className="flex max-w-xl flex-col gap-5">
         {back}
         {head("settings.deleteTitle")}
-        <p className="text-muted">{t("settings.deleteBody", { name: mockShop.name ?? "" })}</p>
-        <Button variant="danger" onClick={() => setView("deleted")}>
+        <p className="text-muted">{t("settings.deleteBody", { name: shop.name })}</p>
+        {failed && (
+          <p role="alert" className="text-sm text-danger">
+            {t("common.error")}
+          </p>
+        )}
+        <Button variant="danger" onClick={remove} disabled={pending} aria-busy={pending}>
           {t("settings.deleteConfirm")}
         </Button>
         <Button variant="text" onClick={() => setView("main")}>
@@ -63,28 +110,28 @@ export function SettingsView() {
           <div className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
             <label className={label}>
               {t("settings.name")}
-              <input defaultValue={mockShop.name ?? ""} className={input} />
+              <input value={name} onChange={(e) => setName(e.target.value)} className={input} />
             </label>
             <label className={label}>
               {t("settings.category")}
-              <select defaultValue="Beauty" className={input}>
-                {["Food & drinks", "Fashion", "Beauty", "Crafts", "Home", "Other"].map((c) => (
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className={input}>
+                {[...new Set([category, ...CATEGORIES])].map((c) => (
                   <option key={c}>{c}</option>
                 ))}
               </select>
             </label>
             <label className={label}>
               {t("settings.country")}
-              <select defaultValue="Indonesia" className={input}>
-                {["Indonesia", "Malaysia", "Singapore", "Philippines", "Thailand", "Other"].map((c) => (
+              <select value={country} onChange={(e) => setCountry(e.target.value)} className={input}>
+                {[...new Set([country, ...COUNTRIES])].map((c) => (
                   <option key={c}>{c}</option>
                 ))}
               </select>
             </label>
             <label className={label}>
               {t("settings.timezone")}
-              <select defaultValue="Asia/Jakarta" className={input}>
-                {["Asia/Jakarta", "Asia/Makassar", "Asia/Jayapura", "Asia/Singapore", "Asia/Kuala_Lumpur"].map((z) => (
+              <select value={zone} onChange={(e) => setZone(e.target.value)} className={input}>
+                {[...new Set([zone, ...TIME_ZONES])].map((z) => (
                   <option key={z}>{z}</option>
                 ))}
               </select>
@@ -140,19 +187,12 @@ export function SettingsView() {
         {view === "instagram" && (
           <div className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
             <p className="text-muted">{t("settings.igBody")}</p>
-            {ig ? (
-              <>
-                <p className="flex min-h-11 items-center gap-2 font-medium text-blue">
-                  <span aria-hidden="true">✓</span> {t("settings.connected", { name: igName })}
-                </p>
-                <Button variant="text" className="w-auto! self-start px-0 text-danger!" onClick={() => setIg(false)}>
-                  {t("settings.disconnect")}
-                </Button>
-              </>
+            {igConnected ? (
+              <p className="flex min-h-11 items-center gap-2 font-medium text-blue">
+                <span aria-hidden="true">✓</span> {t("settings.connected", { name: t("settings.instagram") })}
+              </p>
             ) : (
-              <Button variant="secondary" onClick={() => setIg(true)}>
-                {t("settings.connect")}
-              </Button>
+              <p className="text-sm text-muted">{t("settings.igSoon")}</p>
             )}
           </div>
         )}
@@ -160,13 +200,9 @@ export function SettingsView() {
         {view === "reminders" && (
           <div className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
             <p className="text-muted">{t("settings.remindBody")}</p>
-            <label className="flex min-h-13 cursor-pointer items-center justify-between gap-3 text-sm font-medium">
-              {t("settings.remindOn")}
-              <input type="checkbox" defaultChecked className="size-5 accent-blue" />
-            </label>
             <label className={label}>
               {t("settings.remindTime")}
-              <input type="time" defaultValue="08:00" className={input} />
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} required className={input} />
             </label>
           </div>
         )}
@@ -175,13 +211,26 @@ export function SettingsView() {
           <div className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
             <label className={label}>
               {t("settings.email")}
-              <input value={mockUser.email ?? ""} readOnly className={`${input} bg-surface!`} />
+              <input value={email} readOnly className={`${input} bg-surface!`} />
             </label>
-            <Button variant="secondary">{t("settings.signOut")}</Button>
+            <form action={signOut}>
+              <Button type="submit" variant="secondary">
+                {t("settings.signOut")}
+              </Button>
+            </form>
           </div>
         )}
 
-        {view !== "account" && view !== "instagram" && <Button onClick={() => setView("main")}>{t("settings.save")}</Button>}
+        {failed && (
+          <p role="alert" className="text-sm text-danger">
+            {t("common.error")}
+          </p>
+        )}
+        {view !== "account" && view !== "instagram" && (
+          <Button onClick={save} disabled={pending || (view === "shop" && !name.trim())} aria-busy={pending}>
+            {t("settings.save")}
+          </Button>
+        )}
       </section>
     );
   }
@@ -190,11 +239,11 @@ export function SettingsView() {
     <div className="flex max-w-xl flex-col gap-6">
       <h1 className="pt-2 text-4xl font-semibold tracking-tight">{t("settings.title")}</h1>
       <section className="divide-y divide-border rounded-card border border-border bg-white">
-        <ListRow label={t("settings.shop")} value={mockShop.name ?? ""} onClick={() => setView("shop")} />
+        <ListRow label={t("settings.shop")} value={name} onClick={() => setView("shop")} />
         <ListRow label={t("settings.brand")} value={t("settings.rulesValue", { tone: t(`ob4.tone${tone}` as MessageKey), n: rules.length })} onClick={() => setView("brand")} />
-        <ListRow label={t("settings.instagram")} value={ig ? t("settings.connected", { name: igName }) : t("settings.notConnected")} onClick={() => setView("instagram")} />
-        <ListRow label={t("settings.reminders")} value="08:00" onClick={() => setView("reminders")} />
-        <ListRow label={t("settings.account")} value={mockUser.email ?? ""} onClick={() => setView("account")} />
+        <ListRow label={t("settings.instagram")} value={igConnected ? t("settings.connected", { name: t("settings.instagram") }) : t("settings.notConnected")} onClick={() => setView("instagram")} />
+        <ListRow label={t("settings.reminders")} value={time} onClick={() => setView("reminders")} />
+        <ListRow label={t("settings.account")} value={email} onClick={() => setView("account")} />
       </section>
       <ButtonLink href="/onboarding/5" variant="text" className="w-auto! self-start px-0">
         {t("settings.tour")}

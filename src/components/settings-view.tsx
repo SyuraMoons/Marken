@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button, ButtonLink } from "./button";
+import { InstallMarken } from "./install-marken";
 import { ListRow } from "./list-row";
 import { StatusScreen } from "./status-screen";
 import { t, type MessageKey } from "@/lib/i18n";
@@ -10,6 +11,27 @@ import { mockShop, mockUser } from "@/lib/mock";
 const input = "h-13 w-full rounded-control border border-border bg-white px-4 text-base font-normal placeholder:text-muted focus:outline-2 focus:outline-blue";
 const label = "flex flex-col gap-1.5 text-sm font-medium";
 const TONES = ["Warm", "Playful", "Elegant", "Casual"] as const;
+
+// shortcut: motion choice lives in localStorage until a server-side preference exists.
+const MOTION_EVENT = "marken-motion";
+const subscribeMotion = (cb: () => void) => {
+  window.addEventListener(MOTION_EVENT, cb);
+  return () => window.removeEventListener(MOTION_EVENT, cb);
+};
+function readMotion() {
+  try {
+    const saved = localStorage.getItem("marken-motion");
+    return saved ? saved === "reduce" : window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
+function setMotion(on: boolean) {
+  try {
+    localStorage.setItem("marken-motion", on ? "reduce" : "full");
+  } catch {}
+  window.dispatchEvent(new Event(MOTION_EVENT));
+}
 
 type View = "main" | "shop" | "brand" | "instagram" | "reminders" | "account" | "delete" | "deleted";
 
@@ -20,7 +42,12 @@ export function SettingsView() {
   const [rules, setRules] = useState<string[]>(["Never show prices"]);
   const [draft, setDraft] = useState("");
   const [ig, setIg] = useState(true);
+  const reduceMotion = useSyncExternalStore(subscribeMotion, readMotion, () => false);
   const igName = "rani.studio";
+
+  useEffect(() => {
+    document.documentElement.dataset.motion = reduceMotion ? "reduce" : "";
+  }, [reduceMotion]);
 
   const head = (key: string) => <h1 className="text-3xl font-semibold tracking-tight">{t(key as MessageKey)}</h1>;
   const back = (
@@ -177,6 +204,14 @@ export function SettingsView() {
               {t("settings.email")}
               <input value={mockUser.email ?? ""} readOnly className={`${input} bg-surface!`} />
             </label>
+            <div className="flex flex-col gap-1.5">
+              <label className="flex min-h-13 cursor-pointer items-center justify-between gap-3 text-sm font-medium">
+                {t("settings.motion")}
+                <input type="checkbox" aria-label={t("settings.motionReduce")} checked={reduceMotion} onChange={(e) => setMotion(e.target.checked)} className="size-5 shrink-0 accent-blue" />
+              </label>
+              <p className="text-sm text-muted">{t("settings.motionBody")}</p>
+            </div>
+            <InstallMarken />
             <Button variant="secondary">{t("settings.signOut")}</Button>
           </div>
         )}

@@ -20,6 +20,32 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
   const [pending, start] = useTransition();
   const limited = count >= MAX_REWRITES;
 
+  const [slideList, setSlideList] = useState(slides);
+  const [slideOrder, setSlideOrder] = useState(1);
+  const [slideFeedback, setSlideFeedback] = useState("");
+  const [remade, setRemade] = useState<number | null>(null);
+  const [slideFailed, setSlideFailed] = useState(false);
+  const [slidePending, startSlide] = useTransition();
+  const unchecked = slideList.some((s) => !s.fidelity_passed);
+
+  // Slide remake (FR-ED-05): scene only, then the product check must pass again (FR-FD-01).
+  const remake = () =>
+    startSlide(async () => {
+      setSlideFailed(false);
+      const res = await fetch(`/api/posts/${postId}/regenerate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "slide", slide: slideOrder, feedback: slideFeedback.trim() }),
+      }).catch(() => null);
+      // shortcut: endpoint is still 501, so mark the mock slide unchecked until it ships.
+      if (res?.ok || process.env.NODE_ENV !== "production") {
+        setSlideList(slideList.map((s) => (s.order === slideOrder ? { ...s, fidelity_passed: false } : s)));
+        setRemade(slideOrder);
+        return;
+      }
+      setSlideFailed(true);
+    });
+
   const choose = (i: number) => {
     setIndex(i);
     setText(captions[i] ?? "");
@@ -60,7 +86,7 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
         <section aria-label={t("today.carousel")} className="lg:rounded-card lg:border lg:border-border lg:bg-white lg:p-5">
-          <Carousel slides={slides} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} />
+          <Carousel slides={slideList} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} />
         </section>
 
         <div className="flex flex-col gap-4">
@@ -126,7 +152,49 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
             )}
           </section>
 
-          <ActionButton url={`/api/posts/${postId}/approve`} body={{ caption: text }}>
+          <section className="flex flex-col gap-3 rounded-card border border-border bg-white p-5">
+            <h2 className="text-xl font-semibold">{t("imageEdit.title")}</h2>
+            <p className="text-sm text-muted">{t("imageEdit.body")}</p>
+            <div className="flex gap-2" role="group" aria-label={t("imageEdit.title")}>
+              {slideList.map((s) => (
+                <button
+                  key={s.order}
+                  type="button"
+                  onClick={() => setSlideOrder(s.order)}
+                  aria-pressed={slideOrder === s.order}
+                  className={`flex h-11 items-center rounded-full border px-4 text-sm font-medium ${slideOrder === s.order ? "border-blue bg-powder text-blue" : "border-border bg-white text-ink"}`}
+                >
+                  {t("imageEdit.slide", { n: s.order })}
+                </button>
+              ))}
+            </div>
+            <label className="flex flex-col gap-1.5 text-sm font-medium">
+              {t("imageEdit.feedback")}
+              <textarea
+                value={slideFeedback}
+                onChange={(e) => setSlideFeedback(e.target.value)}
+                rows={3}
+                maxLength={200}
+                placeholder={t("imageEdit.feedbackPlaceholder")}
+                className="rounded-control border border-border bg-white p-3 font-normal placeholder:text-muted focus:outline-2 focus:outline-blue"
+              />
+            </label>
+            <Button variant="secondary" onClick={remake} disabled={slidePending || !slideFeedback.trim()} aria-busy={slidePending}>
+              {t("imageEdit.regenerate")}
+            </Button>
+            {remade !== null && (
+              <p role="alert" className="text-sm text-danger">
+                {t("imageEdit.remade", { n: remade })}
+              </p>
+            )}
+            {slideFailed && (
+              <p role="alert" className="text-sm text-danger">
+                {t("common.error")}
+              </p>
+            )}
+          </section>
+
+          <ActionButton url={`/api/posts/${postId}/approve`} body={{ caption: text }} disabled={unchecked}>
             {t("edit.approve")}
           </ActionButton>
           <ButtonLink href="/today" variant="text">

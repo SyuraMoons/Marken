@@ -6,6 +6,7 @@ import type { Tables } from "@/lib/supabase/database.types";
 import { t } from "@/lib/i18n";
 import { mockProductPhoto, mockProducts } from "@/lib/mock";
 import { Button } from "./button";
+import { UploadError } from "./upload-error";
 
 const input = "h-13 w-full rounded-control border border-border bg-white px-4 text-base font-normal placeholder:text-muted focus:outline-2 focus:outline-blue";
 const label = "flex flex-col gap-1.5 text-sm font-medium";
@@ -100,7 +101,7 @@ export function ProductsView() {
               <div className="flex flex-col gap-0.5 px-1">
                 <h2 className="font-semibold">{p.name}</h2>
                 <p className="text-sm text-muted">{p.category}</p>
-                {p.price != null && <p className="text-sm font-medium">IDR {p.price.toLocaleString("id-ID")}</p>}
+                {p.price != null && <p className="text-sm font-medium">{p.currency ?? "IDR"} {p.price.toLocaleString("id-ID")}</p>}
                 <p className={`flex items-center gap-1.5 text-xs font-medium ${p.cutout_confirmed ? "text-blue" : "text-danger"}`}>
                   <span aria-hidden="true">{p.cutout_confirmed ? "✓" : "!"}</span>
                   {t(p.cutout_confirmed ? "products.checked" : "products.needsCheck")}
@@ -128,17 +129,30 @@ function ProductForm({
   onCancel,
 }: {
   product?: Tables<"products">;
-  onSave: (draft: Pick<Tables<"products">, "name" | "category" | "price">) => void;
+  onSave: (draft: Pick<Tables<"products">, "name" | "category" | "price" | "currency" | "attributes" | "description">) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(product?.name ?? "");
   const [category, setCategory] = useState(product?.category ?? "Beauty");
   const [price, setPrice] = useState(product?.price != null ? String(product.price) : "");
+  const [currency, setCurrency] = useState(product?.currency ?? "IDR");
+  const [attributes, setAttributes] = useState(
+    Array.isArray(product?.attributes)
+      ? product.attributes.map(String).join(", ")
+      : product?.attributes && typeof product.attributes === "object"
+        ? Object.entries(product.attributes).map(([k, v]) => `${k}: ${String(v)}`).join(", ")
+        : "",
+  );
+  const [description, setDescription] = useState(product?.description ?? "");
   const [error, setError] = useState(false);
+  const [photoError, setPhotoError] = useState(false);
 
   const submit = () => {
     if (!name.trim()) return setError(true);
-    onSave({ name: name.trim(), category, price: price.trim() === "" ? null : Number(price) });
+    const parts = attributes.split(",").map((a) => a.trim()).filter(Boolean);
+    // Keep key: value attributes as an object, plain tags as a list.
+    const parsed = parts.length && parts.every((p) => p.includes(":")) ? Object.fromEntries(parts.map((p) => { const [k, ...rest] = p.split(":"); return [k.trim(), rest.join(":").trim()]; })) : parts;
+    onSave({ name: name.trim(), category, price: price.trim() === "" ? null : Number(price), currency, attributes: parsed, description: description.trim() || null });
   };
 
   return (
@@ -147,7 +161,9 @@ function ProductForm({
       <div className="relative mx-auto aspect-square w-full max-w-sm overflow-hidden rounded-card border border-border bg-white">
         <Image src={product?.cutout_path ?? mockProductPhoto.src} alt={t("products.photo")} fill sizes="384px" className="object-cover" />
       </div>
-      <Button variant="secondary">{t(product ? "products.changePhoto" : "products.addPhoto")}</Button>
+      {/* shortcut: photo pick fails until /api/uploads lands, delete with the mock. */}
+      <Button variant="secondary" onClick={() => setPhotoError(true)}>{t(product ? "products.changePhoto" : "products.addPhoto")}</Button>
+      {photoError && <UploadError onRetry={() => setPhotoError(false)} onChoose={() => setPhotoError(false)} />}
       <div className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
         <label className={label}>
           {t("products.name")}
@@ -164,6 +180,22 @@ function ProductForm({
         <label className={label}>
           {t("products.price")}
           <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="189000" className={input} />
+        </label>
+        <label className={label}>
+          {t("products.currency")}
+          <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={input}>
+            {["IDR", "USD", "SGD", "MYR", "THB", "PHP"].map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+        <label className={label}>
+          {t("products.attributes")}
+          <input value={attributes} onChange={(e) => setAttributes(e.target.value)} placeholder={t("products.attributesPlaceholder")} className={input} />
+        </label>
+        <label className={label}>
+          {t("products.description")}
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={500} className="rounded-control border border-border bg-white p-3 font-normal placeholder:text-muted focus:outline-2 focus:outline-blue" />
         </label>
       </div>
       {error && (

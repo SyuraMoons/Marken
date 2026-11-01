@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button, ButtonLink } from "./button";
 import { Carousel } from "./carousel";
+import { ActivityPanel } from "./activity-panel";
 import { ProductCheck } from "./product-check";
+import { UploadError } from "./upload-error";
 import { t, type MessageKey } from "@/lib/i18n";
-import { mockPost, mockProductPhoto, mockProducts } from "@/lib/mock";
+import { mockCalls, mockPost, mockProductPhoto, mockProducts, mockSteps } from "@/lib/mock";
 import { allSlidesPassed, asSlides } from "@/lib/posts/slides";
 
 const input = "h-13 w-full rounded-control border border-border bg-white px-4 text-base font-normal placeholder:text-muted focus:outline-2 focus:outline-blue";
@@ -95,7 +97,15 @@ function Step1() {
 
 function Step2({ onNext }: { onNext: () => void }) {
   const [photos, setPhotos] = useState([1, 2, 3]);
-  const ok = photos.length >= 3;
+  const [failedId, setFailedId] = useState<number | null>(null);
+  const ok = photos.length >= 3 && failedId === null;
+
+  // shortcut: a newly added photo fails until /api/uploads lands, delete with the mock.
+  const add = () => {
+    const id = Math.max(0, ...photos) + 1;
+    setPhotos([...photos, id]);
+    setFailedId(id);
+  };
 
   return (
     <>
@@ -104,10 +114,17 @@ function Step2({ onNext }: { onNext: () => void }) {
       <div className="grid grid-cols-3 gap-3">
         {photos.map((id, i) => (
           <figure key={id} className="relative aspect-square overflow-hidden rounded-control bg-white">
-            <Image src={mockProductPhoto.src} alt={t("ob2.photo", { n: i + 1 })} fill sizes="160px" className="object-cover" />
+            {id === failedId ? (
+              <span aria-hidden="true" className="flex h-full items-center justify-center bg-danger/10 text-2xl text-danger">!</span>
+            ) : (
+              <Image src={mockProductPhoto.src} alt={t("ob2.photo", { n: i + 1 })} fill sizes="160px" className="object-cover" />
+            )}
             <button
               type="button"
-              onClick={() => setPhotos(photos.filter((p) => p !== id))}
+              onClick={() => {
+                setPhotos(photos.filter((p) => p !== id));
+                if (id === failedId) setFailedId(null);
+              }}
               aria-label={t("ob2.remove", { n: i + 1 })}
               className="absolute top-0 right-0 flex size-11 items-center justify-center text-lg text-ink"
             >
@@ -116,12 +133,21 @@ function Step2({ onNext }: { onNext: () => void }) {
           </figure>
         ))}
       </div>
+      {failedId !== null && (
+        <UploadError
+          onRetry={() => setFailedId(null)}
+          onChoose={() => {
+            setPhotos(photos.map((p) => (p === failedId ? Math.max(0, ...photos) + 1 : p)));
+            setFailedId(null);
+          }}
+        />
+      )}
       {photos.length < 10 && (
-        <Button variant="secondary" onClick={() => setPhotos([...photos, Math.max(0, ...photos) + 1])}>
+        <Button variant="secondary" onClick={add}>
           {t("ob2.add")}
         </Button>
       )}
-      {!ok && (
+      {photos.length < 3 && (
         <p role="alert" className="text-sm text-danger">
           {t("ob2.need")}
         </p>
@@ -157,9 +183,27 @@ function Step3({ onNext }: { onNext: () => void }) {
                 defaultValue={p.name}
                 className="h-11 w-full rounded-control border border-border bg-white px-3 text-sm font-medium focus:outline-2 focus:outline-blue"
               />
-              <p className="text-sm text-muted">{p.price == null ? t("ob3.noPrice") : `IDR ${p.price.toLocaleString("id-ID")}`}</p>
+              <p className="text-sm text-muted">{p.price == null ? t("ob3.noPrice") : `${p.currency ?? "IDR"} ${p.price.toLocaleString("id-ID")}`}</p>
             </div>
           </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={label}>
+              {t("products.currency")}
+              <select defaultValue={p.currency ?? "IDR"} className={input}>
+                {["IDR", "USD", "SGD", "MYR", "THB", "PHP"].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            <label className={label}>
+              {t("products.attributes")}
+              <input defaultValue={Array.isArray(p.attributes) ? p.attributes.map(String).join(", ") : p.attributes && typeof p.attributes === "object" ? Object.entries(p.attributes).map(([k, v]) => `${k}: ${String(v)}`).join(", ") : ""} placeholder={t("products.attributesPlaceholder")} className={input} />
+            </label>
+          </div>
+          <label className={label}>
+            {t("products.description")}
+            <textarea defaultValue={p.description ?? ""} rows={2} maxLength={500} className="rounded-control border border-border bg-white p-3 font-normal placeholder:text-muted focus:outline-2 focus:outline-blue" />
+          </label>
           <div className="grid grid-cols-2 gap-2">
             <Button
               variant={p.cutout_confirmed ? "secondary" : "primary"}
@@ -278,7 +322,7 @@ function Step5() {
         <span className="absolute top-3 left-3 z-10 rounded-full bg-ink px-2.5 py-1 text-xs font-medium text-white">{t("ob5.sample")}</span>
         <Carousel slides={slides} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} />
         {allSlidesPassed(slides) && (
-          <ProductCheck photo={mockProductPhoto} slide={slides[1]} labels={{ badge: t("today.badge"), before: t("today.before"), after: t("today.after") }} />
+          <ProductCheck key={tour === 2 ? "tour-open" : "tour-closed"} photo={mockProductPhoto} slide={slides[1]} labels={{ badge: t("today.badge"), before: t("today.before"), after: t("today.after") }} expanded={tour === 2} />
         )}
       </section>
 
@@ -291,6 +335,18 @@ function Step5() {
           </Button>
         )}
       </div>
+
+      {tour === 2 && (
+        <section className="flex flex-col gap-2 rounded-card border border-border bg-white p-5">
+          <p className="flex items-center gap-2 font-semibold">
+            <span aria-hidden="true" className="flex size-8 items-center justify-center rounded-full bg-danger/10 text-danger">!</span>
+            {t("tour.failedTitle")}
+          </p>
+          <p className="text-sm text-muted">{t("tour.failedBody")}</p>
+        </section>
+      )}
+
+      {tour === 3 && <ActivityPanel steps={mockSteps} calls={mockCalls} open />}
 
       <ButtonLink href="/today">{t("ob5.finish")}</ButtonLink>
       <ButtonLink href="/today" variant="text">

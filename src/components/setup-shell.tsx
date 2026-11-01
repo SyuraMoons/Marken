@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { t, type MessageKey } from "@/lib/i18n";
 import { ButtonLink } from "./button";
 import { Logo } from "./logo";
+import { SaveAndExit } from "./save-and-exit";
+import { mockShop } from "@/lib/mock";
 
 export const SETUP_STEPS = 5;
 
@@ -24,12 +26,16 @@ export function SetupShell({ step, children }: { step: number; children: ReactNo
           ))}
         </ol>
 
-        <div className="mt-2 flex h-11 items-center">
-          {step > 1 && (
+        <div className="mt-2 flex min-h-11 items-start justify-between gap-3">
+          {step > 1 ? (
             <ButtonLink href={`/onboarding/${step - 1}`} variant="text" className="w-auto! px-0">
               {t("setup.back")}
             </ButtonLink>
+          ) : (
+            <span />
           )}
+          {/* shortcut: mock shop id, swap with the saved step's shop when reads land. */}
+          <SaveAndExit shopId={mockShop.id} step={step} />
         </div>
 
         <main className="flex flex-1 flex-col">{children}</main>

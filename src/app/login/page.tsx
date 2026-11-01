@@ -29,8 +29,12 @@ async function Login({ searchParams }: Pick<PageProps<"/login">, "searchParams">
             </span>
             <h1 className="text-2xl font-semibold">{t("login.sentTitle")}</h1>
             <p className="text-muted">{t("login.sentBody")}</p>
+            {/* Resend re-enters the sent state until Harfi's magic-link action lands. */}
+            <ButtonLink href="/login?sent=1" variant="secondary">
+              {t("login.resend")}
+            </ButtonLink>
             <ButtonLink href="/login" variant="text">
-              {t("login.back")}
+              {t("login.useAnother")}
             </ButtonLink>
           </section>
         ) : (

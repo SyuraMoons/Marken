@@ -5,10 +5,11 @@ import type { Slide } from "@/lib/posts/slides";
 // Typed fixtures until Supabase reads land (FD-09). Swap callers to real queries, not this file.
 export const mockUser: Pick<Tables<"users">, "email" | "name"> = { email: "rani@ranistudio.shop", name: "Rani" };
 
-export const mockShop: Pick<Tables<"shops">, "id" | "name" | "onboarding_step" | "ig_account_id"> = {
+export const mockShop: Pick<Tables<"shops">, "id" | "name" | "onboarding_step" | "onboarding_completed_at" | "ig_account_id"> = {
   id: "00000000-0000-0000-0000-000000000001",
   name: "Rani Studio",
   onboarding_step: 5,
+  onboarding_completed_at: "2026-11-01T00:05:00.000Z",
   ig_account_id: "17841400000000000",
 };
 
@@ -83,6 +84,22 @@ export const mockCalls: Pick<Tables<"model_calls">, "step" | "latency_ms" | "cos
   { step: "cutout", latency_ms: 2100, cost_usd: 0.003, cache_hit: false, fallback: false },
   { step: "render_image", latency_ms: 21400, cost_usd: 0.03, cache_hit: false, fallback: false },
   { step: "fidelity_check", latency_ms: 3600, cost_usd: 0.006, cache_hit: false, fallback: false },
+];
+
+// Results are mock-only until a metrics/orders table exists (FD-19).
+export type PostResult = { postId: string; date: string; product: string; reach: number; likes: number; shares: number; saves: number; orders: number };
+
+export const mockResults: PostResult[] = [
+  { postId: mockPost.id, date: "2026-10-31", product: "LUMI Daily Serum", reach: 1240, likes: 96, shares: 12, saves: 31, orders: 4 },
+  { postId: "00000000-0000-0000-0000-0000000000a2", date: "2026-10-30", product: "LUMI Glow Mist", reach: 860, likes: 61, shares: 7, saves: 18, orders: 2 },
+  { postId: "00000000-0000-0000-0000-0000000000a3", date: "2026-10-29", product: "LUMI Travel Pouch", reach: 540, likes: 38, shares: 4, saves: 9, orders: 0 },
+];
+
+// Weekly learning fixtures (FR-WL-01), mock-only like the metrics above.
+export const mockLearning: { id: string; title: string; evidence: string }[] = [
+  { id: "l1", title: "Routine posts earn the most saves", evidence: "31 saves on the serum routine post, your best this week" },
+  { id: "l2", title: "Serum posts bring your orders", evidence: "4 of your 6 orders came from serum posts" },
+  { id: "l3", title: "Short opening lines work better", evidence: "Your two shortest hooks reached the most people" },
 ];
 
 // shortcut: dev-only ?status= preview of each Today state, delete with the mocks.

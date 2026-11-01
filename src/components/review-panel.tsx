@@ -11,11 +11,42 @@ const REASONS = ["not_my_style", "wrong_product", "bad_timing", "other"] as cons
 // Caption choice + one-tap Approve (DX-01) + skip with reason chips (FR-TD-03, DX-05).
 export function ReviewPanel({ postId, captions, hashtags }: { postId: string; captions: string[]; hashtags: string[] }) {
   const [index, setIndex] = useState(0);
+  const [picking, setPicking] = useState(false);
   const [skipping, setSkipping] = useState(false);
   const [reason, setReason] = useState<(typeof REASONS)[number] | null>(null);
   const [note, setNote] = useState("");
   const caption = captions[index] ?? "";
   const full = `${caption}\n\n${hashtags.join(" ")}`;
+
+  // Caption picker matches Figma caption-alt (97:2676): option cards, confirm, or edit manually.
+  if (picking) {
+    return (
+      <section className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
+        <h2 className="text-xl font-semibold">{t("today.chooseCaption", { n: index + 1, total: captions.length })}</h2>
+        <div className="flex flex-col gap-3">
+          {captions.map((c, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-pressed={index === i}
+              onClick={() => setIndex(i)}
+              className={`flex min-h-13 flex-col gap-1 rounded-control border p-4 text-left focus-visible:outline-2 focus-visible:outline-blue ${index === i ? "border-blue bg-powder/50" : "border-border bg-white"}`}
+            >
+              <span className={`text-xs font-medium tracking-wide uppercase ${index === i ? "text-blue" : "text-muted"}`}>{t("captionAlt.option", { n: i + 1 })}</span>
+              <span className="text-sm">{c}</span>
+            </button>
+          ))}
+        </div>
+        <Button onClick={() => setPicking(false)}>{t("captionAlt.use")}</Button>
+        <ButtonLink href={`/posts/${postId}/edit`} variant="secondary">
+          {t("captionAlt.editManually")}
+        </ButtonLink>
+        <Button variant="text" onClick={() => setPicking(false)}>
+          {t("captionAlt.cancel")}
+        </Button>
+      </section>
+    );
+  }
 
   if (skipping) {
     return (
@@ -60,7 +91,7 @@ export function ReviewPanel({ postId, captions, hashtags }: { postId: string; ca
         </div>
         <p className="whitespace-pre-line">{caption}</p>
         {captions.length > 1 && (
-          <Button variant="text" className="justify-start! px-0!" onClick={() => setIndex((index + 1) % captions.length)}>
+          <Button variant="text" className="justify-start! px-0!" onClick={() => setPicking(true)}>
             {t("today.chooseCaption", { n: index + 1, total: captions.length })}
           </Button>
         )}

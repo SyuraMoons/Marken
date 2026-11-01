@@ -73,3 +73,35 @@ export const TrendAnalysisModelSchema = z.object({
   from_video: z.boolean().default(true),
 });
 
+/**
+ * Style rule verification output schema (`FR-SP-04..06`, `step: "check_rules"`).
+ */
+export const StyleRuleCheckModelSchema = z.object({
+  passed: z.boolean(),
+  violations: z.array(z.string()).default([]),
+  checkedTextCount: z.number().int().nonnegative().default(0),
+});
+
+/**
+ * Slide specification within CarouselPlan (`FR-CG-01`).
+ */
+export const CarouselSlidePlanSchema = z.object({
+  order: z.number().int().min(1).max(3),
+  role: z.enum(["hook", "product", "cta"]),
+  text: z.string().min(1),
+  alt: z.string().min(1),
+  scene_brief: z.string().min(1),
+});
+
+/**
+ * Full carousel plan returned by `Muse Spark` (`FR-CG-01`, `step: "plan_post"`).
+ */
+export const CarouselPlanModelSchema = z.object({
+  product_id: z.string().min(1),
+  trend_id: z.string().min(1),
+  fit_reason: z.string().min(1),
+  slides: z.array(CarouselSlidePlanSchema).length(3),
+  caption_options: z.array(z.string().min(1)).min(2).max(4),
+  hashtags: z.array(z.string().min(1)).min(5).max(15),
+});
+

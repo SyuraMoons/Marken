@@ -15,11 +15,34 @@ export {
   ExtractedProductSchema,
   RawProductExtractionModelSchema,
   RawTrendCandidateSchema,
+  StyleRuleCheckModelSchema,
+  CarouselPlanModelSchema,
+  CarouselSlidePlanSchema,
   TrendAnalysisModelSchema,
   TrendResearchModelSchema,
   TrendScoreModelSchema,
   type ExtractedProduct,
 } from "./schemas";
+export {
+  checkStyleRules,
+  evaluateLocalRuleViolations,
+  type CheckStyleRulesInput,
+  type CheckStyleRulesResult,
+} from "./rules";
+export {
+  planDailyCarousel,
+  selectEligibleProductsAndTrends,
+  type CarouselCaptionOption,
+  type DailyCarouselPlanResult,
+  type PlanDailyCarouselInput,
+  type PostHistoryItem,
+  type ProductCandidate,
+  type SelectEligibleInput,
+  type SelectEligibleResult,
+  type SlidePlan,
+  type SlideRole,
+  type TrendCandidateForPlan,
+} from "./planner";
 export {
   analyseTrend,
   DEFAULT_TREND_SCORE_THRESHOLD,

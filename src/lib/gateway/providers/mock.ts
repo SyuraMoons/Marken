@@ -40,18 +40,14 @@ export async function callMockProvider(
     case "extract_products":
       return {
         rawOutput: {
-          products: [
-            {
-              name: "Smoky Sambal Roa Artisan Jar",
-              category: "Food & Beverage",
-              price: null,
-              currency: "IDR",
-              attributes: ["smoked fish", "spicy condiment", "glass jar", "no preservatives"],
-              description:
-                "Slow-cooked Manadonese smoked roa chili condiment in a sealed glass jar.",
-              source_photo: "upload_1.jpg",
-            },
-          ],
+          name: "Smoky Sambal Roa Artisan Jar",
+          category: "Food & Beverage",
+          price_visible_in_photo: false,
+          price: null,
+          currency: null,
+          attributes: ["smoked fish", "spicy condiment", "glass jar", "no preservatives"],
+          description:
+            "Slow-cooked Manadonese smoked roa chili condiment in a sealed glass jar.",
         },
         tokensIn: 420,
         tokensOut: 190,

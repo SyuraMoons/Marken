@@ -1,5 +1,11 @@
 import type { ProviderRawResponse, ProviderRequest } from "../types";
-import { LIVE_META_MODEL_IDS, ProviderError, sanitizeBaseUrl } from "./meta";
+import {
+  LIVE_META_MODEL_IDS,
+  ProviderError,
+  buildUserContent,
+  countInputImages,
+  sanitizeBaseUrl,
+} from "./meta";
 
 function resolveSparkOpenConfig(): {
   apiKey: string | undefined;
@@ -62,9 +68,6 @@ export async function callSparkOpenProvider(
     ? `${baseSystem}\n\nIMPORTANT RETRY NOTICE: Your previous response failed schema validation:\n${req.retryValidationError}\nReturn valid JSON only.`
     : baseSystem;
 
-  const userContent =
-    typeof req.input === "string" ? req.input : JSON.stringify(req.input);
-
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -75,7 +78,7 @@ export async function callSparkOpenProvider(
       model: modelId,
       messages: [
         { role: "system", content: systemContent },
-        { role: "user", content: userContent },
+        { role: "user", content: buildUserContent(req.input) },
       ],
       temperature: 0.2,
       ...(req.expectJson ? { response_format: { type: "json_object" } } : {}),
@@ -99,7 +102,7 @@ export async function callSparkOpenProvider(
     rawOutput: payload.choices?.[0]?.message?.content ?? "",
     tokensIn: payload.usage?.prompt_tokens ?? 280,
     tokensOut: payload.usage?.completion_tokens ?? 120,
-    images: 0,
+    images: countInputImages(req.input),
     provider: "spark-open",
   };
 }

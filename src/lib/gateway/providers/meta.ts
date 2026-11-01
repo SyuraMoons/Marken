@@ -53,14 +53,46 @@ export function isMetaConfigured(): boolean {
   );
 }
 
+function readImageUrls(obj: Record<string, unknown>): string[] {
+  const imageUrls: string[] = [];
+  if (typeof obj.imageUrl === "string" && obj.imageUrl.trim()) {
+    imageUrls.push(obj.imageUrl.trim());
+  }
+  if (Array.isArray(obj.imageUrls)) {
+    for (const u of obj.imageUrls) {
+      if (typeof u === "string" && u.trim()) imageUrls.push(u.trim());
+    }
+  }
+  return imageUrls;
+}
+
 /**
- * Supports:
+ * Number of images a chat request carries, so vision steps are billed per image.
+ */
+export function countInputImages(input: unknown): number {
+  if (Array.isArray(input)) {
+    return input.filter(
+      (part) =>
+        typeof part === "object" &&
+        part !== null &&
+        (part as { type?: unknown }).type === "image_url",
+    ).length;
+  }
+  if (typeof input === "object" && input !== null) {
+    return readImageUrls(input as Record<string, unknown>).length;
+  }
+  return 0;
+}
+
+/**
+ * Builds OpenAI-style user content for every chat provider, so a vision step sends
+ * real image parts on the fallback path too. Supports:
  * 1. Plain string prompts
  * 2. Multimodal input objects `{ prompt: string, imageUrl?: string, imageUrls?: string[] }`
  * 3. Pre-formatted OpenAI content arrays `Array<{ type: "text" | "image_url", ... }>`
  * 4. Arbitrary JSON objects (serialized as JSON string)
  */
-function buildUserContent(input: unknown): unknown {
+export function buildUserContent(input: unknown): unknown {
   if (typeof input === "string") {
     return input;
   }
@@ -69,15 +101,7 @@ function buildUserContent(input: unknown): unknown {
   }
   if (typeof input === "object" && input !== null) {
     const obj = input as Record<string, unknown>;
-    const imageUrls: string[] = [];
-    if (typeof obj.imageUrl === "string" && obj.imageUrl.trim()) {
-      imageUrls.push(obj.imageUrl.trim());
-    }
-    if (Array.isArray(obj.imageUrls)) {
-      for (const u of obj.imageUrls) {
-        if (typeof u === "string" && u.trim()) imageUrls.push(u.trim());
-      }
-    }
+    const imageUrls = readImageUrls(obj);
     if (imageUrls.length > 0) {
       const promptText =
         typeof obj.prompt === "string"
@@ -330,7 +354,7 @@ export async function callMetaProvider(
     rawOutput: content,
     tokensIn,
     tokensOut,
-    images: 0,
+    images: countInputImages(req.input),
     provider: "meta",
   };
 }

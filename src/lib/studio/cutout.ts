@@ -159,9 +159,13 @@ function fillMaskHolesAndSpeckles(
     if (y + 1 < height) enqueueIfZero(idx + width);
   }
 
+  // Fix 1 (PR #36 review): Keep the original edge without 2px background halo.
+  // The dilated mask is used only to identify exterior background via border flood-fill.
+  // Any pixel not reached from the exterior is an enclosed interior hole.
+  // An output pixel is foreground (255) if it was in the original mask OR is an enclosed hole.
   const alpha = Buffer.allocUnsafe(total);
   for (let i = 0; i < total; i++) {
-    alpha[i] = exterior[i] ? 0 : 255;
+    alpha[i] = closed[i] || !exterior[i] ? 255 : 0;
   }
   return alpha;
 }

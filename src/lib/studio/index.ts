@@ -153,14 +153,30 @@ export async function renderAndVerifySlide(
   cutoutBufferArg?: Buffer | Uint8Array | string,
 ): Promise<RenderAndVerifySlideResult> {
   const startedAt = Date.now();
+  if (typeof inputOrSceneBrief === "string" && !cutoutBufferArg) {
+    throw new Error(
+      "renderAndVerifySlide requires a valid, non-empty product cutout buffer",
+    );
+  }
+
   const input: RenderAndVerifySlideInput =
     typeof inputOrSceneBrief === "string"
       ? {
           sceneBrief: inputOrSceneBrief,
           slideText: "",
-          cutout: cutoutBufferArg ?? Buffer.alloc(0),
+          cutout: cutoutBufferArg!,
         }
       : inputOrSceneBrief;
+
+  if (
+    !input.cutout ||
+    (Buffer.isBuffer(input.cutout) && input.cutout.length === 0) ||
+    (typeof input.cutout === "string" && !input.cutout.trim())
+  ) {
+    throw new Error(
+      "renderAndVerifySlide requires a valid, non-empty product cutout buffer",
+    );
+  }
 
   const maxRetries =
     typeof input.maxRetries === "number" && input.maxRetries >= 0
@@ -218,6 +234,17 @@ export async function renderAndVerifySlide(
     allTelemetry.push(lastFidelity.telemetry);
 
     if (lastFidelity.fidelityPassed) {
+      break;
+    }
+
+    // Fix 2 (PR #36 review): Pixel failure is deterministic under the same cutout and box,
+    // so regenerating the scene cannot fix it. Only retry when spelling or rule checks fail,
+    // protecting the < $0.10 per carousel budget.
+    if (
+      !lastFidelity.pixelPassed &&
+      lastFidelity.spellingPassed &&
+      lastFidelity.rulesPassed
+    ) {
       break;
     }
   }

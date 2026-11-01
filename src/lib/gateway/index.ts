@@ -249,7 +249,10 @@ export async function callModelWithTelemetry<TInput, TOutput>(
   call: ModelCall<TInput, TOutput>,
 ): Promise<ModelCallResult<TOutput>> {
   const startedAt = performance.now();
-  const requestedModel = normalizeModelId(call.model);
+  const targetModel = normalizeModelId(call.model);
+  const requestedModel = call.requestedModel
+    ? normalizeModelId(call.requestedModel)
+    : targetModel;
   const allowFallback =
     call.allowFallback ?? TEXT_FALLBACK_STEPS.has(call.step);
 
@@ -262,7 +265,7 @@ export async function callModelWithTelemetry<TInput, TOutput>(
       shopId: call.shopId ?? null,
       postId: call.postId ?? null,
       step: call.step,
-      model: requestedModel,
+      model: targetModel,
       requestedModel,
       tokensIn: 0,
       tokensOut: 0,
@@ -270,7 +273,8 @@ export async function callModelWithTelemetry<TInput, TOutput>(
       latencyMs,
       costUsd: 0,
       cacheHit: true,
-      fallback: false,
+      fallback: Boolean(call.fallback),
+      fallbackReason: call.fallbackReason,
       retries: 0,
       provider: "cache",
       createdAt: new Date().toISOString(),
@@ -290,7 +294,7 @@ export async function callModelWithTelemetry<TInput, TOutput>(
   for (let attempt = 0; attempt < 2; attempt++) {
     const dispatched = await dispatchProvider({
       step: call.step,
-      model: requestedModel,
+      model: targetModel,
       input: call.input,
       systemPrompt: call.systemPrompt,
       expectJson,
@@ -316,6 +320,11 @@ export async function callModelWithTelemetry<TInput, TOutput>(
         cacheHit: false,
       });
 
+      const mergedFallbackReason =
+        [call.fallbackReason, dispatched.fallbackReason]
+          .filter(Boolean)
+          .join("; ") || undefined;
+
       const telemetry: ModelCallTelemetry = {
         id: randomUUID(),
         shopId: call.shopId ?? null,
@@ -329,8 +338,8 @@ export async function callModelWithTelemetry<TInput, TOutput>(
         latencyMs,
         costUsd,
         cacheHit: false,
-        fallback: dispatched.fallback,
-        fallbackReason: dispatched.fallbackReason,
+        fallback: Boolean(call.fallback || dispatched.fallback),
+        fallbackReason: mergedFallbackReason,
         retries,
         provider: dispatched.response.provider,
         createdAt: new Date().toISOString(),

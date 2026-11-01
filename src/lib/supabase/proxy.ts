@@ -68,5 +68,15 @@ export async function updateSession(request: NextRequest) {
     return redirectTo(destinationFor(shop));
   }
 
+  // Signed-in owners with unfinished setup land on their saved step, not on the app (FR-OB-11).
+  if (!pathname.startsWith("/onboarding") && !isAuthRoute) {
+    const { data: shop, error } = await supabase
+      .from("shops")
+      .select("onboarding_step, onboarding_completed_at")
+      .eq("owner_id", userId)
+      .maybeSingle();
+    if (!error && !shop?.onboarding_completed_at) return redirectTo(destinationFor(shop));
+  }
+
   return response;
 }

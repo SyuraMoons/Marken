@@ -76,10 +76,12 @@ export async function POST(req: Request, ctx: RouteContext<"/api/posts/[id]/appr
   // `approved` here is either just approved or a repeat tap after a failed send.
   if (!canPublish) return Response.json({ post, publish: "manual" });
 
+  // Inngest drops a repeated event id for 24 h. updated_at changes on every status move, so
+  // a retry after a failed publish gets a fresh key while a double tap keeps the same one.
   const queued = await enqueue(
     "post/publish.requested",
     { shopId: post.shop_id, postId: post.id },
-    post.id,
+    `${post.id}:${post.updated_at}`,
   );
   // The post stays approved, so tapping Approve again retries the send.
   if (!queued) return apiError("queue_unavailable", 503, { status: "approved" });

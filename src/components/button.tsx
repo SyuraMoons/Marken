@@ -21,3 +21,8 @@ export function Button({ variant = "primary", className = "", ...props }: Compon
 export function ButtonLink({ variant = "primary", className = "", ...props }: ComponentProps<typeof Link> & { variant?: Variant }) {
   return <Link className={`${base} ${VARIANTS[variant]} ${className}`} {...props} />;
 }
+
+// Plain anchor for server redirects (e.g. Instagram OAuth): Link would prefetch and client-navigate them.
+export function AnchorButton({ variant = "primary", className = "", ...props }: ComponentProps<"a"> & { variant?: Variant }) {
+  return <a className={`${base} ${VARIANTS[variant]} ${className}`} {...props} />;
+}

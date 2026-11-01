@@ -126,7 +126,7 @@ Step 1 `data` = `{ name, category, country, content_language, time_zone }`. Step
 Not required by Today any more (FD-12: server reads + page refresh). Keep for other clients or the demo.
 
 ### `GET /api/auth/instagram/callback` (FR-OB-06, F-12)
-Browser navigation only. Returns a redirect to `/onboarding/4?ig=connected|error` or `/settings?ig=...` **[confirm: Harfi]**.
+Browser navigation only. Start at `GET /api/auth/instagram?next=onboarding|settings` (use a plain `<a>`, not `next/link`). The callback redirects to `/onboarding/4?ig=connected|error` or `/settings?ig=connected|error`. A connected shop has `shops.ig_account_id` set; the token stays server-side. Publish runs as a job after Approve, and a token that expired disconnects the shop so Approve returns `publish: "manual"` (download + copy).
 
 ### Auth
 Live on `development`: server actions in `src/app/login/actions.ts` (`signInWithGoogle`, `sendMagicLink`, `signOut`), OAuth return at `/auth/callback`, `src/proxy.ts` redirects: logged-out → `/login`, logged-in `/` and `/login` → `/today` or the saved onboarding step, unfinished setup → `/onboarding/N`.

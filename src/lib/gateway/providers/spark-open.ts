@@ -1,19 +1,43 @@
 import type { ProviderRawResponse, ProviderRequest } from "../types";
-import { ProviderError } from "./meta";
+import {
+  LIVE_META_MODEL_IDS,
+  ProviderError,
+  buildUserContent,
+  countInputImages,
+  sanitizeBaseUrl,
+} from "./meta";
+
+let warnedSharedCredentials = false;
 
 function resolveSparkOpenConfig(): {
   apiKey: string | undefined;
   baseUrl: string | undefined;
+  modelId: string;
+  sharesMetaCredentials: boolean;
 } {
-  const apiKey =
+  const dedicatedKey =
     process.env.MUSE_SPARK_OPEN_API_KEY?.trim() ||
     process.env.LLAMA_API_KEY?.trim();
-  const baseUrl = (
-    process.env.MUSE_SPARK_OPEN_BASE_URL?.trim() ||
-    process.env.LLAMA_API_BASE_URL?.trim()
-  )?.replace(/\/+$/, "");
+  const dedicatedUrl = sanitizeBaseUrl(
+    process.env.MUSE_SPARK_OPEN_BASE_URL || process.env.LLAMA_API_BASE_URL,
+  );
 
-  return { apiKey, baseUrl };
+  if (dedicatedKey && dedicatedUrl) {
+    return {
+      apiKey: dedicatedKey,
+      baseUrl: dedicatedUrl,
+      modelId: "muse-spark-open",
+      sharesMetaCredentials: false,
+    };
+  }
+
+  // Default to Meta Model API `muse-spark-1.3-contributor` ($150 free credit pool)
+  return {
+    apiKey: process.env.META_MODEL_API_KEY?.trim(),
+    baseUrl: sanitizeBaseUrl(process.env.META_MODEL_API_BASE_URL),
+    modelId: LIVE_META_MODEL_IDS["muse-spark-open"],
+    sharesMetaCredentials: true,
+  };
 }
 
 export function isSparkOpenConfigured(): boolean {
@@ -22,19 +46,27 @@ export function isSparkOpenConfigured(): boolean {
 }
 
 /**
- * Calls `Muse Spark Open` hosted on Baseten or Modal.
+ * Calls `Muse Spark Open` (`muse-spark-1.3-contributor` on Meta API or Baseten/Modal override).
  * Used directly for `score_trend` (`FR-TR-05`) and as the text fallback when
- * the Meta Model API fails (`NFR-18`).
+ * the primary model fails (`NFR-18`).
  * Never import this outside `src/lib/gateway/`.
  */
 export async function callSparkOpenProvider(
   req: ProviderRequest,
 ): Promise<ProviderRawResponse> {
-  const { apiKey, baseUrl } = resolveSparkOpenConfig();
+  const { apiKey, baseUrl, modelId, sharesMetaCredentials } =
+    resolveSparkOpenConfig();
+
+  if (sharesMetaCredentials && !warnedSharedCredentials) {
+    warnedSharedCredentials = true;
+    console.warn(
+      "Muse Spark Open is using the Meta Model API URL and key, so the text fallback will not survive a Meta outage or a revoked key. Set MUSE_SPARK_OPEN_API_KEY and MUSE_SPARK_OPEN_BASE_URL for an independent fallback (NFR-18).",
+    );
+  }
 
   if (!apiKey || !baseUrl) {
     throw new ProviderError(
-      "MUSE_SPARK_OPEN_API_KEY/LLAMA_API_KEY or BASE_URL is not configured",
+      "Neither META_MODEL_API_KEY nor MUSE_SPARK_OPEN_API_KEY is configured",
       { provider: "spark-open", retriable: false },
     );
   }
@@ -49,9 +81,6 @@ export async function callSparkOpenProvider(
     ? `${baseSystem}\n\nIMPORTANT RETRY NOTICE: Your previous response failed schema validation:\n${req.retryValidationError}\nReturn valid JSON only.`
     : baseSystem;
 
-  const userContent =
-    typeof req.input === "string" ? req.input : JSON.stringify(req.input);
-
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -59,10 +88,10 @@ export async function callSparkOpenProvider(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "muse-spark-open",
+      model: modelId,
       messages: [
         { role: "system", content: systemContent },
-        { role: "user", content: userContent },
+        { role: "user", content: buildUserContent(req.input) },
       ],
       temperature: 0.2,
       ...(req.expectJson ? { response_format: { type: "json_object" } } : {}),
@@ -72,7 +101,7 @@ export async function callSparkOpenProvider(
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
     throw new ProviderError(
-      `Muse Spark Open failed with HTTP ${response.status}: ${errText}`,
+      `Muse Spark Open (${modelId}) failed with HTTP ${response.status}: ${errText}`,
       { provider: "spark-open", statusCode: response.status, retriable: false },
     );
   }
@@ -86,8 +115,9 @@ export async function callSparkOpenProvider(
     rawOutput: payload.choices?.[0]?.message?.content ?? "",
     tokensIn: payload.usage?.prompt_tokens ?? 280,
     tokensOut: payload.usage?.completion_tokens ?? 120,
-    images: 0,
+    images: countInputImages(req.input),
     provider: "spark-open",
   };
 }
+
 

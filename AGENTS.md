@@ -15,7 +15,7 @@ Guidance for AI coding agents (Claude Code, Codex, Cursor, Antigravity, etc.) wo
 
 ## Status and commands
 
-Scaffold state: routes exist and render placeholders, API routes return 501, and `src/lib/*` modules are stubs ready for implementation.
+Scaffold state: routes exist and render placeholders, API routes return 501, and `src/lib/*` modules are being implemented by workstream (`src/lib/gateway/*`, `src/lib/studio/cutout.ts`, and `src/lib/agents/extract.ts` are live against `https://api.meta.ai/v1`).
 
 ```bash
 pnpm dev          # local dev server
@@ -28,7 +28,7 @@ Copy `.env.example` to `.env.local` for secrets.
 
 Next.js 16 notes: middleware is now `src/proxy.ts`; `cacheComponents` is on, so dynamic `params` need `generateStaticParams` or a Suspense boundary.
 
-Stack (SRD v2.0 §9): Next.js App Router + TypeScript + Tailwind (PWA) on Vercel, Supabase (Auth with Google + magic link, Postgres with RLS, Storage with signed URLs), Inngest for cron and durable jobs, Meta Model API (`Muse Spark`, `Muse Wonder`, `Muse Image`, `SAM 3.1`), `Muse Spark Open` on Baseten/Modal, `sharp` for deterministic server-side compositing & fidelity verification, Instagram Graph API (carousel), Resend for email reminders.
+Stack (SRD v2.0 §9): Next.js App Router + TypeScript + Tailwind (PWA) on Vercel, Supabase (Auth with Google + magic link, Postgres with RLS, Storage with signed URLs), Inngest for cron and durable jobs, Meta Model API (`Muse Spark` / `muse-spark-1.3`, `Muse Wonder` / `muse-wonder-1.0`, `Muse Image` / `muse-image-1.0`, `SAM 3.1` / `sam-3.1` with `@meta-sam/parser`), `Muse Spark Open` (`muse-spark-1.3-contributor` on Meta API or Baseten/Modal override), `sharp` for deterministic server-side compositing & fidelity verification, Instagram Graph API (carousel), Resend for email reminders.
 
 ## Three Pillars & Architecture Invariants
 

@@ -24,6 +24,7 @@ export type SetupShop = {
   time_zone: string | null;
   tone: string | null;
   igConnected: boolean;
+  completed: boolean;
 };
 
 type Ctx = { shop: SetupShop; go: (step: number) => void; save: (body: Record<string, unknown>) => Promise<boolean> };
@@ -558,11 +559,12 @@ function Step5({ ctx }: { ctx: Ctx }) {
   const [failed, setFailed] = useState(false);
   const started = useRef(false);
 
+  // Replay tour (Settings) must not start another post.
   useEffect(() => {
-    if (started.current) return;
+    if (started.current || ctx.shop.completed) return;
     started.current = true;
     void fetch(`/api/shops/${ctx.shop.id}/posts/generate`, { method: "POST" }).catch(() => null);
-  }, [ctx.shop.id]);
+  }, [ctx.shop.id, ctx.shop.completed]);
 
   const finish = (action: "finish" | "skip") =>
     start(async () => {

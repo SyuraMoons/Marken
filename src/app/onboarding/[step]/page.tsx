@@ -61,6 +61,7 @@ async function Step({ params }: Pick<PageProps<"/onboarding/[step]">, "params">)
           time_zone: shop.time_zone,
           tone: shop.tone,
           igConnected: Boolean(shop.ig_account_id),
+          completed: Boolean(shop.onboarding_completed_at),
         }}
         products={products}
         rules={(rules.data ?? []).map((r) => r.text)}

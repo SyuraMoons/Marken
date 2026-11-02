@@ -1,63 +1,57 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { t, type MessageKey } from "@/lib/i18n";
 import { ActionButton } from "./action-button";
 import { Button, ButtonLink } from "./button";
-import { CopyButton } from "./copy-button";
+import { InfoCard } from "./info-card";
 
 const REASONS = ["not_my_style", "wrong_product", "bad_timing", "other"] as const;
 
-// Caption choice + one-tap Approve (DX-01) + skip with reason chips (FR-TD-03, DX-05).
-export function ReviewPanel({ postId, captions, hashtags }: { postId: string; captions: string[]; hashtags: string[] }) {
+// Caption choice + Approve (opens "Publish this post?", SRD A-04) + skip with reason chips (FR-TD-03, DX-05). `children` is the "why" section.
+export function ReviewPanel({ postId, captions, hashtags, children }: { postId: string; captions: string[]; hashtags: string[]; children?: ReactNode }) {
   const [index, setIndex] = useState(0);
   const [picking, setPicking] = useState(false);
-  const [before, setBefore] = useState(0);
   const [skipping, setSkipping] = useState(false);
   const [reason, setReason] = useState<(typeof REASONS)[number] | null>(null);
   const [note, setNote] = useState("");
   const caption = captions[index] ?? "";
-  const full = `${caption}\n\n${hashtags.join(" ")}`;
 
-  // Caption picker matches Figma caption-alt (97:2676): option cards, confirm, or edit manually.
+  // Choose a caption (228:11545).
   if (picking) {
     return (
-      <section className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
-        <h2 className="text-xl font-semibold">{t("today.chooseCaption", { n: index + 1, total: captions.length })}</h2>
-        <div className="flex flex-col gap-3">
-          {captions.map((c, i) => (
-            <button
-              key={i}
-              type="button"
-              aria-pressed={index === i}
-              onClick={() => setIndex(i)}
-              className={`flex min-h-13 flex-col gap-1 rounded-control border p-4 text-left focus-visible:outline-2 focus-visible:outline-blue ${index === i ? "border-blue bg-powder/50" : "border-border bg-white"}`}
-            >
-              <span className={`text-xs font-medium tracking-wide uppercase ${index === i ? "text-blue" : "text-muted"}`}>{t("captionAlt.option", { n: i + 1 })}</span>
-              <span className="text-sm">{c}</span>
-            </button>
-          ))}
-        </div>
-        <Button onClick={() => setPicking(false)}>{t("captionAlt.use")}</Button>
-        <ButtonLink href={`/posts/${postId}/edit`} variant="secondary">
+      <section className="flex flex-col gap-4 leading-[1.4]">
+        <h2 className="text-[30px] font-semibold">{t("captionAlt.title")}</h2>
+        <p className="text-muted">{t("captionAlt.body")}</p>
+        {captions.map((c, i) => (
+          <div key={i} className="glass flex flex-col gap-3 rounded-card p-5">
+            <h3 className="text-sm font-semibold text-blue">{t("captionAlt.option", { n: i + 1 })}</h3>
+            <p className="text-[15px] text-muted">{c}</p>
+            <Button variant={i === index ? "primary" : "secondary"} aria-pressed={i === index} onClick={() => { setIndex(i); setPicking(false); }}>
+              {t("captionAlt.useN", { n: i + 1 })}
+            </Button>
+          </div>
+        ))}
+        <InfoCard vector="voice" title={t("captionAlt.settingsTitle")}>
+          {t("captionAlt.settingsBody")}
+        </InfoCard>
+        <ButtonLink href={`/posts/${postId}/edit`} variant="text">
           {t("captionAlt.editManually")}
         </ButtonLink>
-        <Button variant="text" onClick={() => { setIndex(before); setPicking(false); }}>
-          {t("captionAlt.cancel")}
-        </Button>
       </section>
     );
   }
 
+  // Skip this post (228:11065).
   if (skipping) {
     return (
-      <section className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
-        <h2 className="text-xl font-semibold">{t("skip.title")}</h2>
-        <p className="text-sm text-muted">{t("skip.body")}</p>
+      <section className="flex flex-col gap-4 leading-[1.4]">
+        <h2 className="text-[30px] font-semibold">{t("skip.title")}</h2>
+        <p className="text-muted">{t("skip.body")}</p>
         <fieldset className="flex flex-wrap gap-2">
           <legend className="sr-only">{t("skip.reasonLabel")}</legend>
           {REASONS.map((r) => (
-            <label key={r} className={`flex h-11 cursor-pointer items-center rounded-full border px-4 text-sm font-medium has-focus-visible:outline-2 has-focus-visible:outline-blue ${reason === r ? "border-blue bg-powder text-blue" : "border-border bg-white text-ink"}`}>
+            <label key={r} className={`flex h-11 cursor-pointer items-center rounded-full border px-4 text-sm font-medium has-focus-visible:outline-2 has-focus-visible:outline-blue ${reason === r ? "border-blue bg-powder text-blue" : "border-border bg-white text-slate"}`}>
               <input type="radio" name="reason" value={r} checked={reason === r} onChange={() => setReason(r)} className="sr-only" />
               {t(`skip.${r}` as MessageKey)}
             </label>
@@ -70,6 +64,7 @@ export function ReviewPanel({ postId, captions, hashtags }: { postId: string; ca
             onChange={(e) => setNote(e.target.value)}
             maxLength={200}
             rows={3}
+            placeholder={t("skip.notePlaceholder")}
             className="rounded-control border border-border bg-white p-3 font-normal placeholder:text-muted focus:outline-2 focus:outline-blue"
           />
         </label>
@@ -83,33 +78,36 @@ export function ReviewPanel({ postId, captions, hashtags }: { postId: string; ca
     );
   }
 
+  // Mobile: separate glass cards. Desktop: one "Ready for your review" card (2 Nov design).
   return (
-    <div className="flex flex-col gap-4">
-      <section className="flex flex-col gap-3 rounded-card border border-border bg-white p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">{t("today.caption")}</h2>
-          <CopyButton text={full} className="w-auto! px-2" />
-        </div>
-        <p className="whitespace-pre-line">{caption}</p>
+    <div className="flex flex-col gap-2.5 lg:glass lg:gap-4 lg:rounded-2xl lg:p-6">
+      <h2 className="hidden text-xl leading-[1.45] font-semibold lg:block">{t("today.ready")}</h2>
+      <section className="flex flex-col gap-3 max-lg:glass max-lg:rounded-card max-lg:p-5 lg:py-6">
+        {/* eslint-disable-next-line @next/next/no-img-element -- static design illustration */}
+        <img src="/figma/vector-voice.svg" width={78} height={50} alt="" />
+        <h2 className="text-lg leading-[1.4] font-semibold">{t("today.caption")}</h2>
+        <p className="text-[15px] leading-[1.4] whitespace-pre-line text-muted lg:text-base">{caption}</p>
         {captions.length > 1 && (
-          <Button variant="text" className="justify-start! px-0!" onClick={() => { setBefore(index); setPicking(true); }}>
-            {t("today.chooseCaption", { n: index + 1, total: captions.length })}
+          <Button variant="text" onClick={() => setPicking(true)}>
+            {t("today.choose")}
           </Button>
         )}
-        <p className="text-sm text-muted">{hashtags.join(" ")}</p>
+        <p className="text-[13px] leading-[1.4] text-blue">{hashtags.join(" ")}</p>
       </section>
+      {children}
 
-      <ActionButton url={`/api/posts/${postId}/approve`} body={{ caption }}>
-        {t("today.approve")}
-      </ActionButton>
-      <div className="grid grid-cols-2 gap-3">
+      <ButtonLink href={`/today?view=share&c=${index}`}>{t("today.approve")}</ButtonLink>
+      <div className="grid grid-cols-2 gap-2.5 lg:gap-3">
         <ButtonLink href={`/posts/${postId}/edit`} variant="secondary">
           {t("today.edit")}
         </ButtonLink>
-        <Button variant="secondary" onClick={() => setSkipping(true)}>
+        <Button variant="secondary" className="lg:border-transparent! lg:bg-transparent! lg:text-sm lg:font-normal! lg:text-link!" onClick={() => setSkipping(true)}>
           {t("today.skip")}
         </Button>
       </div>
+      <ButtonLink href="/today?view=activity" variant="text">
+        {t("today.activityLink")}
+      </ButtonLink>
     </div>
   );
 }

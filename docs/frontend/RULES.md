@@ -1,7 +1,7 @@
 # MARKEN Frontend — Rules
 
 For everyone (human or agent) working in the frontend workstream: Nalen & Akhnaf.
-Read with: `docs/SRD.md` (source of truth) · `DESIGN.md` · `DESIGN_FIXES.md` · `DECISIONS.md` · `API_CONTRACT.md`.
+Read with: `docs/SRD.md` (source of truth) · `Marken-Frontend-README.md` (2 Nov designer handoff) · `DESIGN.md` · `DESIGN_FIXES.md` · `DECISIONS.md` · `API_CONTRACT.md`.
 
 ---
 
@@ -44,11 +44,12 @@ Exception: `src/app/login/actions.ts` (auth logic) belongs to Harfi; we only sty
 
 ## 5. Slicing workflow (per screen)
 
-1. Pick the screen from the map in `DESIGN.md` §5 (page `96:146` only), and check `DESIGN_FIXES.md` for every `DX-xx` that touches it.
+1. Pick the screen from the map in `DESIGN.md` §5 (canonical page `96:146`; feature pages are copies), check `DESIGN_FIXES.md` for every `DX-xx` that touches it, and check the SRD v2.1 amendments. Where a screen's backend is still ⛔ (FD-29), build the UI with an honest "not available yet" or error state, never a fake success.
 2. Pull its design context from Figma (Mobile + Desktop frame). Map every value to an existing token; if a value is new, add the token to `globals.css` + `DESIGN.md` in the same PR.
 3. Build with shared components, typed mock data, real status logic.
 4. Check 360 px, 1440 px, keyboard, reduced motion.
 5. `pnpm lint && pnpm build && pnpm typecheck` must pass.
+6. Also test 768 px (tablet is not designed), long names and copy, and empty / loading / error / success states (README final QA).
 
 ## 6. Git
 

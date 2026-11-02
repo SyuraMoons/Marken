@@ -4,6 +4,7 @@ import { CaptionEditor } from "@/components/caption-editor";
 import { getOwnedPost } from "@/lib/api/owner";
 import { signPath } from "@/lib/data/today";
 import { asSlides } from "@/lib/posts/slides";
+import { createClient } from "@/lib/supabase/server";
 
 // Edit caption (F-11, FR-ED-01/02). Only a ready post can be edited.
 export default function EditPostPage({ params }: PageProps<"/posts/[id]/edit">) {
@@ -23,5 +24,6 @@ async function Edit({ params }: Pick<PageProps<"/posts/[id]/edit">, "params">) {
     asSlides(post.slides).map(async (s) => ({ ...s, slide_path: (await signPath(s.slide_path)) ?? "" })),
   );
   const captions = (post.caption_options as string[]) ?? [];
-  return <CaptionEditor postId={post.id} slides={slides} captions={captions} hashtags={post.hashtags} />;
+  const product = post.product_id ? (await (await createClient()).from("products").select("name").eq("id", post.product_id).maybeSingle()).data : null;
+  return <CaptionEditor postId={post.id} slides={slides} captions={captions} product={product?.name} />;
 }

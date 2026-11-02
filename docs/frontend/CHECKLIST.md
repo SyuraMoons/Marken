@@ -112,6 +112,31 @@ Mobile node IDs; every screen also has a Desktop frame (verified on Today only).
 ### Summary (1 Nov)
 50 screens: done 41 · built but unverified 8 · intentionally different 1 · not built 0. The missing-states work was merged with `development` (live data) in the `feat/fe-missing-states` PR.
 
+## 2 Nov design update (`Marken-Frontend-README.md`, FD-20 to FD-29, SRD v2.1)
+| Item | Status |
+| :--- | :--- |
+| Navy sidebar + glass mobile nav (FD-22) | 🟡 built 2 Nov, checked at 360/390/1440 with mock data (no live session) |
+| Page 01 Today ready view (`228:9965` / `228:10045`) | 🟡 built 2 Nov, checked with mock data |
+| Page 01 states: generating, publishing, published, failed, fidelity-failed, skipped, download, downloaded, share (publish), activity, run details, compare, caption-alt, skip, edit, image-edit, loading-captions | 🟡 built 2 Nov; generating, download and edit checked in the browser at 360/390 with mock data, the rest by lint/typecheck/build only |
+| Page 02 Products: list, add (choose + review photo, uploading screen), cutout check, edit (6 numbered fields), delete, upload error | 🟡 built 2 Nov; list and edit checked at 360/390/1440 with mock data |
+| Page 02 not built: product switcher overlay | ⛔ needs per-product scope (A-05); the pill and sidebar card open Products |
+| Page 03 Results: post results (empty state), refresh with loading screen, post performance + orders field, weekly insights | 🟡 built 2 Nov; all views checked at 360/390/1440. No metrics or orders backend (F-17/F-18 P1), so no numbers are shown |
+| Page 04 Settings: menu (mobile list, desktop two cards), company details (now saves content language), writing style, Instagram connect/connected, email reminders, account and privacy, delete (type shop name), deleted | 🟡 built 2 Nov; all views checked at 360 and menu at 1440 with mock data. Ready-post email shows a static "On" (FD-35) |
+| Page 05 Start & onboarding: landing, sign in, check inbox, Meta retry, setup steps 1–5 (company, add product + uploading/preparing loading, review photo by photo + details, voice & Instagram + connected, tour ×3), resume | 🟡 built 2 Nov; landing/login checked at 360 and 1440, setup steps 1–5 at 360 and 1440 via a temp preview with mock data, tour clicked through. Saves not run against a live session |
+| Page 01 not built: Facebook publishing/published/download screens, today-sample-product, regenerating-scene loading | ⛔ need backend (A-04 route, A-05 product scope, F-11b slide regenerate) |
+| `AuthShell` for desktop login/email, 400 px panel (FD-23) | 🟡 built 2 Nov (login, check inbox, Meta retry, resume); checked at 360/1440 |
+| New wordmark with blue/pink accents | 🟡 built 2 Nov |
+| Landing carousel: 3 states, 3.2 s autoplay, pause/resume, categories, keyboard (FD-25) | 🟡 built 2 Nov; autoplay checked, plus swipe, arrows, pause on hover/focus/off-screen, none under reduced motion |
+| Loading panels: uploading, preparing cutouts, regenerating scene, captions, results (FD-24) | 🟡 captions built (page 01); others with pages 02, 03, 05 |
+| Activity technical details `189:707` (FD-28) | 🟡 built as `?view=details` |
+| New copy: "Company", numbered fields, settings row names (FD-27) | 🟡 pages 01–05 done |
+| Spacing: 24/32 mobile content, 20–24 card padding, nav + safe-area clearance | ⬜ |
+| Landing new headline + "products or services" (SRD A-01, A-02) | 🟡 built 2 Nov with the 5 flagship features and illustrative demos |
+| Meta sign-in screens (A-03) | 🟡 UI + `signInWithMeta` (opening = pending button, retry = `?error=meta`) · ⛔ enable the Supabase `facebook` provider (Harfi) |
+| Facebook publishing screens (A-04) | ⬜ UI · ⛔ Facebook publish route, format to decide (Harfi) |
+| Product switcher, product-scoped app, sample product (A-05) | ⬜ UI · ⛔ per-product posts, cadence to decide (Harfi/Altaf) |
+| Company description field (A-06) | 🟡 shown disabled with a "not saved yet" note · ⛔ `shops.description` column (Harfi) |
+
 ## Not ours / waiting
 - ✅ Auth, API routes and activity route live on `development`; Today, edit, products, settings and onboarding read and write real data
 - ⛔ Instagram connect (`/api/auth/instagram/callback` still 501) and the generate/regenerate/publish jobs — Harfi

@@ -3,6 +3,17 @@
 Review of Figma page `96:146` "05 Full app — Mobile + Desktop · SRD v2" (Archive ignored), 1 Nov 2026.
 We **don't patch Figma**; we fix these in code. When slicing, **this file overrides the Figma frame**. Each fix has an ID (`DX-xx`) — reference it in the PR.
 
+> **2 Nov update.** The designer's handoff (`Marken-Frontend-README.md`) is newer than this review and wins where they overlap (FD-21):
+> - **DX-21, DX-23 — look superseded by FD-22** (navy sidebar, glass mobile nav with white labels). The structural parts still apply: icon + label rows, same-size tabs, active tab follows the section.
+> - **DX-20** — the designer repaired 23 desktop frames to the horizontal 224 px sidebar shell, matching this fix.
+> - **DX-31 — wordmark superseded:** "marken" with blue/pink offset accents, one accessible name.
+> - **DX-02 extended:** "View result · prototype" and "View recovery · prototype" buttons are never shipped either.
+> - **DX-37 extended:** "EXAMPLE ACTIVITY · Not a live run" is a designer note too.
+> - **DX-15 headline part superseded** by SRD A-01 (new headline, products or services). The 3-step how-it-works and before/after parts still apply.
+> - **Superseded by the consistent 2 Nov frames (page 01):** DX-11 (sidebar has "Agent activity" again, it opens today's activity), DX-24 (app screens use the soft gradient + glass cards), DX-34 (hashtags are blue), DX-38 (Copy left the Today caption card; the download flow still has it).
+> - **Kept on purpose:** slides stay 4:5 on mobile too. The mobile frame shows a 350 x 350 square, which would crop the slide's own text; desktop already uses 4:5 (320 x 400).
+> - Everything else in this file still applies.
+
 How it was checked: layer data for all 108 frames (sizes, component instances, text) + screenshots of today, landing, login, setup-upload, products, settings, activity, generating (mobile) and today, products, activity (desktop).
 
 ---

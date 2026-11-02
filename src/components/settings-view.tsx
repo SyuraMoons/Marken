@@ -101,7 +101,7 @@ export function SettingsView({ email, igConnected, rules: savedRules, shop }: Pr
 
   if (view === "deleted") {
     return (
-      <StatusScreen icon="✓" title={t("settings.deletedTitle")} body={t("settings.deletedBody")}>
+      <StatusScreen title={t("settings.deletedTitle")} body={t("settings.deletedBody")}>
         <ButtonLink href="/">{t("settings.startAgain")}</ButtonLink>
       </StatusScreen>
     );

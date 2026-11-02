@@ -2,16 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ProductsIcon, ResultsIcon, SettingsIcon, TodayIcon } from "./icons";
 
-export type NavItem = { href: string; label: string };
-
-const ICONS: Record<string, () => React.JSX.Element> = {
-  "/today": TodayIcon,
-  "/products": ProductsIcon,
-  "/results": ResultsIcon,
-  "/settings": SettingsIcon,
-};
+export type NavItem = { href: string; label: string; icon: string };
 
 // Post screens live under Today (DX-23).
 function section(pathname: string) {
@@ -24,22 +16,33 @@ export function AppNav(props: Props) {
   return <NavLinks {...props} active={section(usePathname())} />;
 }
 
+// "Workspace / today" breadcrumb on desktop.
+export function Crumb({ root }: { root: string }) {
+  return (
+    <span className="text-[13px] text-muted">
+      {root}
+      <span aria-hidden="true">{"  /  "}</span>
+      {section(usePathname()).slice(1)}
+    </span>
+  );
+}
+
 // Hook-free render, used as the Suspense fallback on dynamic routes (cacheComponents).
 export function NavLinks({ items, variant, label, active }: Props & { active: string }) {
   if (variant === "side") {
     return (
-      <nav aria-label={label} className="flex flex-col gap-1">
-        {items.map(({ href, label }) => {
-          const Icon = ICONS[href];
+      <nav aria-label={label} className="flex flex-col gap-2">
+        {items.map(({ href, label, icon }) => {
           const on = href === active;
           return (
             <Link
               key={href}
               href={href}
               aria-current={on ? "page" : undefined}
-              className={`flex h-11 items-center gap-3 rounded-control px-3 text-sm font-medium ${on ? "bg-powder text-blue" : "text-muted hover:bg-surface hover:text-ink"}`}
+              className={`flex min-h-12 items-center gap-2 rounded-[10px] border p-2 text-sm font-medium text-white focus-visible:outline-2 focus-visible:outline-white ${on ? "border-white/20 bg-white/12 backdrop-blur-md" : "border-transparent hover:bg-white/8"}`}
             >
-              <Icon />
+              {/* eslint-disable-next-line @next/next/no-img-element -- static design icon */}
+              <img src={`/figma/side-${icon}.svg`} width={20} height={20} alt="" />
               {label}
             </Link>
           );
@@ -49,20 +52,18 @@ export function NavLinks({ items, variant, label, active }: Props & { active: st
   }
 
   return (
-    <nav aria-label={label} className="grid h-18 grid-cols-4 border-t border-border bg-white pb-[env(safe-area-inset-bottom)]">
-      {items.map(({ href, label }) => {
-        const Icon = ICONS[href];
+    <nav aria-label={label} className="nav-glass grid h-18 grid-cols-4 gap-0.5 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      {items.map(({ href, label, icon }) => {
         const on = href === active;
         return (
           <Link
             key={href}
             href={href}
             aria-current={on ? "page" : undefined}
-            className={`flex flex-col items-center justify-center gap-1 text-xs font-medium ${on ? "text-blue" : "text-muted"}`}
+            className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-2 text-[11px] leading-[14px] font-medium text-white focus-visible:outline-2 focus-visible:outline-white ${on ? "border-white/18 bg-white/20" : "border-transparent"}`}
           >
-            <span className={`flex h-7 w-12 items-center justify-center rounded-full ${on ? "bg-powder" : ""}`}>
-              <Icon />
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element -- static design icon */}
+            <img src={`/figma/tab-${icon}.svg`} width={24} height={24} alt="" />
             {label}
           </Link>
         );

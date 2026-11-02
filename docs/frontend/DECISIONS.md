@@ -127,7 +127,11 @@ Setup step 1 keeps the Category field (the onboarding route requires it and tren
 Five horizontal page links sit below the mobile header. The selected link uses blue textured glass on a white glass strip; labels remain opaque, bold, 13 px, and targets are at least 44 px. Activity continues to use `/today?view=activity`; both activity and details select Activity. Desktop keeps its 224 px navy sidebar.
 
 **FD-38 · Landing walkthroughs are interactive sample sequences.**
-Five feature sections use `FeatureDemo`: autoplay only while visible, pause on focus/hover, manual steps, and reduced-motion support. They do not send requests or claim a completed upload, generation, or publication. Facebook and metrics limitations remain explicit. Real end-to-end recordings require a configured test account; sample walkthroughs are not evidence of live integration.
+Five feature sections use `FeatureDemo`: autoplay only while visible, pause on focus, manual steps, and reduced-motion support. They do not send requests or claim a completed upload, generation, or publication. Facebook and metrics limitations remain explicit. Real end-to-end recordings require a configured test account; sample walkthroughs are not evidence of live integration.
 
 **FD-39 · Captions accept both database representations; render failures fail visibly.**
 Generated jobs currently store `{label,text}[]`; older rows contain `string[]`. Both Today and Edit normalize these at the display boundary. Missing cutouts and Studio exceptions now reach the existing job failure handling, instead of returning a blank image with `fidelityPassed=true`.
+
+
+**FD-40 · Continuous, compositor-friendly landing motion.**
+Feature panels use a 12-second camera drift, layered product movement and 1.8-second eased lateral transitions. Copy remains mounted in a stable-height grid and crossfades. Hover no longer pauses playback; explicit pause, keyboard focus, offscreen suspension and reduced-motion controls remain. Animation uses transforms/opacity rather than per-frame React updates. Local Chrome frame scheduling had no >50 ms stalls in an eight-second sample; this is not a guarantee on all devices. Preview exports now use 30 fps rather than the earlier 4 fps capture.

@@ -23,9 +23,11 @@ async function uploadOne(file: File) {
   return uploadId;
 }
 
-export async function uploadAndExtract(shopId: string, files: File[]): Promise<Extracted> {
+// onUploaded fires between the upload and the cutout/extract phase (loading screens, FD-24).
+export async function uploadAndExtract(shopId: string, files: File[], onUploaded?: () => void): Promise<Extracted> {
   const uploadIds: string[] = [];
   for (const file of files) uploadIds.push(await uploadOne(file));
+  onUploaded?.();
   const res = await fetch(`/api/shops/${shopId}/extract`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

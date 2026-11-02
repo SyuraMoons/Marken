@@ -52,18 +52,34 @@
   text-shadow: -1.2px 0 0 rgb(31 140 255 / 70%), 1.2px 0.6px 0 rgb(255 110 196 / 65%);
 }
 
-/* Mobile bottom nav, values from Marken-Frontend-README (FD-22). Alpha on the background only. */
+/* White glass tabs sit below the mobile header. */
 @utility nav-glass {
-  background: var(--color-navy);
-  border: 1px solid rgb(255 255 255 / 26%);
-  box-shadow: 0 6px 20px rgb(13 26 69 / 18%);
-  @supports (backdrop-filter: blur(20px)) {
-    background: linear-gradient(180deg, rgb(51 84 171 / 88%), rgb(33 61 140 / 82%));
-    backdrop-filter: blur(20px);
+  background: rgb(255 255 255 / 84%);
+  border-block: 1px solid rgb(255 255 255 / 90%);
+  backdrop-filter: blur(8px);
+  @media (prefers-reduced-transparency: reduce) {
+    background: var(--color-white);
+    backdrop-filter: none;
+  }
+}
+@utility nav-active-glass {
+  background: linear-gradient(135deg, rgb(79 130 240 / 35%), rgb(31 74 186 / 42%), rgb(59 105 222 / 36%));
+  border-color: rgb(255 255 255 / 70%);
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / 80%), 0 2px 3px rgb(31 61 140 / 10%);
+  backdrop-filter: blur(6px);
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: url("/figma/nav-glass-texture.svg") center / 100% 100%;
+    pointer-events: none;
+    z-index: -1;
   }
   @media (prefers-reduced-transparency: reduce) {
-    background: var(--color-navy);
+    background: var(--color-powder);
     backdrop-filter: none;
+    &::before { display: none; }
   }
 }
 
@@ -89,4 +105,20 @@ body {
   animation-duration: 0.01ms !important;
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
+}
+
+/* Short content transitions keep walkthroughs readable and never hide content before JS. */
+@keyframes demo-enter {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.demo-enter { animation: demo-enter 450ms ease-out both; }
+.feature-demo { transition: box-shadow 350ms ease, transform 350ms ease; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .feature-demo:hover { transform: translateY(-4px); box-shadow: 0 24px 60px rgb(33 61 140 / 14%); }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .landing-feature > div { animation: demo-enter linear both; animation-timeline: view(); animation-range: entry 0% entry 25%; }
+  }
 }

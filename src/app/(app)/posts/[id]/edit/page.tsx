@@ -1,3 +1,4 @@
+import { asCaptions } from "@/lib/posts/captions";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { CaptionEditor } from "@/components/caption-editor";
@@ -24,7 +25,7 @@ async function Edit({ params, searchParams }: Pick<PageProps<"/posts/[id]/edit">
   const slides = await Promise.all(
     asSlides(post.slides).map(async (s) => ({ ...s, slide_path: (await signPath(s.slide_path)) ?? "" })),
   );
-  const captions = (post.caption_options as string[]) ?? [];
+  const captions = asCaptions(post.caption_options);
   const pick = Number(c);
   const initial = Number.isInteger(pick) && captions[pick] ? pick : 0;
   const product = post.product_id ? (await (await createClient()).from("products").select("name").eq("id", post.product_id).maybeSingle()).data : null;

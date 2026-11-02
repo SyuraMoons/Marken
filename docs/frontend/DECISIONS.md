@@ -121,3 +121,13 @@ Page 04 (`228:15583`) has a "Ready-post email" toggle, but no opt-out column exi
 
 **FD-36 · Page 05 keeps backend rules where Figma differs.**
 Setup step 1 keeps the Category field (the onboarding route requires it and trend research uses it) next to Figma's fields; the company description is shown disabled until `shops.description` exists (A-06). Step 2 still needs 3–10 photos (route `need_3_photos`), so "Add one product" sends every chosen photo. Step 3 reviews one photo at a time; "Replace this photo" uploads the new photo as a product and deletes the old one. Prototype-only buttons ("Preview signed-in state", "View upload error", "View result · prototype") are not built (FD-32). Every landing action leads to sign-in except "See a generated post", which opens the public `/example` before/after page (landing-compare); its Figma "Back to Today" becomes "Create your first post" + "Back to home" because the visitor is signed out. The Meta "You're signed in" screen is not built: the callback sends the owner straight into the app. Meta sign-in sets a short-lived cookie so a failed callback shows the Meta retry screen; the magic-link address is kept in a 10-minute httpOnly cookie for "Resend link" instead of the URL.
+
+
+**FD-37 · Latest mobile web navigation supersedes FD-11/FD-22 bottom-bar placement.**
+Five horizontal page links sit below the mobile header. The selected link uses blue textured glass on a white glass strip; labels remain opaque, bold, 13 px, and targets are at least 44 px. Activity continues to use `/today?view=activity`; both activity and details select Activity. Desktop keeps its 224 px navy sidebar.
+
+**FD-38 · Landing walkthroughs are interactive sample sequences.**
+Five feature sections use `FeatureDemo`: autoplay only while visible, pause on focus/hover, manual steps, and reduced-motion support. They do not send requests or claim a completed upload, generation, or publication. Facebook and metrics limitations remain explicit. Real end-to-end recordings require a configured test account; sample walkthroughs are not evidence of live integration.
+
+**FD-39 · Captions accept both database representations; render failures fail visibly.**
+Generated jobs currently store `{label,text}[]`; older rows contain `string[]`. Both Today and Edit normalize these at the display boundary. Missing cutouts and Studio exceptions now reach the existing job failure handling, instead of returning a blank image with `fidelityPassed=true`.

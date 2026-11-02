@@ -55,7 +55,7 @@ export async function updateSession(request: NextRequest) {
     return redirectTo(`/auth/callback${search}`);
   }
 
-  const isPublic = pathname === "/" || pathname === "/login";
+  const isPublic = pathname === "/" || pathname === "/login" || pathname === "/example";
   const isAuthRoute = pathname.startsWith("/auth/");
 
   if (!userId) {

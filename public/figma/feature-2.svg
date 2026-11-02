@@ -1,0 +1,11 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="132" height="48" viewBox="0 0 132 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Feature explanation / vector 2">
+<path id="Vector" d="M115.5 3H16.5C9.87258 3 4.5 8.37258 4.5 15V33C4.5 39.6274 9.87258 45 16.5 45H115.5C122.127 45 127.5 39.6274 127.5 33V15C127.5 8.37258 122.127 3 115.5 3Z" fill="#F1F6FF"/>
+<path id="Vector_2" d="M111.75 17.25C115.478 17.25 118.5 14.2279 118.5 10.5C118.5 6.77208 115.478 3.75 111.75 3.75C108.022 3.75 105 6.77208 105 10.5C105 14.2279 108.022 17.25 111.75 17.25Z" fill="#F8DCEF"/>
+<g id="Group">
+<path id="Vector_3" d="M19.5 7.5H46.5C49.8137 7.5 52.5 10.1863 52.5 13.5V34.5C52.5 37.8137 49.8137 40.5 46.5 40.5H19.5C16.1863 40.5 13.5 37.8137 13.5 34.5V13.5C13.5 10.1863 16.1863 7.5 19.5 7.5Z" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" stroke="#2456DB"/>
+<path id="Vector_4" d="M18 33.75L27 24L33.75 30L40.5 18L48 33.75M69 14.25H102M69 23.25H94.5M69 32.25H99" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" stroke="#2456DB"/>
+<path id="Vector_5" d="M26.25 17.25C26.25 18.4926 25.2426 19.5 24 19.5C22.7574 19.5 21.75 18.4926 21.75 17.25C21.75 16.0074 22.7574 15 24 15C25.2426 15 26.25 16.0074 26.25 17.25Z" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" stroke="#2456DB"/>
+</g>
+</g>
+</svg>

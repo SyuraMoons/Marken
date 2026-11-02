@@ -13,6 +13,7 @@ const Shop = z.object({
   category: z.string().trim().min(1).max(120),
   country: z.string().trim().min(2).max(80),
   time_zone: z.string().refine(isValidTimeZone),
+  content_language: z.enum(["en", "id"]),
 });
 
 export async function saveShop(input: unknown): Promise<Result> {

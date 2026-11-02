@@ -34,6 +34,7 @@ async function Settings() {
         category: shop.category ?? "Other",
         country: shop.country ?? "Other",
         time_zone: shop.time_zone ?? "UTC",
+        content_language: shop.content_language === "id" ? "id" : "en",
         tone: shop.tone,
         notify_time: shop.notify_time.slice(0, 5),
       }}

@@ -1,18 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { signOut } from "@/app/login/actions";
 import { saveBrand, saveReminder, saveShop } from "@/app/(app)/settings/actions";
 import { AnchorButton, Button, ButtonLink } from "./button";
+import { Field, glassInput } from "./field";
+import { InfoCard } from "./info-card";
 import { InstallMarken } from "./install-marken";
-import { ListRow } from "./list-row";
+import { PageHeader } from "./page-header";
 import { StatusScreen } from "./status-screen";
 import { t, type MessageKey } from "@/lib/i18n";
 import { asTone, CATEGORIES, COUNTRIES, TIME_ZONES, TONES, type Tone } from "@/lib/options";
-
-const input = "h-13 w-full rounded-control border border-border bg-white px-4 text-base font-normal placeholder:text-muted focus:outline-2 focus:outline-blue";
-const label = "flex flex-col gap-1.5 text-sm font-medium";
 
 // shortcut: motion choice lives in localStorage until a server-side preference exists.
 const MOTION_EVENT = "marken-motion";
@@ -36,15 +36,16 @@ function setMotion(on: boolean) {
 }
 
 type View = "main" | "shop" | "brand" | "instagram" | "reminders" | "account" | "delete" | "deleted";
+type Lang = "en" | "id";
 
 type Props = {
   email: string;
   igConnected: boolean;
   rules: string[];
-  shop: { id: string; name: string; category: string; country: string; time_zone: string; tone: string | null; notify_time: string };
+  shop: { id: string; name: string; category: string; country: string; time_zone: string; content_language: Lang; tone: string | null; notify_time: string };
 };
 
-// Settings and sub-views (F-15, DX-06, DX-27). Saves go through owner-scoped server actions.
+// Settings (Figma page 04, F-15). Saves go through owner-scoped server actions.
 export function SettingsView({ email, igConnected, rules: savedRules, shop }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -54,12 +55,18 @@ export function SettingsView({ email, igConnected, rules: savedRules, shop }: Pr
   const [name, setName] = useState(shop.name);
   const [category, setCategory] = useState(shop.category);
   const [country, setCountry] = useState(shop.country);
+  const [lang, setLang] = useState<Lang>(shop.content_language);
   const [zone, setZone] = useState(shop.time_zone);
   const [tone, setTone] = useState<Tone>(asTone(shop.tone));
-  const [rules, setRules] = useState<string[]>(savedRules);
-  const [draft, setDraft] = useState("");
-  const reduceMotion = useSyncExternalStore(subscribeMotion, readMotion, () => false);
+  const [rules, setRules] = useState<string[]>(savedRules.length ? savedRules : [""]);
   const [time, setTime] = useState(shop.notify_time);
+  const [typed, setTyped] = useState("");
+  const reduceMotion = useSyncExternalStore(subscribeMotion, readMotion, () => false);
+
+  const go = (v: View) => {
+    setFailed(false);
+    setView(v);
+  };
 
   const run = (job: () => Promise<{ ok: boolean }>) =>
     start(async () => {
@@ -69,12 +76,6 @@ export function SettingsView({ email, igConnected, rules: savedRules, shop }: Pr
       router.refresh();
       setView("main");
     });
-
-  const save = () => {
-    if (view === "shop") return run(() => saveShop({ name, category, country, time_zone: zone }));
-    if (view === "brand") return run(() => saveBrand({ tone, rules }));
-    return run(() => saveReminder({ notify_time: time }));
-  };
 
   const remove = () =>
     start(async () => {
@@ -92,209 +93,285 @@ export function SettingsView({ email, igConnected, rules: savedRules, shop }: Pr
     document.documentElement.dataset.motion = reduceMotion ? "reduce" : "full";
   }, [reduceMotion]);
 
-  const head = (key: string) => <h1 className="text-3xl font-semibold tracking-tight">{t(key as MessageKey)}</h1>;
-  const back = (
-    <Button variant="text" className="w-auto! self-start px-0" onClick={() => { setFailed(false); setView("main"); }}>
-      ← {t("settings.back")}
+  const error = failed && (
+    <p role="alert" className="text-sm text-danger">
+      {t("common.error")}
+    </p>
+  );
+  const cancel = (
+    <Button variant="text" onClick={() => go("main")}>
+      {t("settings.cancel")}
     </Button>
   );
 
+  // Your shop has been deleted (228:15840)
   if (view === "deleted") {
     return (
       <StatusScreen title={t("settings.deletedTitle")} body={t("settings.deletedBody")}>
+        <InfoCard vector="build" title={t("settings.deletedCardTitle")}>
+          {t("settings.deletedCardBody")}
+        </InfoCard>
         <ButtonLink href="/">{t("settings.startAgain")}</ButtonLink>
       </StatusScreen>
     );
   }
 
+  // Delete your shop? (228:15761): typing the shop name unlocks the button.
   if (view === "delete") {
     return (
-      <section className="flex max-w-xl flex-col gap-5">
-        {back}
-        {head("settings.deleteTitle")}
-        <p className="text-muted">{t("settings.deleteBody", { name: shop.name })}</p>
-        {failed && (
-          <p role="alert" className="text-sm text-danger">
-            {t("common.error")}
-          </p>
-        )}
-        <Button variant="danger" onClick={remove} disabled={pending} aria-busy={pending}>
+      <StatusScreen title={t("settings.deleteTitle")} body={t("settings.deleteBody")}>
+        <InfoCard vector="details" title={t("settings.deleteCardTitle")}>
+          {t("settings.deleteCardBody")}
+        </InfoCard>
+        <Field n={1} cue="shop" label={t("settings.deleteType")}>
+          <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={shop.name} autoComplete="off" className={glassInput} />
+        </Field>
+        {error}
+        <Button variant="danger" onClick={remove} disabled={pending || typed.trim() !== shop.name.trim()} aria-busy={pending}>
           {t("settings.deleteConfirm")}
         </Button>
-        <Button variant="text" onClick={() => setView("main")}>
-          {t("settings.cancel")}
+        <Button variant="secondary" onClick={() => go("account")}>
+          {t("settings.keepShop")}
         </Button>
-      </section>
+      </StatusScreen>
     );
   }
 
-  if (view === "shop" || view === "brand" || view === "instagram" || view === "reminders" || view === "account") {
+  // Company details (228:15162)
+  if (view === "shop") {
     return (
-      <section className="flex max-w-xl flex-col gap-5">
-        {back}
-        {head(`settings.${view}`)}
+      <StatusScreen title={t("settings.shopTitle")} body={t("settings.shopBody")}>
+        <Field n={1} cue="shop" label={t("settings.name")}>
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} className={glassInput} />
+        </Field>
+        <Field n={2} cue="tag" label={t("settings.category")}>
+          <Select value={category} onChange={setCategory} options={[...new Set([category, ...CATEGORIES])]} />
+        </Field>
+        <Field n={3} cue="globe" label={t("settings.country")}>
+          <Select value={country} onChange={setCountry} options={[...new Set([country, ...COUNTRIES])]} />
+        </Field>
+        <Field n={4} cue="text" label={t("settings.language")}>
+          <select value={lang} onChange={(e) => setLang(e.target.value as Lang)} className={glassInput}>
+            <option value="en">{t("settings.langEn")}</option>
+            <option value="id">{t("settings.langId")}</option>
+          </select>
+        </Field>
+        <Field n={5} cue="clock" label={t("settings.timezone")}>
+          <Select value={zone} onChange={setZone} options={[...new Set([zone, ...TIME_ZONES])]} />
+        </Field>
+        {error}
+        <Button onClick={() => run(() => saveShop({ name, category, country, time_zone: zone, content_language: lang }))} disabled={pending || !name.trim()} aria-busy={pending}>
+          {t("settings.saveShop")}
+        </Button>
+        {cancel}
+      </StatusScreen>
+    );
+  }
 
-        {view === "shop" && (
-          <div className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
-            <label className={label}>
-              {t("settings.name")}
-              <input value={name} onChange={(e) => setName(e.target.value)} className={input} />
-            </label>
-            <label className={label}>
-              {t("settings.category")}
-              <select value={category} onChange={(e) => setCategory(e.target.value)} className={input}>
-                {[...new Set([category, ...CATEGORIES])].map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </label>
-            <label className={label}>
-              {t("settings.country")}
-              <select value={country} onChange={(e) => setCountry(e.target.value)} className={input}>
-                {[...new Set([country, ...COUNTRIES])].map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </label>
-            <label className={label}>
-              {t("settings.timezone")}
-              <select value={zone} onChange={(e) => setZone(e.target.value)} className={input}>
-                {[...new Set([zone, ...TIME_ZONES])].map((z) => (
-                  <option key={z}>{z}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-        )}
-
-        {view === "brand" && (
-          <div className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
-            <fieldset className="flex flex-col gap-1.5">
-              <legend className="text-sm font-medium">{t("settings.tone")}</legend>
-              <div className="flex flex-wrap gap-2">
-                {TONES.map((x) => (
-                  <label key={x} className={`flex h-11 cursor-pointer items-center rounded-full border px-4 text-sm font-medium has-focus-visible:outline-2 has-focus-visible:outline-blue ${tone === x ? "border-blue bg-powder text-blue" : "border-border bg-white text-ink"}`}>
-                    <input type="radio" name="tone" checked={tone === x} onChange={() => setTone(x)} className="sr-only" />
-                    {t(`ob4.tone${x}` as MessageKey)}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium" htmlFor="s-rule">
-                {t("settings.rules")}
-              </label>
-              <ul className="flex flex-col gap-1.5">
-                {rules.map((r) => (
-                  <li key={r} className="flex min-h-11 items-center justify-between gap-2 rounded-control bg-surface px-3 text-sm">
-                    <span>{r}</span>
-                    <button type="button" aria-label={t("settings.removeRule", { rule: r })} onClick={() => setRules(rules.filter((x) => x !== r))} className="flex size-11 shrink-0 items-center justify-center text-danger">
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <div className="flex gap-2">
-                <input id="s-rule" value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={200} placeholder={t("settings.rulePlaceholder")} className={input} />
-                <Button
-                  variant="secondary"
-                  className="w-auto! shrink-0 px-4"
-                  onClick={() => {
-                    if (draft.trim() && rules.length < 10) setRules([...rules, draft.trim()]);
-                    setDraft("");
-                  }}
-                  disabled={!draft.trim() || rules.length >= 10}
-                >
-                  {t("settings.addRule")}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {view === "instagram" && (
-          <div className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
-            <p className="text-muted">{t("settings.igBody")}</p>
-            {igConnected ? (
-              <p className="flex min-h-11 items-center gap-2 font-medium text-blue">
-                <span aria-hidden="true">✓</span> {t("settings.connected", { name: t("settings.instagram") })}
-              </p>
-            ) : (
-              <>
-                {igResult === "error" && (
-                  <p role="alert" className="text-sm text-danger">
-                    {t("settings.igError")}
-                  </p>
-                )}
-                <p className="text-sm text-muted">{t("settings.igHint")}</p>
-                <AnchorButton href="/api/auth/instagram?next=settings">{t("settings.igConnect")}</AnchorButton>
-              </>
-            )}
-          </div>
-        )}
-
-        {view === "reminders" && (
-          <div className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
-            <p className="text-muted">{t("settings.remindBody")}</p>
-            <label className={label}>
-              {t("settings.remindTime")}
-              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} required className={input} />
-            </label>
-          </div>
-        )}
-
-        {view === "account" && (
-          <div className="flex flex-col gap-4 rounded-card border border-border bg-white p-5">
-            <label className={label}>
-              {t("settings.email")}
-              <input value={email} readOnly className={`${input} bg-surface!`} />
-            </label>
-            <div className="flex flex-col gap-1.5">
-              <label className="flex min-h-13 cursor-pointer items-center justify-between gap-3 text-sm font-medium">
-                {t("settings.motion")}
-                <input type="checkbox" aria-label={t("settings.motionReduce")} checked={reduceMotion} onChange={(e) => setMotion(e.target.checked)} className="size-5 shrink-0 accent-blue" />
-              </label>
-              <p className="text-sm text-muted">{t("settings.motionBody")}</p>
-            </div>
-            <InstallMarken />
-            <form action={signOut}>
-              <Button type="submit" variant="secondary">
-                {t("settings.signOut")}
-              </Button>
-            </form>
-          </div>
-        )}
-
-        {failed && (
-          <p role="alert" className="text-sm text-danger">
-            {t("common.error")}
-          </p>
-        )}
-        {view !== "account" && view !== "instagram" && (
-          <Button onClick={save} disabled={pending || (view === "shop" && !name.trim())} aria-busy={pending}>
-            {t("settings.save")}
+  // Writing style and rules (228:15341)
+  if (view === "brand") {
+    return (
+      <StatusScreen title={t("settings.brandTitle")} body={t("settings.brandBody")}>
+        <Field n={1} cue="voice" label={t("settings.tone")}>
+          <select value={tone} onChange={(e) => setTone(e.target.value as Tone)} className={glassInput}>
+            {TONES.map((x) => (
+              <option key={x} value={x}>
+                {t(`ob4.tone${x}` as MessageKey)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {rules.map((r, i) => (
+          <Field key={i} n={i + 2} cue="rules" label={t("settings.rule", { n: i + 1 })}>
+            <span className="flex gap-2">
+              <input value={r} onChange={(e) => setRules(rules.map((x, j) => (j === i ? e.target.value : x)))} maxLength={200} placeholder={t("settings.rulePlaceholder")} className={glassInput} />
+              {rules.length > 1 && (
+                <button type="button" aria-label={t("settings.removeRule", { n: i + 1 })} onClick={() => setRules(rules.filter((_, j) => j !== i))} className="flex size-11 shrink-0 items-center justify-center self-center text-xl text-danger">
+                  ×
+                </button>
+              )}
+            </span>
+          </Field>
+        ))}
+        <p className="text-[13px] text-muted">{t("settings.ruleHint")}</p>
+        {rules.length < 10 && (
+          <Button variant="secondary" onClick={() => setRules([...rules, ""])}>
+            {t("settings.addRule")}
           </Button>
         )}
-      </section>
+        <InfoCard vector="voice" title={t("ob4.sample")}>
+          {t("ob4.sampleText")}
+        </InfoCard>
+        {error}
+        <Button onClick={() => run(() => saveBrand({ tone, rules: rules.map((r) => r.trim()).filter(Boolean) }))} disabled={pending} aria-busy={pending}>
+          {t("settings.saveBrand")}
+        </Button>
+        {cancel}
+      </StatusScreen>
     );
   }
 
+  // Connect Instagram / Instagram connected (228:15494)
+  if (view === "instagram") {
+    return igConnected ? (
+      <StatusScreen title={t("settings.igConnectedTitle")} body={t("settings.igConnectedBody")}>
+        <InfoCard vector="social" title={t("settings.igConnectedTitle")}>
+          {t("settings.igConnectedCard")}
+        </InfoCard>
+        <Button variant="secondary" onClick={() => go("main")}>
+          {t("settings.backSettings")}
+        </Button>
+      </StatusScreen>
+    ) : (
+      <StatusScreen title={t("settings.igTitle")} body={t("settings.igBody")}>
+        <InfoCard vector="social" title={t("settings.igCardTitle")}>
+          {t("settings.igCardBody")}
+        </InfoCard>
+        {igResult === "error" && (
+          <p role="alert" className="text-sm text-danger">
+            {t("settings.igError")}
+          </p>
+        )}
+        <p className="text-[13px] text-muted">{t("settings.igHint")}</p>
+        <AnchorButton href="/api/auth/instagram?next=settings">{t("settings.igConnect")}</AnchorButton>
+        <Button variant="text" onClick={() => go("main")}>
+          {t("settings.igSkip")}
+        </Button>
+      </StatusScreen>
+    );
+  }
+
+  // Email reminders (228:15583)
+  if (view === "reminders") {
+    return (
+      <StatusScreen title={t("settings.remindTitle")} body={t("settings.remindBody")}>
+        {/* shortcut: no opt-out column for the ready-post email yet (FR-NT-01 always sends), so it shows On. */}
+        <Field n={1} cue="text" label={t("settings.remindEmail")}>
+          <input value={t("settings.remindOn")} readOnly className={glassInput} />
+        </Field>
+        <Field n={2} cue="clock" label={t("settings.remindTime")}>
+          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} required className={glassInput} />
+        </Field>
+        <Field n={3} cue="globe" label={t("settings.remindZone")}>
+          <input value={zone} readOnly className={glassInput} />
+        </Field>
+        <InfoCard vector="clock" title={t("settings.remindCardTitle")}>
+          {t("settings.remindCardBody")}
+        </InfoCard>
+        {error}
+        <Button onClick={() => run(() => saveReminder({ notify_time: time }))} disabled={pending || !time} aria-busy={pending}>
+          {t("settings.saveReminders")}
+        </Button>
+        {cancel}
+      </StatusScreen>
+    );
+  }
+
+  // Account and privacy (228:15680)
+  if (view === "account") {
+    return (
+      <StatusScreen title={t("settings.accountTitle")} body={t("settings.accountBody")}>
+        <Field n={1} cue="text" label={t("settings.email")}>
+          <input value={email} readOnly className={glassInput} />
+        </Field>
+        <section className="glass flex flex-col gap-2 rounded-card p-5 leading-[1.4]">
+          <h2 className="text-lg font-semibold">{t("settings.motion")}</h2>
+          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 font-medium">
+            {t("settings.motionReduce")}
+            <input type="checkbox" checked={reduceMotion} onChange={(e) => setMotion(e.target.checked)} className="size-5 shrink-0 accent-blue" />
+          </label>
+          <p className="text-[15px] text-muted">{t("settings.motionBody")}</p>
+        </section>
+        <InstallMarken />
+        <p className="text-[13px] text-muted">{t("settings.installBody")}</p>
+        <ButtonLink href="/onboarding/5" variant="secondary">
+          {t("settings.tour")}
+        </ButtonLink>
+        <Button variant="text" className="text-danger!" onClick={() => go("delete")}>
+          {t("settings.deleteAll")}
+        </Button>
+        <form action={signOut} className="flex flex-col">
+          <Button type="submit" variant="text">
+            {t("settings.signOut")}
+          </Button>
+        </form>
+        <Button variant="text" onClick={() => go("main")}>
+          {t("settings.backSettings")}
+        </Button>
+      </StatusScreen>
+    );
+  }
+
+  // Settings menu (228:14906 / 228:15020): one list on mobile, two glass cards on desktop.
   return (
-    <div className="flex max-w-xl flex-col gap-6">
-      <h1 className="pt-2 text-4xl font-semibold tracking-tight">{t("settings.title")}</h1>
-      <section className="divide-y divide-border rounded-card border border-border bg-white">
-        <ListRow label={t("settings.shop")} value={name} onClick={() => setView("shop")} />
-        <ListRow label={t("settings.brand")} value={t("settings.rulesValue", { tone: t(`ob4.tone${tone}` as MessageKey), n: rules.length })} onClick={() => setView("brand")} />
-        <ListRow label={t("settings.instagram")} value={igConnected ? t("settings.connected", { name: t("settings.instagram") }) : t("settings.notConnected")} onClick={() => setView("instagram")} />
-        <ListRow label={t("settings.reminders")} value={time} onClick={() => setView("reminders")} />
-        <ListRow label={t("settings.account")} value={email} onClick={() => setView("account")} />
-      </section>
-      <ButtonLink href="/onboarding/5" variant="text" className="w-auto! self-start px-0">
-        {t("settings.tour")}
-      </ButtonLink>
-      <section className="rounded-card border border-border bg-white">
-        <ListRow label={t("settings.delete")} danger onClick={() => setView("delete")} />
-      </section>
+    <div className="flex flex-col gap-6 lg:gap-7">
+      <PageHeader eyebrow={t("settings.eyebrow")} title={t("settings.title")} body={t("settings.body")} />
+      <div className="grid items-start gap-3 lg:grid-cols-2 lg:gap-5">
+        <Group title={t("settings.groupContent")} body={t("settings.groupContentBody")}>
+          <Row icon="shop" n={1} onClick={() => go("shop")} />
+          <Row icon="voice" n={2} onClick={() => go("brand")} />
+        </Group>
+        <Group title={t("settings.groupAccount")} body={t("settings.groupAccountBody")}>
+          <Row icon="social" n={3} onClick={() => go("instagram")} />
+          <Row icon="mail" n={4} onClick={() => go("reminders")} />
+          <Row icon="plan" n={5} href="/onboarding/5" />
+          <Row icon="check" n={6} onClick={() => go("account")} />
+        </Group>
+      </div>
+      <InfoCard vector="check" title={t("settings.approvalTitle")}>
+        {t("settings.approvalBody")}
+      </InfoCard>
     </div>
+  );
+}
+
+function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={glassInput}>
+      {options.map((o) => (
+        <option key={o}>{o}</option>
+      ))}
+    </select>
+  );
+}
+
+// Group heading shows on desktop only; mobile is one continuous list (228:14906).
+function Group({ title, body, children }: { title: string; body: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3 lg:glass lg:rounded-2xl lg:p-6">
+      <h2 className="text-lg font-semibold max-lg:hidden">{title}</h2>
+      <p className="text-[15px] text-muted max-lg:hidden">{body}</p>
+      <ul className="flex flex-col gap-3">{children}</ul>
+    </section>
+  );
+}
+
+// Numbered illustrated row (Figma "Settings row").
+function Row({ icon, n, onClick, href }: { icon: string; n: number; onClick?: () => void; href?: string }) {
+  const cls = "glass flex min-h-16 w-full items-center gap-3 rounded-card px-4 py-3 text-left leading-[1.4] focus-visible:outline-2 focus-visible:outline-blue";
+  const inner = (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- static design icon */}
+      <img src={`/figma/row-${icon}.svg`} width={32} height={20.57} alt="" className="shrink-0" />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="font-semibold whitespace-pre-wrap">{t(`settings.row${n}` as MessageKey)}</span>
+        <span className="text-[13px] text-muted">{t(`settings.row${n}Body` as MessageKey)}</span>
+      </span>
+      {/* eslint-disable-next-line @next/next/no-img-element -- static design icon */}
+      <img src="/figma/row-chevron.svg" width={16} height={20} alt="" className="shrink-0" />
+    </>
+  );
+  return (
+    <li>
+      {href ? (
+        <Link href={href} className={cls}>
+          {inner}
+        </Link>
+      ) : (
+        <button type="button" onClick={onClick} className={cls}>
+          {inner}
+        </button>
+      )}
+    </li>
   );
 }

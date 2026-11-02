@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { t, type MessageKey } from "@/lib/i18n";
-import { Sprite } from "./sprite";
+import { DemoScene } from "./demo-scene";
 
 const subscribe = (callback: () => void) => {
   const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -55,48 +55,7 @@ export function FeatureDemo({ feature }: { feature: number }) {
         <span className="rounded-full bg-powder/60 px-2.5 py-1 text-xs font-semibold text-navy">{t("demo.sample")}</span>
       </div>
       <div className="demo-stage relative flex min-h-72 flex-col justify-center gap-5 bg-signature p-5 sm:min-h-88 sm:p-8">
-        {feature <= 2 && (
-          <div className="demo-gallery-viewport"><div className="demo-gallery">
-            {[0, 1, 2].map((index) => (
-              <div key={index} data-active={index === step} className="demo-product relative aspect-[4/5] overflow-hidden rounded-md border-2 border-white bg-white shadow-lg">
-                <Sprite src={feature === 1 ? "/figma/landing-products.png" : "/figma/landing-coffee.png"} i={index} sizes="(min-width: 1024px) 600px, 300px" alt={t(`demo.product${index}` as MessageKey)} />
-                <span className="absolute bottom-2 left-2 rounded-md bg-white/95 px-2 py-1 text-xs font-bold text-navy">0{index + 1}</span>
-              </div>
-            ))}
-          </div></div>
-        )}
-        {feature === 3 && (
-          <div className="demo-review-camera grid grid-cols-[0.8fr_1fr] items-center gap-4">
-            <div className="demo-review-photo relative aspect-[4/5] overflow-hidden rounded-md shadow-lg"><Sprite src="/figma/landing-products.png" i={0} sizes="500px" alt={t("demo.product0")} /></div>
-            <div className="flex flex-col gap-4">
-              <span className="text-xs font-semibold uppercase tracking-wider text-link">{t("landing.f3Caption")}</span>
-              <DemoCopy texts={[0, 1, 2].map((index) => key(`caption${index}`))} step={step} className="text-sm leading-relaxed sm:text-base" />
-              <span className={`rounded-control px-3 py-3 text-center text-xs font-semibold ${step === 2 ? "bg-blue text-white" : "bg-white text-navy"}`}><DemoCopy texts={[0, 1, 2].map((index) => key(`state${index}`))} step={step} /></span>
-            </div>
-          </div>
-        )}
-        {feature === 4 && (
-          <div className="demo-share-camera flex flex-col gap-4">
-            {(["instagram", "facebook"] as const).map((platform, index) => (
-              <div key={platform} data-active={step === index} className={`demo-platform flex items-center gap-4 rounded-control border p-4 transition-colors duration-500 ${step === index ? "border-blue bg-powder/70 shadow-md" : "border-border bg-white"}`}>
-                {/* eslint-disable-next-line @next/next/no-img-element -- exported platform icon */}
-                <img src={`/figma/platform-${platform}.svg`} width={28} height={28} alt="" />
-                <div className="flex-1 text-sm font-semibold">{t(`share.${platform}` as MessageKey)}</div>
-                <span aria-hidden="true" className="text-blue">{step === index ? "◉" : "○"}</span>
-              </div>
-            ))}
-            <DemoCopy texts={[0, 1, 2].map((index) => key(`state${index}`))} step={step} className="rounded-control bg-white p-4 text-sm leading-relaxed text-muted" />
-          </div>
-        )}
-        {feature === 5 && (
-          <div className="demo-metrics-camera grid grid-cols-3 gap-3">
-            {(["f5Reach", "f5Saves", "f5Orders"] as const).map((metric, index) => (
-              <div key={metric} className={`demo-metric rounded-control border p-3 transition-colors duration-500 ${step === index ? "-translate-y-2 border-blue bg-powder/60" : "border-border bg-white"}`}>
-                <p className="text-xs text-muted">{t(`landing.${metric}`)}</p><p className="py-4 text-3xl font-semibold">—</p>
-              </div>
-            ))}
-          </div>
-        )}
+        <DemoScene feature={feature} />
         <div aria-live={playing ? "off" : "polite"} className="flex min-h-14 items-center gap-3 rounded-control border border-white bg-white/90 px-4 py-3 shadow-sm">
           <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-powder text-xs font-bold text-navy">{step + 1}</span>
           <DemoCopy texts={[0, 1, 2].map((index) => key(`step${index}`))} step={step} className="text-sm leading-5" />

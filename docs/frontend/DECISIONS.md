@@ -135,3 +135,7 @@ Generated jobs currently store `{label,text}[]`; older rows contain `string[]`. 
 
 **FD-40 · Continuous, compositor-friendly landing motion.**
 Feature panels use a 12-second camera drift, layered product movement and 1.8-second eased lateral transitions. Copy remains mounted in a stable-height grid and crossfades. Hover no longer pauses playback; explicit pause, keyboard focus, offscreen suspension and reduced-motion controls remain. Animation uses transforms/opacity rather than per-frame React updates. Local Chrome frame scheduling had no >50 ms stalls in an eight-second sample; this is not a guarantee on all devices. Preview exports now use 30 fps rather than the earlier 4 fps capture.
+
+
+**FD-41 · Redesign only the animated feature canvases.**
+The surrounding landing sections, headings, copy, CTA buttons and composition are unchanged. `DemoScene` replaces the old static-card layouts inside `FeatureDemo` with five independent storyboards: photos assemble into a workspace; product scenes fan into a carousel; a caption editing overlay opens; a post branches toward sharing destinations; and a focus frame inspects Results. Native CSS transform/opacity transitions retain the existing playback controls and reduced-motion handling. Lint/build/typecheck passed; all five scenes visually checked, with no page overflow at 360/390/768/1280/1440. These remain sample walkthroughs, not live backend recordings.

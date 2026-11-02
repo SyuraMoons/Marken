@@ -310,17 +310,22 @@ export function SettingsView({ email, igConnected, rules: savedRules, shop }: Pr
         <Group title={t("settings.groupContent")} body={t("settings.groupContentBody")}>
           <Row icon="shop" n={1} onClick={() => go("shop")} />
           <Row icon="voice" n={2} onClick={() => go("brand")} />
-        </Group>
-        <Group title={t("settings.groupAccount")} body={t("settings.groupAccountBody")}>
           <Row icon="social" n={3} onClick={() => go("instagram")} />
+        </Group>
+        <Group
+          title={t("settings.groupAccount")}
+          body={t("settings.groupAccountBody")}
+          after={
+            <InfoCard vector="check" title={t("settings.approvalTitle")}>
+              {t("settings.approvalBody")}
+            </InfoCard>
+          }
+        >
           <Row icon="mail" n={4} onClick={() => go("reminders")} />
           <Row icon="plan" n={5} href="/onboarding/5" />
           <Row icon="check" n={6} onClick={() => go("account")} />
         </Group>
       </div>
-      <InfoCard vector="check" title={t("settings.approvalTitle")}>
-        {t("settings.approvalBody")}
-      </InfoCard>
     </div>
   );
 }
@@ -336,12 +341,13 @@ function Select({ value, onChange, options }: { value: string; onChange: (v: str
 }
 
 // Group heading shows on desktop only; mobile is one continuous list (228:14906).
-function Group({ title, body, children }: { title: string; body: string; children: ReactNode }) {
+function Group({ title, body, children, after }: { title: string; body: string; children: ReactNode; after?: ReactNode }) {
   return (
     <section className="flex flex-col gap-3 lg:glass lg:rounded-2xl lg:p-6">
       <h2 className="text-lg font-semibold max-lg:hidden">{title}</h2>
       <p className="text-[15px] text-muted max-lg:hidden">{body}</p>
       <ul className="flex flex-col gap-3">{children}</ul>
+      {after}
     </section>
   );
 }

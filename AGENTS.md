@@ -7,13 +7,13 @@ Guidance for AI coding agents (Claude Code, Codex, Cursor, Antigravity, etc.) wo
 **MARKEN** is the AI marketer that posts for you every morning, using your real product, your brand rules, and today's trends. You approve with one tap. Built for the **Meta Global AI Developer Hackathon** (submission due **4 Nov 2026, 9:00 PM ET / 5 Nov, 09:00 WIB**).
 
 - **Product name:** **MARKEN**. ("TrenToko" in `docs/images/*.png` is the old name — never use it in code or UI.)
-- **Target user:** Small business owners in any country who sell **physical products** on Instagram. Do not use "UMKM" or frame the product as Indonesia-only. Content language is set per shop (English and Bahasa Indonesia at the demo). UI strings are English and externalised in `src/lib/i18n/index.ts`.
-- **Headline promise:** *"Your real product, never redrawn."*
+- **Target user:** Small business owners in any country who sell **physical products** on Instagram (SRD v2.1 A-02: landing copy may also speak to services; the workflow stays product-photo based). Do not use "UMKM" or frame the product as Indonesia-only. Content language is set per shop (English and Bahasa Indonesia at the demo). UI strings are English and externalised in `src/lib/i18n/index.ts`.
+- **Headline promise:** *"Your real product, never redrawn."* (product promise; the landing headline is "Turn product photos into social posts." per SRD v2.1 A-01)
 - **North Star:** **Trusted posts per shop per week** (a post counts only when approved by the owner, published, and every slide passed the product fidelity check).
-- **Source of truth:** `docs/SRD.md` (**SRD v2.0 Final**). If anything from v1.0/v1.1 disagrees with v2.0, **v2.0 wins**.
+- **Source of truth:** `docs/SRD.md` (**SRD v2.0 Final + v2.1 amendments A-01 to A-07 in §1**). If anything from v1.0/v1.1 disagrees with v2.0, **v2.0 wins**; the v2.1 amendments win over the v2.0 body.
 - **Team & Workstreams:** See `docs/TEAM.md` for workstream boundaries between **Altaf** (AI Engine, Gateway, Studio/Fidelity), **Harfi** (Supabase, Inngest Jobs, IG API, API Routes), and **Nalen & Akhnaf** (UI/UX, Frontend Flows, Pilot & Video).
 
-- **Frontend rules:** Anyone touching UI reads `docs/frontend/` first (`RULES.md`, `DESIGN.md`, `DESIGN_FIXES.md`, `DECISIONS.md`, `API_CONTRACT.md`).
+- **Frontend rules:** Anyone touching UI reads `docs/frontend/` first (`Marken-Frontend-README.md`, `RULES.md`, `DESIGN.md`, `DESIGN_FIXES.md`, `DECISIONS.md`, `API_CONTRACT.md`, `CHECKLIST.md`).
 
 ## Status and commands
 

@@ -64,6 +64,22 @@ Markers: **NEW** added in v2.0 · **CHG** changed from v1.1 · **KEPT** from v1.
 
 **Cut in v2.0:** Offerings pipeline (F-21 and its FRs), LinkedIn and X export pack (F-23), peer watch (F-25), video Reel (F-20), website fetch.
 
+### v2.1 amendments (2 Nov 2026, team decision on the 2 Nov design handoff)
+
+Where this table disagrees with the rest of the SRD, this table wins. Items marked **to decide** are agreed in direction only; build nothing that depends on them until they are filled in.
+
+| ID | Area | v2.0 | v2.1 |
+| :--- | :--- | :--- | :--- |
+| A-01 | Landing (FR-LP-01) | Headline "Your real product, never redrawn" | Headline "Turn product photos into social posts." Copy may mention products **or services**. The "real product, never redrawn" promise stays in the product (badge, compare, Pillar 1) |
+| A-02 | Target user | Physical product sellers only; services out of scope | Landing speaks to products or services. The workflow (photos, cutout, fidelity, Real product badge) stays product-photo based. **To decide:** any service-specific workflow |
+| A-03 | Auth (FR-AU-01) | Google OAuth or email magic link | Google OAuth, **Meta (Facebook) OAuth**, or email magic link; all create the same user |
+| A-04 | Publishing (F-12) | Instagram carousel only; Facebook out of scope | Instagram carousel **and** Facebook Page post as separate destinations the owner picks per post. Approve still gates both. Download + copy fallback per destination. **To decide:** Facebook post format (Figma shows "Photo post") |
+| A-05 | Product scope (F-10, F-04) | One shop; the daily loop picks one product | The app is scoped to a **selected product** (product switcher in the header). Today, Products, Results and Settings show that product. A shop can hold a sample product with no photos yet. **To decide:** post cadence per product, and how this works with one live post per shop per day (`posts_one_live_per_shop_day`) |
+| A-06 | Company details (onboarding step 1, Settings) | name, category, country, content language, time zone | Adds a free-text **company description** ("what you sell and who it's for"), injected into prompts like tone and rules. Needs a `shops` column |
+| A-07 | Loading states (NFR-17) | Not specified | Uploading, preparing cutouts, regenerating scene, preparing captions and refreshing results each have a screen state; they advance on real completion only |
+
+Out of scope changes: service businesses and Facebook publishing are no longer out of scope (A-02, A-04).
+
 ---
 
 ## 2. Introduction
@@ -76,7 +92,7 @@ Markers: **NEW** added in v2.0 · **CHG** changed from v1.1 · **KEPT** from v1.
 
 **In scope:** a mobile first, installable web app (PWA): landing page, login, 5 step onboarding, and the main app (Today, Products, Results, Settings). Behind it runs the daily agent loop.
 
-**Out of scope:** SaaS and service businesses · video and Reels · LinkedIn, X, TikTok, Shopee or Facebook publishing · chat app interfaces · payments · paid ads · multiple shops per owner · peer watch · training our own models.
+**Out of scope:** SaaS businesses · video and Reels · LinkedIn, X, TikTok or Shopee publishing · chat app interfaces · payments · paid ads · multiple shops per owner · peer watch · training our own models.
 
 | Term | Meaning |
 | :--- | :--- |

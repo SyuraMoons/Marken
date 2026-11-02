@@ -5,6 +5,9 @@
   --color-ink: #111b36;
   --color-muted: #64708a;
   --color-blue: #2456db;
+  --color-navy: #213d8c;
+  --color-link: #3155aa;
+  --color-slate: #26385f;
   --color-white: #ffffff;
   --color-surface: #f4f6fc;
   --color-border: #e5e9f4;
@@ -15,7 +18,7 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
   --radius-card: 20px;
-  --radius-control: 14px;
+  --radius-control: 12px;
 }
 
 /* Public + setup screens only (DX-24). */
@@ -24,6 +27,44 @@
     radial-gradient(60% 50% at 0% 0%, color-mix(in srgb, var(--color-powder) 80%, transparent), transparent),
     radial-gradient(60% 60% at 100% 100%, color-mix(in srgb, var(--color-pink) 45%, transparent), transparent),
     var(--color-white);
+}
+
+/* App screens (2 Nov design): soft white, blue and pink wash. */
+@utility bg-app {
+  background: linear-gradient(105deg, #fff 0%, #f0f7ff 16%, #fff 40%, #fff 62%, #ffecf7 75%, #fffafc 80%);
+}
+
+/* Header and intro cards. */
+@utility bg-signature {
+  background: linear-gradient(135deg, #f0f7ff 0%, #fff 36%, #fffcff 58%, #ffebf7 80%);
+}
+
+/* Frosted white card used across the app. */
+@utility glass {
+  background: rgb(255 255 255 / 74%);
+  border: 1px solid rgb(255 255 255 / 85%);
+  box-shadow: 0 8px 14px rgb(31 59 122 / 7%);
+  backdrop-filter: blur(12px);
+}
+
+/* Wordmark accent: small blue and pink offsets (2 Nov). */
+@utility wordmark {
+  text-shadow: -1.2px 0 0 rgb(31 140 255 / 70%), 1.2px 0.6px 0 rgb(255 110 196 / 65%);
+}
+
+/* Mobile bottom nav, values from Marken-Frontend-README (FD-22). Alpha on the background only. */
+@utility nav-glass {
+  background: var(--color-navy);
+  border: 1px solid rgb(255 255 255 / 26%);
+  box-shadow: 0 6px 20px rgb(13 26 69 / 18%);
+  @supports (backdrop-filter: blur(20px)) {
+    background: linear-gradient(180deg, rgb(51 84 171 / 88%), rgb(33 61 140 / 82%));
+    backdrop-filter: blur(20px);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    background: var(--color-navy);
+    backdrop-filter: none;
+  }
 }
 
 body {

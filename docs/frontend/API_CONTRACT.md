@@ -144,6 +144,15 @@ Delete shop (NFR-14) uses `DELETE /api/shops/:id` with `{ "confirm": true }` (re
 
 - `POST /api/push/subscribe` — web push is out of SRD v2.0 (email only). Don't build UI for it.
 
+## 7. Needed for SRD v2.1 (not built yet) **[confirm: Harfi / Altaf]**
+
+The UI is in scope (FD-29) but no route or column exists. Do not infer contracts from Figma copy; the backend owner defines them.
+- **A-03 Meta sign-in:** Supabase Auth `facebook` provider + a `signInWithMeta` server action next to `signInWithGoogle`.
+- **A-04 Facebook publishing:** a destination choice on Approve (Instagram / Facebook / both), Page connection, publish job and status per destination. Post format **to decide**.
+- **A-05 Product scope:** a way to read and generate posts per product; today `posts_one_live_per_shop_day` allows one live post per shop per day. Cadence **to decide**.
+- **A-08 Several photos per product (Figma "One product · 3 photos"):** today every upload becomes its own product (`products_source_upload_id_key`). The UI collects up to 3 photos but sends only photo 1 until the backend can attach extra photos to one product (e.g. a `product_photos` table and `extract` grouping `uploadIds` into one product).
+- **A-06 Company description:** a `shops.description` column, saved by onboarding step 1 and Settings, and injected into prompts.
+
 ## 6. Real response shapes (override the proposals above)
 
 - `POST /api/uploads` body `{ mimeType, bytes }` → `201 { uploadId, path, token, signedUrl }`; upload with `uploadToSignedUrl(path, token, file)`.

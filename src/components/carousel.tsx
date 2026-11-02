@@ -4,8 +4,8 @@ import Image from "next/image";
 import { useRef, useState } from "react";
 import type { Slide } from "@/lib/posts/slides";
 
-// 4:5 slides, CSS scroll-snap swipe (FD-10), labels jump to a slide (DX-33).
-export function Carousel({ slides, labels }: { slides: Slide[]; labels: string[] }) {
+// 4:5 slides, CSS scroll-snap swipe (FD-10), labels jump to a slide (DX-33). With an eyebrow, the current slide's text shows under it (2 Nov design).
+export function Carousel({ slides, labels, eyebrow }: { slides: Slide[]; labels: string[]; eyebrow?: string }) {
   const track = useRef<HTMLDivElement>(null);
   const [current, setCurrent] = useState(0);
 
@@ -30,6 +30,12 @@ export function Carousel({ slides, labels }: { slides: Slide[]; labels: string[]
           </div>
         ))}
       </div>
+      {eyebrow && (
+        <div className="flex flex-col gap-2 leading-[1.35] font-semibold" aria-live="polite">
+          <p className="text-[10px] uppercase">{eyebrow}</p>
+          <p>{slides[current]?.text}</p>
+        </div>
+      )}
       <div className="grid grid-cols-3">
         {labels.map((label, i) => (
           <button
@@ -37,7 +43,7 @@ export function Carousel({ slides, labels }: { slides: Slide[]; labels: string[]
             type="button"
             onClick={() => go(i)}
             aria-current={i === current ? "true" : undefined}
-            className={`h-11 text-sm font-medium ${i === current ? "text-blue" : "text-muted"}`}
+            className={`h-11 rounded-control text-sm text-link ${i === current ? "font-semibold" : "font-normal"}`}
           >
             {label}
           </button>

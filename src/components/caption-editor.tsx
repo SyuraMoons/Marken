@@ -3,35 +3,29 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Carousel } from "./carousel";
-import { CopyButton } from "./copy-button";
-import { ActionButton } from "./action-button";
 import { Button, ButtonLink } from "./button";
+import { InfoCard } from "./info-card";
+import { StatusScreen } from "./status-screen";
 import { t } from "@/lib/i18n";
 import type { Slide } from "@/lib/posts/slides";
 
 const POLL_MS = 3000;
 const GIVE_UP_MS = 60_000;
+const MAX_REWRITES = 5;
+const field = "glass rounded-card p-3.5 text-base leading-[1.4] text-ink placeholder:text-muted focus:outline-2 focus:outline-blue";
 
-// Manual caption edit + rewrite from feedback (F-11, FR-ED-01/02, DX-32). Manual edit is sent with Approve, not saved on its own.
-export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: string; slides: Slide[]; captions: string[]; hashtags: string[] }) {
+// Edit the caption (228:10507, F-11, FR-ED-01/02). The edited caption goes to "Publish this post?" and is sent with Approve.
+export function CaptionEditor({ postId, slides, captions, product }: { postId: string; slides: Slide[]; captions: string[]; product?: string }) {
   const router = useRouter();
-  const [index, setIndex] = useState(0);
   const [text, setText] = useState(captions[0] ?? "");
   const [feedback, setFeedback] = useState("");
-  const [limited, setLimited] = useState(false);
+  const [used, setUsed] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [waiting, setWaiting] = useState(false);
+  const [scene, setScene] = useState(false);
   const [pending, start] = useTransition();
   const seen = useRef(captions.join("\n"));
-
-  // Slide remake (FR-ED-05, F-11b) is P1: the regenerate route only accepts target "caption", so the panel stays hidden until it ships.
-  const slideList = slides;
-  const unchecked = slideList.some((s) => !s.fidelity_passed);
-
-  const choose = (i: number) => {
-    setIndex(i);
-    setText(captions[i] ?? "");
-  };
+  const limited = used !== null && used >= MAX_REWRITES;
 
   // The rewrite runs as a job; re-read the page until new options arrive.
   useEffect(() => {
@@ -52,7 +46,6 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
     if (!waiting || now === seen.current) return;
     seen.current = now;
     setWaiting(false);
-    setIndex(0);
     setText(captions[0] ?? "");
   }, [captions, waiting]);
 
@@ -64,99 +57,88 @@ export function CaptionEditor({ postId, slides, captions, hashtags }: { postId: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target: "caption", feedback: feedback.trim() }),
       }).catch(() => null);
-      if (res?.status === 429) return setLimited(true);
+      if (res?.status === 429) return setUsed(MAX_REWRITES);
       if (!res?.ok) return setFailed(true);
       const data = (await res.json().catch(() => ({}))) as { remaining?: number };
-      if (data.remaining === 0) setLimited(true);
+      if (typeof data.remaining === "number") setUsed(MAX_REWRITES - data.remaining);
       setWaiting(true);
     });
 
-  return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2 pt-2">
-        <ButtonLink href="/today" variant="text" className="w-auto! self-start px-0">
-          {t("edit.back")}
-        </ButtonLink>
-        <h1 className="text-4xl font-semibold tracking-tight">{t("edit.title")}</h1>
-        <p className="text-muted">{t("edit.body")}</p>
-      </header>
-
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
-        <section aria-label={t("today.carousel")} className="lg:rounded-card lg:border lg:border-border lg:bg-white lg:p-5">
-          <Carousel slides={slideList} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} />
-        </section>
-
-        <div className="flex flex-col gap-4">
-          <section className="flex flex-col gap-3 rounded-card border border-border bg-white p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">{t("edit.caption")}</h2>
-              <CopyButton text={`${text}\n\n${hashtags.join(" ")}`} className="w-auto! px-2" />
-            </div>
-            {captions.length > 1 && (
-              <div className="flex gap-2" role="group" aria-label={t("edit.chooseCaption", { n: index + 1, total: captions.length })}>
-                {captions.map((c, i) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => choose(i)}
-                    aria-pressed={i === index}
-                    className={`flex h-11 items-center rounded-full border px-4 text-sm font-medium ${i === index ? "border-blue bg-powder text-blue" : "border-border bg-white text-ink"}`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-                <span className="flex items-center text-sm text-muted">{t("edit.chooseCaption", { n: index + 1, total: captions.length })}</span>
-              </div>
-            )}
-            <label className="sr-only" htmlFor="caption">
-              {t("edit.caption")}
-            </label>
-            <textarea
-              id="caption"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              rows={5}
-              maxLength={2200}
-              className="rounded-control border border-border bg-white p-3 font-normal placeholder:text-muted focus:outline-2 focus:outline-blue"
-            />
-            <p className="text-sm text-muted">{hashtags.join(" ")}</p>
-          </section>
-
-          <section className="flex flex-col gap-3 rounded-card border border-border bg-white p-5">
-            <label className="flex flex-col gap-1.5 text-sm font-medium">
-              {t("edit.feedback")}
-              <textarea
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                rows={3}
-                maxLength={200}
-                placeholder={t("edit.feedbackPlaceholder")}
-                className="rounded-control border border-border bg-white p-3 font-normal placeholder:text-muted focus:outline-2 focus:outline-blue"
-              />
-            </label>
-            <Button variant="secondary" onClick={rewrite} disabled={limited || pending || waiting || !feedback.trim()} aria-busy={pending || waiting}>
-              {t("edit.rewrite")}
-            </Button>
-            {limited && (
-              <p role="alert" className="text-sm text-danger">
-                {t("edit.limit")}
-              </p>
-            )}
-            {failed && (
-              <p role="alert" className="text-sm text-danger">
-                {t("common.error")}
-              </p>
-            )}
-          </section>
-
-          <ActionButton url={`/api/posts/${postId}/approve`} body={{ caption: text }} then="/today" disabled={unchecked}>
-            {t("edit.approve")}
-          </ActionButton>
-          <ButtonLink href="/today" variant="text">
-            {t("edit.today")}
-          </ButtonLink>
+  // Preparing caption options (270:2121): the current caption stays until new options arrive.
+  if (waiting) {
+    return (
+      <StatusScreen title={t("loading.captionsTitle")} body={t("loading.captionsBody")}>
+        <div aria-busy="true" aria-live="polite">
+          <InfoCard vector="build" title={t("loading.captionsCard")}>
+            {t("loading.captionsCardBody")}
+          </InfoCard>
         </div>
-      </div>
-    </div>
+        <InfoCard vector="check" title={t("loading.waitTitle")}>
+          {t("loading.waitBody")}
+        </InfoCard>
+      </StatusScreen>
+    );
+  }
+
+  const preview = <Carousel slides={slides} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} eyebrow={product} />;
+
+  // Edit the image background (228:11424). The regenerate route only accepts captions (F-11b, P1), so it is shown but disabled.
+  if (scene) {
+    return (
+      <StatusScreen title={t("imageEdit.title")} body={t("imageEdit.body")}>
+        <div className="mx-auto w-full max-w-90">{preview}</div>
+        <label className="flex flex-col gap-4 text-sm font-medium">
+          {t("imageEdit.feedback")}
+          <textarea rows={2} maxLength={200} placeholder={t("imageEdit.feedbackPlaceholder")} className={`${field} font-normal`} />
+        </label>
+        <InfoCard vector="check" title={t("imageEdit.keptTitle")}>
+          {t("imageEdit.keptBody")}
+        </InfoCard>
+        <p role="status" className="text-sm text-muted">
+          {t("imageEdit.unavailable")}
+        </p>
+        <Button disabled>{t("imageEdit.regenerate")}</Button>
+        <Button variant="text" onClick={() => setScene(false)}>
+          {t("edit.cancel")}
+        </Button>
+      </StatusScreen>
+    );
+  }
+
+  return (
+    <StatusScreen title={t("edit.title")} body={t("edit.body")}>
+      <label className="flex flex-col gap-4 text-sm font-medium">
+        {t("edit.caption")}
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} maxLength={2200} className={`${field} font-normal`} />
+      </label>
+      <label className="flex flex-col gap-4 text-sm font-medium">
+        {t("edit.feedback")}
+        <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={2} maxLength={200} placeholder={t("edit.feedbackPlaceholder")} className={`${field} font-normal`} />
+      </label>
+      {used !== null && <p className="text-[13px] text-muted">{t("edit.used", { n: used })}</p>}
+      {limited && (
+        <p role="alert" className="text-sm text-danger">
+          {t("edit.limit")}
+        </p>
+      )}
+      {failed && (
+        <p role="alert" className="text-sm text-danger">
+          {t("common.error")}
+        </p>
+      )}
+      <Button onClick={rewrite} disabled={limited || pending || !feedback.trim()} aria-busy={pending}>
+        {t("edit.rewrite")}
+      </Button>
+      <ButtonLink href={`/today?view=share&caption=${encodeURIComponent(text.trim())}`} variant="secondary" aria-disabled={!text.trim()}>
+        {t("edit.save")}
+      </ButtonLink>
+      <div className="mx-auto w-full max-w-90">{preview}</div>
+      <Button variant="secondary" onClick={() => setScene(true)}>
+        {t("edit.background")}
+      </Button>
+      <ButtonLink href="/today" variant="text">
+        {t("edit.cancel")}
+      </ButtonLink>
+    </StatusScreen>
   );
 }

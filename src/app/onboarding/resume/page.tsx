@@ -31,7 +31,6 @@ async function Resume() {
         </header>
         <main className="flex flex-1 flex-col justify-center py-10">
           <StatusScreen
-            icon="✦"
             title={t("resume.title")}
             body={t("resume.body", { shop: shop.name ?? "", n: step, total: SETUP_STEPS, step: t(`setup.step${step}` as MessageKey) })}
           >

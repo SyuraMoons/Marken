@@ -4,14 +4,14 @@ Source: Figma `9FeEf6cIQUwKkn8OsPAI7b`.
 
 | Figma page | Use it? |
 | :--- | :--- |
-| `0:1` Archive — Earlier mobile exploration | **No. Never slice from it.** |
-| `4:2` 01 Moodboard | Palette, mood, principles |
-| `4:3` 02 Wireframes | Layout reference only |
-| `4:4` 04 Components & motion | Buttons, motion spec, 360 px checks |
-| `96:146` 05 Full app — Mobile + Desktop · SRD v2 | **The screens we build** |
+| `96:146` 00 Prototype — Complete app | **The screens we build (canonical)** |
+| `213:1825` 01 Today · `228:9961` 02 Products · `228:9962` 03 Results · `228:9963` 04 Settings · `228:9964` 05 Start & onboarding | Organized copies. If a copy disagrees with `96:146`, `96:146` wins (FD-20) |
+| `230:1220` 06 Wireframes — Connected flows | Journeys only |
+| `4:2` 07 Visual direction · `4:4` 08 Components & motion | References |
+| Every page named "Archive" (`0:1`, `213:1824`, `213:867`, `4:3`, `213:771`) | **No. Never slice from them.** |
 
-If Figma and `docs/SRD.md` disagree, the SRD wins (see `DECISIONS.md`).
-Known Figma inconsistencies and their code fixes are in `DESIGN_FIXES.md` — **it overrides the Figma frames**.
+Order of truth (FD-21): **SRD → `Marken-Frontend-README.md` (2 Nov handoff) → `DESIGN_FIXES.md` → Figma `96:146`.**
+The SRD v2.1 amendments (A-01 to A-07) bring the whole 2 Nov design in scope (FD-29).
 
 ---
 
@@ -33,15 +33,18 @@ Defined once in `src/app/globals.css` (`@theme`), used as Tailwind classes (`bg-
 | :--- | :--- | :--- |
 | `ink` | `#111B36` | Headings, body text |
 | `muted` | `#64708A` | Secondary text, labels |
-| `blue` | `#2456DB` | Primary action, links, active nav |
+| `blue` | `#2456DB` | Primary action, links (still the Figma variable) |
+| `navy` | `#213D8C` | Desktop sidebar, auth panel and login buttons, mobile nav fallback (FD-22) |
 | `white` | `#FFFFFF` | Cards, canvas |
 | `surface` | `#F4F6FC` | App background (desktop), secondary buttons |
 | `border` | `#E5E9F4` | Card and input borders |
 | `pink` | `#F2B1E6` | Atmosphere gradient only (never text) |
-| `powder` | `#DBE9FF` | Atmosphere gradient, active nav fill |
+| `powder` | `#DBE9FF` | Atmosphere gradient, selected chips |
 | `danger` | `#B42318` | Delete / error text. *Not in Figma yet — AA safe placeholder* |
 
 Atmosphere background (landing, login, onboarding, carousel frame only): soft gradient `powder` → `white` → `pink` at low opacity. Cards on top are solid `white`. Signed-in app screens use flat `surface` (DX-24). Never put `muted` text directly on the gradient (DX-40).
+
+Mobile glass nav (FD-22, values from the README): background `linear-gradient(180deg, rgb(51 84 171 / 88%), rgb(33 61 140 / 82%))`, `backdrop-filter: blur(20px)`, 1 px inside border white 26%, shadow `0 6px 20px rgb(13 26 69 / 18%)`. Opaque `navy` fallback when blur is unsupported or `prefers-reduced-transparency: reduce`. Put the alpha on the background, never on the whole element, so icons and labels stay opaque.
 
 ### Type (Inter, via `next/font`)
 
@@ -58,7 +61,9 @@ Atmosphere background (landing, login, onboarding, carousel frame only): soft gr
 ### Shape and spacing
 
 - Page gutter: **24 px** on mobile (Figma: 390 frame, 25 px inset; 360 px QA frames still fit).
-- Card: white, 1 px `border`, radius ~**20 px**, padding 16–20 px.
+- Mobile content: 24 px top, 32 px bottom, plus the bottom-nav height and safe-area inset so nothing hides under the glass nav.
+- Card: white, 1 px `border`, radius ~**20 px**, padding **20–24 px**. Major blocks 24–28 px apart. Cards grow with content: no fixed text heights.
+- Landing sections: 48 px vertical padding on mobile, 64 px on desktop. Landing photo panels: radius 5–8 px, tilted (2D approximation).
 - Buttons (component `Marken/Button/*`), only these heights (DX-25):
   - Primary: 52 px tall, full width on mobile, `blue` fill, white Body M, radius ~14 px.
   - Secondary: 52 px tall, `surface` fill, `border` stroke, ink text.
@@ -73,15 +78,17 @@ Atmosphere background (landing, login, onboarding, carousel frame only): soft gr
 
 | Viewport | Shell |
 | :--- | :--- |
-| < 1024 px (mobile/tablet) | 64 px header (`marken ✦` + shop name), content column, 72 px **bottom nav** with icon + label: Today · Products · Results · Settings. Active tab follows the section (DX-22, DX-23) |
-| ≥ 1024 px (desktop) | **Left sidebar 224 px on every signed-in screen** (logo, nav rows icon + label, shop card at bottom; no "View agent activity"), breadcrumb top bar (`Workspace / today`), content on `surface` with white cards; Today uses 2 columns (carousel · review panel) (DX-20, DX-21, DX-11) |
+| < 1024 px (mobile/tablet) | 64 px header (wordmark + company name), content column, 72 px **glass bottom nav** (FD-22) with icon + label: Today · Products · Results · Settings, always visible, content padded for nav + safe area. Active tab follows the section (DX-22, DX-23) |
+| ≥ 1024 px (desktop) | **Navy 224 px sidebar on every signed-in screen** (FD-22): wordmark, nav rows icon + label in white, company card at bottom; no "View agent activity". Sidebar and main area are siblings in a row (`minmax(0, 1fr)` / `min-width: 0` on main); never nest the sidebar in a vertical stack. Breadcrumb top bar, content on `surface` with white cards; Today uses 2 columns (carousel · review panel) (DX-20, DX-11) |
+| Desktop login + email | **`AuthShell`** (FD-23): 400 px navy panel flush left/top/bottom, flexible form area. Mobile login stays one column |
 
-Setup and landing screens have no nav, only the header.
+Landing and setup screens have no app nav. Tablet widths are not specified in Figma: stay fluid between 360 and 1440 and test at 768.
 Must work 360 → 1440 px with no horizontal scroll (NFR-09, FR-LP-01).
 
 ## 4. Components (build these once, in `src/components/`)
 
-Built: `Button`/`ButtonLink`, `AppShell` (+`AppNav`), `SetupShell`, `Carousel`, `ProductCheck` (badge + compare in one), `ActivityPanel`, `ReviewPanel` (caption picker + skip chips inline), `StatusScreen`, `CopyButton`, `ActionButton`, `Logo`, `ListRow`, `Placeholder`. Still planned: `Chip`, `Card`, `Field`, `CoachMark` — extract them when their screen lands, don't build ahead.
+Built: `Button`/`ButtonLink`, `AppShell` (+`AppNav`), `SetupShell`, `Carousel`, `ProductCheck` (badge + compare in one), `ActivityPanel`, `ReviewPanel` (caption picker + skip chips inline), `StatusScreen`, `CopyButton`, `ActionButton`, `Logo`, `ListRow`, `Placeholder`, `DownloadFlow`, `UploadError`, `SaveAndExit`, `InstallMarken`, `ResultsView`.
+New for the 2 Nov design: `AuthShell` (FD-23), `LandingCarousel` (FD-25), `LoadingPanel` (FD-24), `Alert`, `Dialog`, `ProductSwitcher` (A-05), `PlatformSelect` (Instagram/Facebook, A-04). Still planned: `Chip`, `Card`, `Field`, `CoachMark` — extract them when their screen lands, don't build ahead.
 
 | Component | Notes |
 | :--- | :--- |
@@ -89,7 +96,10 @@ Built: `Button`/`ButtonLink`, `AppShell` (+`AppNav`), `SetupShell`, `Carousel`, 
 | `ListRow` | settings rows: label, current value, chevron (DX-06) |
 | `Chip` | single-select chips, e.g. skip reasons (DX-05) |
 | `Card` | white, bordered, rounded |
-| `AppShell` | bottom nav (mobile) + sidebar (desktop) |
+| `AppShell` | glass bottom nav (mobile) + navy sidebar (desktop) |
+| `AuthShell` | desktop 400 px navy panel + form area; mobile single column |
+| `LandingCarousel` | 3 example states, 3.2 s autoplay, swipe, category controls, pause/resume, keyboard, no autoplay with reduced motion |
+| `LoadingPanel` | skeleton for one panel, `aria-busy`, indeterminate unless real progress |
 | `SetupShell` | ← Back · Save and exit · 5-segment progress bar · "N of 5 · Label" |
 | `Carousel` | 4:5 slides, CSS scroll-snap swipe, dots, labels `01 / Hook · 02 / Product · 03 / CTA`, alt text on every slide |
 | `RealProductBadge` | "✓ Real product · Compare"; rendered **only** when every slide `fidelity_passed` |
@@ -101,6 +111,7 @@ Built: `Button`/`ButtonLink`, `AppShell` (+`AppNav`), `SetupShell`, `Carousel`, 
 | `Field` | label + input/select/textarea + error, 44 px min height |
 
 Icons: small inline SVGs in `src/components/icons.tsx` (Figma desktop uses simple line icons). No icon library.
+Wordmark: "marken" with small blue/pink offset accents (2 Nov). Text or SVG with one accessible name; decorative copies are hidden from screen readers.
 
 ## 5. Screen map (page `96:146`)
 
@@ -145,17 +156,35 @@ Every screen has a Mobile and Desktop frame; node IDs below are the **Mobile** f
 | shop / brand / instagram / connected / reminders / account / delete / deleted | `/settings` sub-views | `97:1498`, `97:1579`, `97:1650`, `98:1287`, `97:1707`, `97:1782`, `97:1859`, `98:1397` |
 | results / result-detail / learning / image-edit **[P1]** | after the 2 Nov gate only | `97:324`, `97:1295`, `97:1366`, `97:1427` |
 
+### Added 2 Nov
+| Screen | Route / place | Node (mobile / desktop) | Status |
+| :--- | :--- | :--- | :--- |
+| landing-carousel 2, 3 + paused | `/` carousel states | `244:569`, `244:811` / `244:1069`, `244:1311`; paused `245:477`, `245:729` / `245:987`, `245:1239` | build (FD-25, A-01) |
+| uploading | onboarding 2, Products add | `270:513` / `270:578` | build (FD-24) |
+| preparing-cutouts | onboarding 2 to 3, Products add | `270:661` / `270:726` | build |
+| regenerating-scene | Edit (slide remake) | `270:809` / `270:874` | build, route still caption-only |
+| loading-captions | Edit (caption rewrite) | `270:957` / `270:1022` | build |
+| loading-results | `/results` | `270:1105` / `270:1170` | build |
+| activity-technical-details | `/today?view=activity` | `189:707` / `189:754` | build (FD-28) |
+| auth-meta-opening / success / retry | login | `176:695`, `176:704`, `176:714` / `176:729`, `176:738`, `176:748` | build UI (A-03); needs Meta provider in Supabase Auth |
+| share / publishing / published / download / downloaded -facebook | Today | `227:533`, `227:583`, `227:639`, `230:2416`, `230:2484` / `227:732`, `227:801`, `227:876`, `230:2535`, `230:2622` | build UI (A-04); needs Facebook publish route |
+| Product switcher overlay, today-sample-product | app header | `186:918`, `186:701` / `186:917`, `186:790` | build UI (A-05); cadence **to decide**, needs per-product posts |
+
+The README lists "Download complete" as `98:1342`; the frame is `98:1340` (mobile) / `98:1366` (desktop).
+
 QA frames: `100:1050`–`100:1173` (360 px), `100:1207` (1280 px), `100:1264` / `100:1291` (reduced motion landing).
 
 ## 6. Motion
 
 - Setup step change: 200 ms dissolve.
-- Landing hero product study: 500 ms ease, 1.4 s hold.
+- Landing carousel: 3.2 s per state, pause on hover/focus/off-screen, no autoplay with reduced motion (FD-25).
 - `prefers-reduced-motion`: static landing, instant transitions.
+- `prefers-reduced-transparency`: opaque nav, no blur (FD-22).
 - CSS transitions only; no animation library.
 
 ## 7. Copy
 
 - UI copy comes from Figma frame titles/bodies, stored in `messages/en.json` and read with `t()`.
-- Figma notes like "Illustrative design sample", "Example rationale · source must come from…", "ILLUSTRATIVE RUN" are **designer annotations — do not ship them**. The only exception is the tour sample post, which must be labelled "Sample".
+- Figma notes like "Illustrative design sample", "Example rationale · source must come from…", "ILLUSTRATIVE RUN", "EXAMPLE ACTIVITY · Not a live run" are **designer annotations — do not ship them**. Neither are the "View result · prototype" / "View recovery · prototype" buttons. The only exception is the tour sample post, which must be labelled "Sample".
+- 2 Nov wording is adopted (FD-27): "Company" in UI, "Review today's post", numbered field labels ("01 Company name"). The landing headline is "Turn product photos into social posts." (SRD A-01).
 - Post content (captions, slide text) is in the shop's content language (EN or ID); UI is English.

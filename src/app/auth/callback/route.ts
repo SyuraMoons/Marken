@@ -13,7 +13,11 @@ export async function GET(request: NextRequest) {
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(`${origin}/`);
+    if (!error) {
+      const ok = NextResponse.redirect(`${origin}/`);
+      ok.cookies.delete({ name: "marken-oauth", path: "/auth/callback" });
+      return ok;
+    }
   }
   const meta = request.cookies.get("marken-oauth")?.value === "meta";
   const res = NextResponse.redirect(`${origin}/login?error=${meta ? "meta" : "generic"}`);

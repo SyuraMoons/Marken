@@ -49,7 +49,7 @@ async function Step({ params }: Pick<PageProps<"/onboarding/[step]">, "params">)
   ]);
 
   return (
-    <SetupShell step={step} shopId={shop.id}>
+    <SetupShell step={step} shopId={shop.id} shopName={shop.name ?? ""}>
       <SetupSteps
         step={step}
         shop={{

@@ -7,7 +7,7 @@ import { t } from "@/lib/i18n";
 import { Button } from "./button";
 
 // Save and exit (FR-OB-11): confirm the step is saved, then sign out; sign back in resumes at this step.
-export function SaveAndExit({ shopId, step }: { shopId: string; step: number }) {
+export function SaveAndExit({ shopId, step, className = "" }: { shopId: string; step: number; className?: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
@@ -28,12 +28,12 @@ export function SaveAndExit({ shopId, step }: { shopId: string; step: number }) 
   };
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <Button variant="text" className="w-auto! px-0" onClick={save} disabled={pending} aria-busy={pending}>
+    <div className={`flex flex-col gap-1 ${className}`}>
+      <Button variant="text" className={className} onClick={save} disabled={pending} aria-busy={pending}>
         {t("setup.saveExit")}
       </Button>
       {error && (
-        <p role="alert" className="text-right text-sm text-danger">
+        <p role="alert" className="text-center text-sm text-danger">
           {t("setup.saveError")}
         </p>
       )}

@@ -1,16 +1,16 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { ButtonLink } from "@/components/button";
-import { Logo } from "@/components/logo";
-import { StatusScreen } from "@/components/status-screen";
-import { SETUP_STEPS } from "@/components/setup-shell";
-import { t, type MessageKey } from "@/lib/i18n";
+import { signOutToWelcome } from "@/app/login/actions";
+import { AuthShell } from "@/components/auth-shell";
+import { Button, ButtonLink } from "@/components/button";
+import { InfoCard } from "@/components/info-card";
+import { t } from "@/lib/i18n";
 import { getOwnerShop } from "@/lib/data/today";
 
-// Resume (97:2638, FR-OB-11/12, FR-LP-03): returning owner with unfinished setup lands here, not on a blank step.
+// Continue setup (228:17528, FR-OB-11/12, FR-LP-03): returning owner with unfinished setup lands here, not on a blank step.
 export default function ResumePage() {
   return (
-    <Suspense fallback={<div className="bg-atmosphere min-h-dvh" />}>
+    <Suspense fallback={<div className="bg-app min-h-dvh" />}>
       <Resume />
     </Suspense>
   );
@@ -21,23 +21,23 @@ async function Resume() {
   if (!owner) redirect("/login");
   const { shop } = owner;
   if (shop.onboarding_completed_at) redirect("/today");
-  const step = shop.onboarding_step;
 
   return (
-    <div className="bg-atmosphere flex min-h-dvh flex-col">
-      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col px-6 py-6">
-        <header className="flex h-10 items-center">
-          <Logo />
-        </header>
-        <main className="flex flex-1 flex-col justify-center py-10">
-          <StatusScreen
-            title={t("resume.title")}
-            body={t("resume.body", { shop: shop.name ?? "", n: step, total: SETUP_STEPS, step: t(`setup.step${step}` as MessageKey) })}
-          >
-            <ButtonLink href={`/onboarding/${step}`}>{t("resume.continue")}</ButtonLink>
-          </StatusScreen>
-        </main>
+    <AuthShell>
+      <h1 className="text-[30px] font-semibold">{t("resume.title")}</h1>
+      <p className="text-muted">{t("resume.body")}</p>
+      <div className="flex flex-col gap-4 lg:max-w-136">
+        <InfoCard vector="check" title={t("resume.cardTitle")}>
+          {t("resume.cardBody")}
+        </InfoCard>
+        <ButtonLink href={`/onboarding/${shop.onboarding_step}`}>{t("resume.continue")}</ButtonLink>
+        {/* A signed-in owner is sent away from "/", so leaving for the welcome page signs out first. */}
+        <form action={signOutToWelcome} className="flex flex-col">
+          <Button type="submit" variant="text">
+            {t("resume.welcome")}
+          </Button>
+        </form>
       </div>
-    </div>
+    </AuthShell>
   );
 }

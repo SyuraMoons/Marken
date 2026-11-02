@@ -15,5 +15,8 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return NextResponse.redirect(`${origin}/`);
   }
-  return NextResponse.redirect(`${origin}/login?error=generic`);
+  const meta = request.cookies.get("marken-oauth")?.value === "meta";
+  const res = NextResponse.redirect(`${origin}/login?error=${meta ? "meta" : "generic"}`);
+  res.cookies.delete({ name: "marken-oauth", path: "/auth/callback" });
+  return res;
 }

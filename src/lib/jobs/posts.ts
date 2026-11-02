@@ -123,6 +123,9 @@ export const generatePost = inngest.createFunction(
       ),
     ) as CarouselPlan;
 
+    const chosenProduct =
+      input.products.find((p) => p.id === plan.productId) ?? input.products[0];
+
     const slides: Slide[] = [];
     for (const s of plan.slides) {
       const slide = await step.run(`slide-${s.order}`, () =>
@@ -130,7 +133,16 @@ export const generatePost = inngest.createFunction(
           ctx,
           `render_slide_${s.order}`,
           "muse-image",
-          () => renderSlide(shopId, postId, s),
+          () =>
+            renderSlide(
+              shopId,
+              postId,
+              s,
+              chosenProduct?.cutoutPath,
+              input.shop.tone ?? undefined,
+              input.shop.styleRules,
+              input.shop.contentLanguage,
+            ),
           (r) => ({ fidelity_score: r.fidelity_score, fidelity_passed: r.fidelity_passed }),
         ),
       );
@@ -250,11 +262,23 @@ async function renderSlide(
   shopId: string,
   postId: string,
   s: CarouselPlan["slides"][number],
+  cutoutPath?: string | null,
+  shopTone?: string,
+  styleRules?: string[],
+  contentLanguage?: "en" | "id",
 ): Promise<Slide> {
   const admin = createAdminClient();
   // The studio rebuilds a failed slide once (FR-FD-01), then flags it. Retrying here too
   // would multiply paid image calls past the USD 0.10 per carousel target (NFR-06).
-  const result = await renderAndVerifySlide(s);
+  const result = await renderAndVerifySlide({
+    ...s,
+    cutoutPath,
+    shopId,
+    postId,
+    shopTone,
+    styleRules,
+    contentLanguage,
+  });
   const scene_path = `${shopId}/scenes/${postId}-${s.order}.png`;
   const slide_path = `${shopId}/slides/${postId}-${s.order}.png`;
   for (const [path, body] of [
@@ -297,8 +321,23 @@ export const regeneratePost = inngest.createFunction(
       // The owner may have approved or skipped while this was queued.
       if (post?.status !== "ready") return null;
 
+      const { data: shop } = await admin
+        .from("shops")
+        .select("tone, content_language")
+        .eq("id", shopId)
+        .single();
+
       const options = await withStep({ postId, shopId }, "regenerate_caption", "muse-spark", () =>
-        regenerateCaption({ currentCaption: post.chosen_caption, feedback }),
+        regenerateCaption({
+          currentCaption: post.chosen_caption,
+          feedback,
+          shopId,
+          postId,
+          shop: {
+            tone: shop?.tone,
+            contentLanguage: (shop?.content_language as "en" | "id") ?? "en",
+          },
+        }),
       );
       await admin.from("post_revisions").update({ output: options as unknown as Json }).eq("id", revisionId);
       const { error } = await admin

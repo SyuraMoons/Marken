@@ -15,9 +15,9 @@ const MAX_REWRITES = 5;
 const field = "glass rounded-card p-3.5 text-base leading-[1.4] text-ink placeholder:text-muted focus:outline-2 focus:outline-blue";
 
 // Edit the caption (228:10507, F-11, FR-ED-01/02). The edited caption goes to "Publish this post?" and is sent with Approve.
-export function CaptionEditor({ postId, slides, captions, product }: { postId: string; slides: Slide[]; captions: string[]; product?: string }) {
+export function CaptionEditor({ postId, slides, captions, initial = 0, product }: { postId: string; slides: Slide[]; captions: string[]; initial?: number; product?: string }) {
   const router = useRouter();
-  const [text, setText] = useState(captions[0] ?? "");
+  const [text, setText] = useState(captions[initial] ?? captions[0] ?? "");
   const [feedback, setFeedback] = useState("");
   const [used, setUsed] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
@@ -129,9 +129,15 @@ export function CaptionEditor({ postId, slides, captions, product }: { postId: s
       <Button onClick={rewrite} disabled={limited || pending || !feedback.trim()} aria-busy={pending}>
         {t("edit.rewrite")}
       </Button>
-      <ButtonLink href={`/today?view=share&caption=${encodeURIComponent(text.trim())}`} variant="secondary" aria-disabled={!text.trim()}>
-        {t("edit.save")}
-      </ButtonLink>
+      {text.trim() ? (
+        <ButtonLink href={`/today?view=share&caption=${encodeURIComponent(text.trim())}`} variant="secondary">
+          {t("edit.save")}
+        </ButtonLink>
+      ) : (
+        <Button variant="secondary" disabled>
+          {t("edit.save")}
+        </Button>
+      )}
       <div className="mx-auto w-full max-w-90">{preview}</div>
       <Button variant="secondary" onClick={() => setScene(true)}>
         {t("edit.background")}

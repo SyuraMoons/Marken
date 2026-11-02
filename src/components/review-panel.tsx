@@ -35,7 +35,7 @@ export function ReviewPanel({ postId, captions, hashtags, children }: { postId: 
         <InfoCard vector="voice" title={t("captionAlt.settingsTitle")}>
           {t("captionAlt.settingsBody")}
         </InfoCard>
-        <ButtonLink href={`/posts/${postId}/edit`} variant="text">
+        <ButtonLink href={`/posts/${postId}/edit?c=${index}`} variant="text">
           {t("captionAlt.editManually")}
         </ButtonLink>
       </section>
@@ -98,7 +98,7 @@ export function ReviewPanel({ postId, captions, hashtags, children }: { postId: 
 
       <ButtonLink href={`/today?view=share&c=${index}`}>{t("today.approve")}</ButtonLink>
       <div className="grid grid-cols-2 gap-2.5 lg:gap-3">
-        <ButtonLink href={`/posts/${postId}/edit`} variant="secondary">
+        <ButtonLink href={`/posts/${postId}/edit?c=${index}`} variant="secondary">
           {t("today.edit")}
         </ButtonLink>
         <Button variant="secondary" className="lg:border-transparent! lg:bg-transparent! lg:text-sm lg:font-normal! lg:text-link!" onClick={() => setSkipping(true)}>

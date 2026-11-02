@@ -16,7 +16,7 @@ import { PageHeader } from "./page-header";
 import { StatusScreen } from "./status-screen";
 import { UploadError } from "./upload-error";
 
-type View = { kind: "list" } | { kind: "add" } | { kind: "check"; id: string } | { kind: "edit"; id: string } | { kind: "delete"; id: string };
+type View = { kind: "list" } | { kind: "add"; replace?: string } | { kind: "check"; id: string } | { kind: "edit"; id: string } | { kind: "delete"; id: string };
 
 const money = (p: ProductView) => `${p.currency ?? ""} ${Number(p.price).toLocaleString()}`.trim();
 
@@ -76,8 +76,8 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
         <Button onClick={() => run(() => setCutoutConfirmed(current.id, true))} disabled={pending} aria-busy={pending}>
           {t("products.confirm")}
         </Button>
-        {/* Replacing removes this product; the new photo makes a new one (one product per upload). */}
-        <Button variant="secondary" onClick={() => run(() => deleteProduct(current.id), { kind: "add" })} disabled={pending}>
+        {/* The old product is removed only after the new photo uploads, so cancelling or a failed upload loses nothing. */}
+        <Button variant="secondary" onClick={() => setView({ kind: "add", replace: current.id })} disabled={pending}>
           {t("products.replace")}
         </Button>
         <Button variant="text" onClick={() => setView({ kind: "edit", id: current.id })}>
@@ -107,7 +107,7 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
   }
 
   if (view.kind === "add") {
-    return <AddProduct shopId={shopId} onCancel={() => setView({ kind: "list" })} onDone={(id) => { router.refresh(); setView(id ? { kind: "check", id } : { kind: "list" }); }} />;
+    return <AddProduct shopId={shopId} replace={view.replace} onCancel={() => setView({ kind: "list" })} onDone={(id) => { router.refresh(); setView(id ? { kind: "check", id } : { kind: "list" }); }} />;
   }
 
   if (view.kind === "edit" && current) {
@@ -181,7 +181,7 @@ const TIPS = [
 ] as const;
 
 // Add one product (228:13807): up to 3 photos per Figma; only photo 1 is uploaded until the backend groups photos (FD-33).
-function AddProduct({ shopId, onDone, onCancel }: { shopId: string; onDone: (id: string | null) => void; onCancel: () => void }) {
+function AddProduct({ shopId, replace, onDone, onCancel }: { shopId: string; replace?: string; onDone: (id: string | null) => void; onCancel: () => void }) {
   const pick = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
   const [error, setError] = useState<"type" | "failed" | null>(null);
@@ -206,7 +206,10 @@ function AddProduct({ shopId, onDone, onCancel }: { shopId: string; onDone: (id:
       setError(null);
       const res = await uploadAndExtract(shopId, [files[0]]).catch(() => null);
       if (!res || res.failures.length) return setError("failed");
-      onDone(res.products[0]?.id ?? null);
+      const id = res.products[0]?.id ?? null;
+      // Best effort: if the old one cannot be removed it stays in the list, and retrying here would only upload a duplicate.
+      if (id && replace) await deleteProduct(replace).catch(() => null);
+      onDone(id);
     });
 
   if (pending) {

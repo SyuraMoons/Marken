@@ -107,7 +107,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
   }
 
   // Download instead (228:10910): from the publish screen or a failed publish.
-  if (q.view === "download") {
+  if (q.view === "download" && allSlidesPassed(slides)) {
     return <DownloadFlow slides={slides} downloads={downloads} captionText={captionText} connected={connected} />;
   }
 

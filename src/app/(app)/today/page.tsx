@@ -3,7 +3,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ActionButton } from "@/components/action-button";
-import { ActivityPanel } from "@/components/activity-panel";
+import { ActivityPanel, stepLabel } from "@/components/activity-panel";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { ButtonLink } from "@/components/button";
 import { Carousel } from "@/components/carousel";
@@ -14,6 +14,8 @@ import { ReviewPanel } from "@/components/review-panel";
 import { StatusScreen } from "@/components/status-screen";
 import { t } from "@/lib/i18n";
 import { getTodayData } from "@/lib/data/today";
+
+type TodayData = NonNullable<Awaited<ReturnType<typeof getTodayData>>>;
 import { allSlidesPassed } from "@/lib/posts/slides";
 
 // Today (F-10, FR-TD-01..04, FR-FD-03, F-24). One screen per post status; ?view= opens the post's sub-pages (Figma page 01).
@@ -44,7 +46,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
     );
   }
 
-  const { slides, downloads, trend, photo } = data;
+  const { slides, downloads, trend, photo, productName } = data;
   const captions = asCaptions(post.caption_options);
   const pick = Number(q.c);
   // An edited caption from Edit arrives as ?caption= (owners cannot write posts directly, FD-08).
@@ -112,7 +114,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
   // A ready post with a failed product check never offers Approve (FR-FD-01).
   const unchecked = post.status === "ready" ? slides.find((s) => !s.fidelity_passed) : undefined;
   if (unchecked || (post.status === "ready" && slides.length === 0)) {
-    return <FidelityFailed shopId={shop.id} slide={unchecked?.order ?? 1} />;
+    return <FidelityFailed shopId={shop.id} slide={unchecked?.order ?? 1} steps={steps} calls={calls} />;
   }
 
   // Publish this post? (228:10628, SRD v2.1 A-04): Approve opens it so the owner sees where it goes.
@@ -146,20 +148,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
 
   switch (post.status) {
     case "generating":
-      return (
-        <StatusScreen title={t("status.generating.title")} body={t("status.generating.body")}>
-          <AutoRefresh />
-          <InfoCard vector="build" title={t("status.generating.cardTitle")}>
-            {t("status.savedBody")}
-          </InfoCard>
-          <ButtonLink href="/today?view=details" variant="secondary">
-            {t("status.liveSteps")}
-          </ButtonLink>
-          <InfoCard vector="check" title={t("status.approvalTitle")}>
-            {t("status.approvalBody")}
-          </InfoCard>
-        </StatusScreen>
-      );
+      return <Studio cutout={data.cutout} productName={productName} steps={steps} calls={calls} />;
 
     case "approved":
     case "publishing":
@@ -171,9 +160,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
           <InfoCard vector="social" title={t("status.publishing.cardTitle")}>
             {t("status.savedBody")}
           </InfoCard>
-          <ButtonLink href="/today?view=details" variant="secondary">
-            {t("status.liveSteps")}
-          </ButtonLink>
+          <ActivityPanel steps={steps} calls={calls} open />
         </StatusScreen>
       );
 
@@ -194,14 +181,12 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
     case "failed": {
       const bad = slides.find((s) => !s.fidelity_passed);
       // A failed product check never offers Approve (FR-FD-01); a failed publish retries via Approve.
-      if (bad) return <FidelityFailed shopId={shop.id} slide={bad.order} />;
+      if (bad) return <FidelityFailed shopId={shop.id} slide={bad.order} steps={steps} calls={calls} />;
       if (!post.approved_at) {
         return (
           <StatusScreen title={t("status.genFailed.title")} body={t("status.genFailed.body")}>
             <ActionButton url={`/api/shops/${shop.id}/posts/generate`}>{t("status.fidelity.action")}</ActionButton>
-            <ButtonLink href="/today?view=details" variant="secondary">
-              {t("status.failed.viewStep")}
-            </ButtonLink>
+            <ActivityPanel steps={steps} calls={calls} open />
           </StatusScreen>
         );
       }
@@ -213,12 +198,10 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
           <ActionButton url={`/api/posts/${post.id}/approve`} body={{ caption }}>
             {t("status.failed.action")}
           </ActionButton>
-          <ButtonLink href="/today?view=details" variant="secondary">
-            {t("status.failed.viewStep")}
-          </ButtonLink>
           <ButtonLink href="/today?view=download" variant="secondary">
             {t("status.failed.download")}
           </ButtonLink>
+          <ActivityPanel steps={steps} calls={calls} />
         </StatusScreen>
       );
     }
@@ -229,9 +212,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
           <InfoCard vector="clock" title={t("status.skipped.cardTitle")}>
             {t("status.skipped.cardBody")}
           </InfoCard>
-          <ButtonLink href="/today?view=details" variant="secondary">
-            {t("status.skipped.viewActivity")}
-          </ButtonLink>
+          <ActivityPanel steps={steps} calls={calls} />
         </StatusScreen>
       );
   }
@@ -257,6 +238,8 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
               {t("today.compare")}
             </ButtonLink>
           )}
+          {/* How this post was made sits under the result, not in a separate tab. */}
+          <ActivityPanel steps={steps} calls={calls} />
         </section>
 
         <ReviewPanel postId={post.id} captions={captions} hashtags={post.hashtags}>
@@ -277,18 +260,72 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
   );
 }
 
+type Steps = TodayData["steps"];
+type Calls = TodayData["calls"];
+
 // Product check failed (228:11908): Approve is never offered (FR-FD-01).
-function FidelityFailed({ shopId, slide }: { shopId: string; slide: number }) {
+function FidelityFailed({ shopId, slide, steps, calls }: { shopId: string; slide: number; steps: Steps; calls: Calls }) {
   return (
     <StatusScreen title={t("status.fidelity.title")} body={t("status.fidelity.body")}>
       <InfoCard vector="check" title={t("status.fidelity.cardTitle", { n: slide })}>
         {t("status.fidelity.cardBody")}
       </InfoCard>
       <ActionButton url={`/api/shops/${shopId}/posts/generate`}>{t("status.fidelity.action")}</ActionButton>
-      <ButtonLink href="/today?view=details" variant="secondary">
-        {t("status.failed.viewStep")}
-      </ButtonLink>
+      <ActivityPanel steps={steps} calls={calls} open />
     </StatusScreen>
+  );
+}
+
+const SLIDE_LABELS = ["today.slide1", "today.slide2", "today.slide3"] as const;
+
+// Studio (generate image post): the confirmed cutout, the three slides being built around it,
+// and the live agent steps on one screen, so the owner watches the post take shape (F-24, NFR-17).
+function Studio({ cutout, productName, steps, calls }: { cutout: string | null; productName: string | null; steps: Steps; calls: Calls }) {
+  const done = steps.filter((s) => s.status === "succeeded" || s.status === "skipped").length;
+  const running = steps.find((s) => s.status === "running");
+  return (
+    <div className="flex flex-col gap-6 lg:gap-7">
+      <AutoRefresh />
+      <PageHeader eyebrow={t("studio.eyebrow")} title={t("status.generating.title")} body={t("studio.body")} />
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,616fr)_minmax(0,496fr)]">
+        <section aria-label={t("studio.canvas")} className="flex flex-col gap-4 lg:glass lg:rounded-2xl lg:p-6">
+          <figure className="glass flex items-center gap-4 rounded-card p-4">
+            <div className="relative aspect-[4/5] w-24 shrink-0 overflow-hidden rounded-control bg-[radial-gradient(circle_at_30%_40%,#e5f0ff,#f9f9ff)]">
+              {cutout && <Image src={cutout} alt={productName ?? ""} fill sizes="96px" className="object-contain" />}
+            </div>
+            <figcaption className="flex min-w-0 flex-col gap-1 leading-[1.4]">
+              <span className="text-[10px] font-semibold text-muted uppercase">{t("studio.productEyebrow")}</span>
+              <span className="text-lg font-semibold">{productName ?? t("studio.productPicked")}</span>
+              <span className="text-sm text-muted">{t("studio.productBody")}</span>
+            </figcaption>
+          </figure>
+          <ol className="grid grid-cols-3 gap-3" aria-busy="true">
+            {SLIDE_LABELS.map((key, i) => (
+              <li key={key} className="flex flex-col gap-2">
+                <div className="relative aspect-[4/5] overflow-hidden rounded-card bg-white">
+                  <div className="absolute inset-0 animate-pulse bg-[linear-gradient(135deg,#e5f0ff,#f9f9ff_60%,#e5f0ff)]" style={{ animationDelay: `${i * 200}ms` }} />
+                </div>
+                <span className="text-xs font-semibold">{t(key)}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <div role="status" aria-live="polite" className="glass flex flex-col gap-1.5 rounded-card p-5 leading-[1.4]">
+            <span className="text-[10px] font-semibold text-muted uppercase">{t("studio.now")}</span>
+            <span className="text-lg font-semibold">
+              {running ? stepLabel(running.step) : steps.length ? t("studio.nextStep") : t("studio.starting")}
+            </span>
+            <span className="text-sm text-muted">{t("studio.progress", { n: done })}</span>
+          </div>
+          <ActivityPanel steps={steps} calls={calls} open />
+          <InfoCard vector="check" title={t("status.approvalTitle")}>
+            {t("status.approvalBody")}
+          </InfoCard>
+        </section>
+      </div>
+    </div>
   );
 }
 

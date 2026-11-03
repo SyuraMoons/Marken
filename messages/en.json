@@ -26,6 +26,7 @@
   "products.title": "Your products",
   "products.body": "Add products and manage their photos and details.",
   "products.add": "Add product",
+  "status.generating.forProduct": "Making a post for {name}.",
   "products.edit": "Edit product",
   "products.delete": "Delete product",
   "products.name": "Product name",
@@ -750,5 +751,15 @@
   "se.bgNote": "Only the background changes. Your product and text are placed on top again.",
   "se.limit": "You have used all AI edits for this post today.",
   "se.done": "Back to caption",
-  "edit.slides": "Edit slides"
+  "edit.slides": "Edit slides",
+  "studio.eyebrow": "Studio",
+  "studio.body": "Watch Marken build each slide around your real product. You can leave this page; the post keeps going.",
+  "studio.canvas": "Post being created",
+  "studio.productEyebrow": "Your real product",
+  "studio.productPicked": "Picking a product",
+  "studio.productBody": "This exact cutout goes into every slide. It is never redrawn.",
+  "studio.now": "Now",
+  "studio.starting": "Starting the agent",
+  "studio.nextStep": "Moving to the next step",
+  "studio.progress": "{n} steps done"
 }

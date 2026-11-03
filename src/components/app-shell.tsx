@@ -12,12 +12,9 @@ const NAV: NavItem[] = [
   { href: "/results", label: t("nav.results"), icon: "results" },
   { href: "/settings", label: t("nav.settings"), icon: "settings" },
 ];
-// Desktop sidebar also opens today's agent activity (2 Nov design, supersedes DX-11).
-const SIDE: NavItem[] = [...NAV, { href: "/today?view=activity", label: t("nav.activity"), icon: "activity" }];
-
+// Agent activity is shown inline on Today and in the studio, so it no longer has its own tab (FD-45).
 function Nav({ variant }: { variant: "bar" | "side" }) {
-  const items = SIDE.map((item) => item.icon === "activity" && variant === "bar" ? { ...item, label: t("nav.activityShort") } : item);
-  const props = { items, variant, label: t("nav.label") };
+  const props = { items: NAV, variant, label: t("nav.label") };
   return (
     <Suspense fallback={<NavLinks {...props} active="" />}>
       <AppNav {...props} />

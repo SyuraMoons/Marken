@@ -153,3 +153,6 @@ Step 2 accepts 1–10 photos and the route answers `need_a_photo` only when noth
 
 **FD-44 · Make a post with this product (SRD v2.1 A-11).**
 After confirming a cutout, /products offers "Make post" (also on each confirmed product card). It calls the generate route with `productId` and opens /today, which shows the generating screen with the product name and live steps. A product post replaces today's post only while it is `ready`; approved posts answer `today_post_locked`. One live post per day is unchanged.
+
+**FD-45 · Generate image post opens one studio; agent activity is inline (supersedes the Activity link in FD-37 and FD-44).**
+Each confirmed product card on /products has a one-tap "Generate image post" button. It calls the generate route with `productId` and opens /today. While the post is `generating`, Today shows the studio: the confirmed cutout ("never redrawn"), three slide placeholders (hook, product, call to action), the step that is running now, and the live Agent Activity Panel, all on one screen. The panel also sits inline on the ready, publishing, failed and skipped screens, so the separate Activity nav item is removed. `?view=activity` and `?view=details` still resolve for old links and tours.

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 export type NavItem = { href: string; label: string; icon: string };
@@ -14,12 +14,7 @@ function section(pathname: string) {
 type Props = { items: NavItem[]; variant: "bar" | "side"; label: string };
 
 export function AppNav(props: Props) {
-  const pathname = usePathname();
-  const view = useSearchParams().get("view");
-  const active = pathname === "/today" && (view === "activity" || view === "details")
-    ? "/today?view=activity"
-    : section(pathname);
-  return <NavLinks {...props} active={active} />;
+  return <NavLinks {...props} active={section(usePathname())} />;
 }
 
 // "Workspace / today" breadcrumb on desktop.

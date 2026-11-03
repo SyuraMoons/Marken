@@ -55,6 +55,9 @@ export async function updateSession(request: NextRequest) {
     return redirectTo(`/auth/callback${search}`);
   }
 
+  // The practice route holds only fixed fixtures and never reads owner data; keep the refreshed session, skip every redirect.
+  if (pathname === "/sandbox") return response;
+
   const isPublic = pathname === "/" || pathname === "/login" || pathname === "/example";
   const isAuthRoute = pathname.startsWith("/auth/");
 

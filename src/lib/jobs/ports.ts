@@ -1,5 +1,4 @@
 import "server-only";
-import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   researchAndScoreTrends as agentResearchAndScore,
@@ -15,7 +14,7 @@ import { regenerateCaptionFromFeedback as agentRegenerateCaption } from "@/lib/a
 // - `agents/planner.ts` (planDailyCarousel)
 // - `studio/index.ts` (renderAndVerifySlide)
 // - `agents/caption.ts` (regenerateCaption)
-// All calls include resilient deterministic fallbacks so jobs never fail silently or hang.
+// Image failures propagate to the job status; unverified substitutes are never returned.
 
 export type TrendCandidate = {
   source: string;
@@ -229,62 +228,43 @@ export async function renderAndVerifySlide(input: RenderSlideInput): Promise<Ren
 
   // If cutout buffer not directly passed, attempt download from Supabase Storage
   if (!cutoutBuffer && input.cutoutPath) {
+    // A Storage failure is infrastructure, not a bad product photo: surface the real cause.
+    let cause: string;
     try {
       const admin = createAdminClient();
       const { data, error } = await admin.storage.from("media").download(input.cutoutPath);
-      if (!error && data) {
-        cutoutBuffer = Buffer.from(await data.arrayBuffer());
-      }
+      if (error || !data) throw new Error(error?.message ?? "empty response");
+      cutoutBuffer = Buffer.from(await data.arrayBuffer());
+      cause = "";
     } catch (e) {
-      console.warn(`[ports.renderAndVerifySlide] Could not download cutout from ${input.cutoutPath}:`, e);
+      cause = e instanceof Error ? e.message : String(e);
+    }
+    if (cause) {
+      console.warn(`[ports.renderAndVerifySlide] Could not download cutout from ${input.cutoutPath}: ${cause}`);
+      throw new Error(`Could not load the product cutout from storage (${cause}). Try again shortly.`);
     }
   }
 
-  // If cutoutBuffer is still missing, synthesize a transparent PNG buffer so sharp pipeline stays deterministic
-  if (!cutoutBuffer || cutoutBuffer.length === 0) {
-    cutoutBuffer = await sharp({
-      create: {
-        width: 400,
-        height: 500,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 0 },
-      },
-    })
-      .png()
-      .toBuffer();
-  }
+  // Missing product pixels must fail the job, never become a verified blank slide.
+  if (!cutoutBuffer?.length) throw new Error("Product cutout is unavailable. Confirm or upload the product photo again.");
 
-  try {
-    const res = await studioRenderAndVerifySlide({
-      sceneBrief: input.sceneBrief,
-      slideText: input.text,
-      slideRole: input.role,
-      cutout: cutoutBuffer,
-      shopTone: input.shopTone,
-      styleRules: input.styleRules,
-      contentLanguage: input.contentLanguage,
-      shopId: input.shopId,
-      postId: input.postId,
-    });
-
-    return {
-      scenePng: res.sceneBuffer,
-      slidePng: res.slideBuffer,
-      fidelityScore: res.fidelityScore,
-      fidelityPassed: res.fidelityPassed,
-    };
-  } catch (error) {
-    console.error("[ports.renderAndVerifySlide] Real studio call failed, falling back to sharp:", error);
-  }
-
-  // Deterministic sharp fallback
-  const fallbackPng = await sharp({
-    create: { width: 1080, height: 1350, channels: 3, background: { r: 245, g: 240, b: 232 } },
-  })
-    .png()
-    .toBuffer();
-
-  return { scenePng: fallbackPng, slidePng: fallbackPng, fidelityScore: 1, fidelityPassed: true };
+  const res = await studioRenderAndVerifySlide({
+    sceneBrief: input.sceneBrief,
+    slideText: input.text,
+    slideRole: input.role,
+    cutout: cutoutBuffer,
+    shopTone: input.shopTone,
+    styleRules: input.styleRules,
+    contentLanguage: input.contentLanguage,
+    shopId: input.shopId,
+    postId: input.postId,
+  });
+  return {
+    scenePng: res.sceneBuffer,
+    slidePng: res.slideBuffer,
+    fidelityScore: res.fidelityScore,
+    fidelityPassed: res.fidelityPassed,
+  };
 }
 
 export async function regenerateCaption(input: {

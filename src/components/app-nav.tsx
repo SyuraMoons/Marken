@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 export type NavItem = { href: string; label: string; icon: string };
 
@@ -13,7 +14,12 @@ function section(pathname: string) {
 type Props = { items: NavItem[]; variant: "bar" | "side"; label: string };
 
 export function AppNav(props: Props) {
-  return <NavLinks {...props} active={section(usePathname())} />;
+  const pathname = usePathname();
+  const view = useSearchParams().get("view");
+  const active = pathname === "/today" && (view === "activity" || view === "details")
+    ? "/today?view=activity"
+    : section(pathname);
+  return <NavLinks {...props} active={active} />;
 }
 
 // "Workspace / today" breadcrumb on desktop.
@@ -27,11 +33,22 @@ export function Crumb({ root }: { root: string }) {
   );
 }
 
-// Hook-free render, used as the Suspense fallback on dynamic routes (cacheComponents).
+// URL-independent fallback also keeps the selected mobile link in view.
 export function NavLinks({ items, variant, label, active }: Props & { active: string }) {
+  const bar = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (variant !== "bar") return;
+    const nav = bar.current;
+    const link = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !link) return;
+    const bounds = nav.getBoundingClientRect();
+    const item = link.getBoundingClientRect();
+    if (item.left < bounds.left) nav.scrollLeft -= bounds.left - item.left + 12;
+    else if (item.right > bounds.right) nav.scrollLeft += item.right - bounds.right + 12;
+  }, [active, variant]);
   if (variant === "side") {
     return (
-      <nav aria-label={label} className="flex flex-col gap-2">
+      <nav data-tour="navigation" aria-label={label} className="flex flex-col gap-2">
         {items.map(({ href, label, icon }) => {
           const on = href === active;
           return (
@@ -52,18 +69,16 @@ export function NavLinks({ items, variant, label, active }: Props & { active: st
   }
 
   return (
-    <nav aria-label={label} className="nav-glass grid h-18 grid-cols-4 gap-0.5 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-      {items.map(({ href, label, icon }) => {
+    <nav data-tour="navigation" ref={bar} aria-label={label} className="nav-glass flex h-16 max-w-full items-center gap-1 overflow-x-auto px-3 py-2">
+      {items.map(({ href, label }) => {
         const on = href === active;
         return (
           <Link
             key={href}
             href={href}
             aria-current={on ? "page" : undefined}
-            className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-2 text-[11px] leading-[14px] font-medium text-white focus-visible:outline-2 focus-visible:outline-white ${on ? "border-white/18 bg-white/20" : "border-transparent"}`}
+            className={`relative isolate flex min-h-11 min-w-22 shrink-0 items-center justify-center rounded-control border px-2 text-[13px] leading-[14px] font-bold whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-navy ${on ? "nav-active-glass text-ink" : "border-transparent text-link hover:bg-powder/40"}`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element -- static design icon */}
-            <img src={`/figma/tab-${icon}.svg`} width={24} height={24} alt="" />
             {label}
           </Link>
         );

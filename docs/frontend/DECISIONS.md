@@ -121,3 +121,27 @@ Page 04 (`228:15583`) has a "Ready-post email" toggle, but no opt-out column exi
 
 **FD-36 · Page 05 keeps backend rules where Figma differs.**
 Setup step 1 keeps the Category field (the onboarding route requires it and trend research uses it) next to Figma's fields; the company description is shown disabled until `shops.description` exists (A-06). Step 2 still needs 3–10 photos (route `need_3_photos`), so "Add one product" sends every chosen photo. Step 3 reviews one photo at a time; "Replace this photo" uploads the new photo as a product and deletes the old one. Prototype-only buttons ("Preview signed-in state", "View upload error", "View result · prototype") are not built (FD-32). Every landing action leads to sign-in except "See a generated post", which opens the public `/example` before/after page (landing-compare); its Figma "Back to Today" becomes "Create your first post" + "Back to home" because the visitor is signed out. The Meta "You're signed in" screen is not built: the callback sends the owner straight into the app. Meta sign-in sets a short-lived cookie so a failed callback shows the Meta retry screen; the magic-link address is kept in a 10-minute httpOnly cookie for "Resend link" instead of the URL.
+
+
+**FD-37 · Latest mobile web navigation supersedes FD-11/FD-22 bottom-bar placement.**
+Five horizontal page links sit below the mobile header. The selected link uses blue textured glass on a white glass strip; labels remain opaque, bold, 13 px, and targets are at least 44 px. Activity continues to use `/today?view=activity`; both activity and details select Activity. Desktop keeps its 224 px navy sidebar.
+
+**FD-38 · Landing walkthroughs are interactive sample sequences.**
+Five feature sections use `FeatureDemo`: autoplay only while visible, pause on focus, manual steps, and reduced-motion support. They do not send requests or claim a completed upload, generation, or publication. Facebook and metrics limitations remain explicit. Real end-to-end recordings require a configured test account; sample walkthroughs are not evidence of live integration.
+
+**FD-39 · Captions accept both database representations; render failures fail visibly.**
+Generated jobs currently store `{label,text}[]`; older rows contain `string[]`. Both Today and Edit normalize these at the display boundary. Missing cutouts and Studio exceptions now reach the existing job failure handling, instead of returning a blank image with `fidelityPassed=true`.
+
+
+**FD-40 · Continuous, compositor-friendly landing motion.**
+Feature panels use a 12-second camera drift, layered product movement and 1.8-second eased lateral transitions. Copy remains mounted in a stable-height grid and crossfades. Hover no longer pauses playback; explicit pause, keyboard focus, offscreen suspension and reduced-motion controls remain. Animation uses transforms/opacity rather than per-frame React updates. Local Chrome frame scheduling had no >50 ms stalls in an eight-second sample; this is not a guarantee on all devices. Preview exports now use 30 fps rather than the earlier 4 fps capture.
+
+
+**FD-41 · Redesign only the animated feature canvases.**
+The surrounding landing sections, headings, copy, CTA buttons and composition are unchanged. `DemoScene` replaces the old static-card layouts inside `FeatureDemo` with five independent storyboards: photos assemble into a workspace; product scenes fan into a carousel; a caption editing overlay opens; a post branches toward sharing destinations; and a focus frame inspects Results. Native CSS transform/opacity transitions retain the existing playback controls and reduced-motion handling. Lint/build/typecheck passed; all five scenes visually checked, with no page overflow at 360/390/768/1280/1440. These remain sample walkthroughs, not live backend recordings.
+
+
+**FD-42 · Guided tours and a fixed-input practice sandbox.**
+A bottom-right question-mark button opens page-specific tours on the app shell and onboarding. It highlights visible targets, scrolls them into view, supports Back/Next/Skip/Finish and Escape, traps keyboard focus, and restores focus to the help button. Dynamic spotlight geometry uses measured inline positions; visual tokens remain in CSS. Missing controls are omitted instead of pointing at nonexistent UI.
+
+`/sandbox` is a public, isolated client-only practice route, exempted from the session proxy only at that exact path. It uses one fixed sample product/brief and two preset captions; it has no API calls, uploads, authentication actions or writes. Users can practise slide review, destination selection, approval, a simulated failure/retry and reset. Completion explicitly says nothing was published. Facebook selection here is a simulation, not evidence of a Facebook integration. Practice state resets on reload. Neither tours nor practice auto-start real generation or publishing.

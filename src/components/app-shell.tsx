@@ -1,3 +1,4 @@
+import { AppHelp } from "./app-help";
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { t } from "@/lib/i18n";
@@ -14,7 +15,8 @@ const NAV: NavItem[] = [
 const SIDE: NavItem[] = [...NAV, { href: "/today?view=activity", label: t("nav.activity"), icon: "activity" }];
 
 function Nav({ variant }: { variant: "bar" | "side" }) {
-  const props = { items: variant === "side" ? SIDE : NAV, variant, label: t("nav.label") };
+  const items = SIDE.map((item) => item.icon === "activity" && variant === "bar" ? { ...item, label: t("nav.activityShort") } : item);
+  const props = { items, variant, label: t("nav.label") };
   return (
     <Suspense fallback={<NavLinks {...props} active="" />}>
       <AppNav {...props} />
@@ -38,7 +40,7 @@ function ProductPill({ name }: { name: string }) {
   );
 }
 
-// One shell for every signed-in screen: glass bottom nav < lg, navy 224px sidebar >= lg (FD-22, DX-20).
+// One shell keeps mobile web tabs below the header and the desktop sidebar consistent.
 export function AppShell({ shopName, productName, children }: { shopName: string; productName: string; children: ReactNode }) {
   return (
     <div className="bg-app flex min-h-dvh">
@@ -78,11 +80,12 @@ export function AppShell({ shopName, productName, children }: { shopName: string
             <span aria-hidden="true">{"  ·  "}{initials(shopName)}</span>
           </span>
         </header>
-        <main className="flex-1 px-5 pt-6 pb-8 lg:px-10 lg:pt-10 lg:pb-12">{children}</main>
-        <div className="sticky bottom-0 lg:hidden">
+        <div className="min-w-0 lg:hidden">
           <Nav variant="bar" />
         </div>
+        <main className="flex-1 px-5 pt-6 pb-24 lg:px-10 lg:pt-10 lg:pb-24">{children}</main>
       </div>
+      <AppHelp />
     </div>
   );
 }

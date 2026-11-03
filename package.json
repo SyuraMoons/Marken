@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:integration": "node --test tests/integration.test.mjs"
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",

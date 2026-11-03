@@ -1,3 +1,4 @@
+import { AppHelp } from "./app-help";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { t, type MessageKey } from "@/lib/i18n";
@@ -48,7 +49,7 @@ export function SetupShell({ step, shopId, shopName, children }: { step: number;
           {shopName && <p className="font-medium max-lg:hidden lg:ml-auto">{shopName}</p>}
         </header>
 
-        <main className="flex flex-col gap-5 px-5 pt-6 pb-8 leading-[1.4] lg:gap-7 lg:px-10 lg:pt-10 lg:pb-12">
+        <main className="flex flex-col gap-5 px-5 pt-6 pb-24 leading-[1.4] lg:gap-7 lg:px-10 lg:pt-10 lg:pb-24">
           <p className="text-[13px] font-semibold whitespace-pre-wrap text-blue">{t("setup.stepOf", { n: step, total: SETUP_STEPS, name: name(step) })}</p>
           <ol className="flex gap-1.5" aria-label={t("setup.progress", { n: step, total: SETUP_STEPS })}>
             {Array.from({ length: SETUP_STEPS }, (_, i) => (
@@ -76,6 +77,7 @@ export function SetupShell({ step, shopId, shopName, children }: { step: number;
           {children}
         </main>
       </div>
+      <AppHelp scope="onboarding" />
     </div>
   );
 }

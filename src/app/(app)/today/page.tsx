@@ -1,3 +1,4 @@
+import { asCaptions } from "@/lib/posts/captions";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -10,7 +11,6 @@ import { DownloadFlow } from "@/components/download-flow";
 import { InfoCard } from "@/components/info-card";
 import { PageHeader } from "@/components/page-header";
 import { ReviewPanel } from "@/components/review-panel";
-import { Stage, Stages } from "@/components/stages";
 import { StatusScreen } from "@/components/status-screen";
 import { t } from "@/lib/i18n";
 import { getTodayData } from "@/lib/data/today";
@@ -45,7 +45,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
   }
 
   const { slides, downloads, trend, photo } = data;
-  const captions = (post.caption_options as string[]) ?? [];
+  const captions = asCaptions(post.caption_options);
   const pick = Number(q.c);
   // An edited caption from Edit arrives as ?caption= (owners cannot write posts directly, FD-08).
   const edited = typeof q.caption === "string" && q.caption.trim() ? q.caption.trim().slice(0, 2200) : null;
@@ -57,10 +57,8 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
   if (q.view === "activity") {
     return (
       <StatusScreen title={t("activity.title")} body={t("activity.body")}>
-        <Stages />
-        <a href="/today?view=details" className="rounded-card focus-visible:outline-2 focus-visible:outline-blue">
-          <Stage icon="details" title={t("activity.s6")} body={t("activity.s6Body")} />
-        </a>
+        {(post.status === "generating" || post.status === "publishing" || post.status === "approved") && <AutoRefresh />}
+        <ActivityPanel steps={steps} calls={calls} open />
         <ButtonLink href="/today">{t("status.backToday")}</ButtonLink>
         {allSlidesPassed(slides) && photo?.src && (
           <ButtonLink href="/today?view=compare" variant="secondary">
@@ -244,7 +242,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
       <PageHeader eyebrow={t("today.eyebrow")} title={t("today.title")} body={t("today.subtitle")} />
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,616fr)_minmax(0,496fr)]">
-        <section aria-label={t("today.carousel")} className="flex flex-col gap-2.5 lg:glass lg:gap-4 lg:rounded-2xl lg:p-6">
+        <section data-tour="carousel" aria-label={t("today.carousel")} className="flex flex-col gap-2.5 lg:glass lg:gap-4 lg:rounded-2xl lg:p-6">
           <div className="hidden justify-between text-xs leading-[1.45] text-muted lg:flex">
             <span className="font-semibold uppercase">{t("today.carousel")}</span>
             <span>{t("today.slidesMeta")}</span>

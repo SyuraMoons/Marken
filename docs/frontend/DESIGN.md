@@ -1,5 +1,7 @@
 # MARKEN Frontend — Design
 
+> Latest implementation update: FD-37 replaces all historical bottom-nav references below. Mobile uses five scrollable page links below the header, white glass, and a blue textured active highlight. FD-38 describes landing walkthroughs.
+
 Source: Figma `9FeEf6cIQUwKkn8OsPAI7b`.
 
 | Figma page | Use it? |

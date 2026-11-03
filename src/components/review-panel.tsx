@@ -82,7 +82,7 @@ export function ReviewPanel({ postId, captions, hashtags, children }: { postId: 
   return (
     <div className="flex flex-col gap-2.5 lg:glass lg:gap-4 lg:rounded-2xl lg:p-6">
       <h2 className="hidden text-xl leading-[1.45] font-semibold lg:block">{t("today.ready")}</h2>
-      <section className="flex flex-col gap-3 max-lg:glass max-lg:rounded-card max-lg:p-5 lg:py-6">
+      <section data-tour="caption" className="flex flex-col gap-3 max-lg:glass max-lg:rounded-card max-lg:p-5 lg:py-6">
         {/* eslint-disable-next-line @next/next/no-img-element -- static design illustration */}
         <img src="/figma/vector-voice.svg" width={78} height={50} alt="" />
         <h2 className="text-lg leading-[1.4] font-semibold">{t("today.caption")}</h2>
@@ -96,7 +96,7 @@ export function ReviewPanel({ postId, captions, hashtags, children }: { postId: 
       </section>
       {children}
 
-      <ButtonLink href={`/today?view=share&c=${index}`}>{t("today.approve")}</ButtonLink>
+      <ButtonLink data-tour="approve" href={`/today?view=share&c=${index}`}>{t("today.approve")}</ButtonLink>
       <div className="grid grid-cols-2 gap-2.5 lg:gap-3">
         <ButtonLink href={`/posts/${postId}/edit?c=${index}`} variant="secondary">
           {t("today.edit")}

@@ -2,6 +2,16 @@
 
 Updated 2026-11-02. This document describes the current design handoff, not a working backend.
 
+## Current architecture — one page per tab
+
+This revision supersedes older separate-detail-screen guidance below. Build five application pages: Today, Products, Results, Settings and Agent activity. Mobile navigation has five text links (Activity is the short label); desktop uses the existing sidebar. Preserve one application shell per page.
+
+Detail editing, comparisons, sharing, confirmations, loading and errors are states within the owning tab, not standalone application routes. Figma frames named `Panel / Mobile|Desktop / ...` are supporting overlay/swap specimens; they intentionally omit the application sidebar/header/navigation. Keep their trigger page visible behind the panel. Close restores focus to the trigger and preserves scroll, selected product and draft state. Use accessible dialogs for blocking confirmations, drawers/panels for editing, and inline skeleton/status regions for routine loading. Do not implement every loading specimen as a modal.
+
+Onboarding, landing and authentication remain separate views. Onboarding upload/preparation remains part of its step flow. Historical QA specimens, sample-product screens and archives are reference variants, not extra routes. Slide 2/3 specimens represent carousel state inside Today, not separate pages or modal routes. Activity technical details expand within Agent activity.
+
+Canonical Agent activity nodes: mobile `97:478`, desktop `97:520`. Main page IDs elsewhere in this document remain unchanged; converted detail node IDs also remain valid but now refer to panels. Some copied-page cross-feature links remain Figma URLs: use the canonical prototype to review navigation, and implement app state rather than those URLs.
+
 ## Start here
 
 [Figma file](https://www.figma.com/design/9FeEf6cIQUwKkn8OsPAI7b/Untitled)
@@ -30,7 +40,7 @@ With Figma MCP, inspect the node tree, variables and components, then obtain des
 - Primary specimens: 390 px mobile and 1440 px desktop. Narrow checks exist at 360 and 1280 px. Implement fluid behavior across 360–1440 px; intermediate/tablet behavior is not fully specified in Figma.
 - Desktop app shell: horizontal layout, **224 px sidebar**, remaining width for header and content. Keep the sidebar and main content siblings. Never put the sidebar inside a vertical content stack. Use `minmax(0, 1fr)` or `min-width: 0` for main content.
 - Desktop login/email: separate **400 px authentication panel**, flush to the left/top/bottom, and flexible form area. Do not reuse the 224 px app-sidebar width here.
-- Mobile app: header, content, bottom navigation. In implementation, keep navigation visible and reserve its height plus safe-area inset so content cannot hide behind it. Full-height Figma canvas screens are content references, not literal browser viewport heights.
+- Mobile web app: header and product selector, then a 64 px horizontal text-first navigation row, then page content. Today, Products, Results and Settings use actual route links with aria-current="page". The former bottom dock has been removed. Keep the header/tabs in normal flow initially; if making them sticky, test browser chrome, keyboard and anchor offsets. Full-height Figma screens describe content, not browser viewport height.
 - Cards and sections grow with content. Avoid fixed text-container heights. Allow text wrapping and test long product names, validation messages and localized copy.
 - Keep normal document scrolling. Avoid nested scroll regions except intentional carousels/dialogs. Full content and shadows are intentionally visible on the design canvas.
 - Typical spacing: 24 px mobile content top, 32 px bottom; 20–24 px card padding; 24–28 px major-block gaps. Landing features use 48 px vertical padding on mobile and 64 px on desktop. Follow individual inspected values where intentionally different.
@@ -39,33 +49,34 @@ Extract shared components for AppShell, AuthShell, navigation, product switcher,
 
 ## Brand and assets
 
-- Sidebar and login buttons: approximately **#213D8C** (`rgb(33,61,140)`). Mobile bottom navigation uses a translucent glass variation of this blue. Blue and white dominate; pink is an accent.
-- Mobile bottom-bar glass: blue gradient from `rgba(51,84,171,.88)` to `rgba(33,61,140,.82)`, 20 px background blur, 1 px inside white border at 26% opacity, and a soft shadow. Active tabs use white at 20% opacity with an 18% white border; labels/icons remain white. Preserve existing bar dimensions, rounding and safe-area clearance. Provide keyboard focus and selected-state semantics in code.
+- Sidebar and login buttons: approximately **#213D8C** (`rgb(33,61,140)`). Mobile web navigation uses frosted white glass with blue controls. Blue and white dominate; pink is an accent.
+- Mobile web navigation: frosted white glass rgba(255,255,255,.84), 20 px backdrop blur, 1 px white border at 90% opacity and soft shadow. Navigation labels use Inter Bold (font-weight: 700) in both active and inactive states. Blue inactive icons/labels (#2E52A6); active tab translucent blue with fully opaque dark-navy icons/labels (#112154). Keep square outer corners and the 64 px tab row below the header. Keep touch targets at least 44 px and provide focus and selected-state semantics.
 
 ```css
-.mobile-bottom-nav {
-  background: #213d8c; /* opaque fallback */
-  border: 1px solid rgb(255 255 255 / 26%);
+.mobile-web-nav {
+  background: #ffffff; /* opaque fallback */
+  border: 1px solid rgb(255 255 255 / 90%);
   box-sizing: border-box;
-  box-shadow: 0 6px 20px rgb(13 26 69 / 18%);
+  border-radius: 0;
+  box-shadow: 0 -2px 16px rgb(26 46 92 / 9%);
 }
 @supports ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
-  .mobile-bottom-nav {
-    background: linear-gradient(180deg, rgb(51 84 171 / 88%), rgb(33 61 140 / 82%));
+  .mobile-web-nav {
+    background: rgb(255 255 255 / 84%);
     -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
   }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .mobile-bottom-nav {
-    background: #213d8c;
+  .mobile-web-nav {
+    background: #ffffff;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
 }
 ```
 
-Apply alpha to the background colors, not to the whole navigation element. This keeps icons and labels opaque. Validate text contrast over both light and dark scrolling content. The bar's blur is most visible when content passes underneath it; keep enough bottom content padding to prevent obscuring the last action.
+Apply alpha to the background colors, not to the whole navigation element. This keeps icons and labels opaque. Validate text contrast over both light and dark scrolling content. No bottom-dock spacer is required. Keep normal page-bottom padding and safe-area handling. If tabs become sticky, verify the glass effect and contrast over scrolling content.
 - Marken wordmark uses small blue/pink offset accents. Implement as accessible text/SVG or a static asset, with one accessible name; do not announce decorative copies.
 - Photo corners are restrained, generally 5–8 px on landing panels. Landing carousel panels are tilted; Figma uses a 2D approximation, not a complete 3D implementation specification.
 - Export presets: image assets at 2× PNG, named vectors at SVG, screen references at 1× PNG. Screen PNGs are references only. Export source images and icons, not buttons/text/forms as raster UI.
@@ -104,8 +115,43 @@ These are screen-level loading specimens containing reusable skeleton panels. Pr
 
 ## Final QA before shipping
 
-Test 360, 390, tablet, 1280 and 1440 widths; no horizontal page overflow. Check desktop sidebar/main sibling alignment, mobile safe-area navigation, full-content scrolling, dropdown/dialog placement, long text and empty/error/loading/success states. Test keyboard navigation, focus restoration, contrast and reduced motion. Confirm product switching updates every feature, publishing requires approval, download does not imply publication, and metrics are never invented.
+Test 360, 390, tablet, 1280 and 1440 widths; no horizontal page overflow. Check desktop sidebar/main sibling alignment, mobile header/tab placement and safe areas, full-content scrolling, dropdown/dialog placement, long text and empty/error/loading/success states. Test keyboard navigation, focus restoration, contrast and reduced motion. Confirm product switching updates every feature, publishing requires approval, download does not imply publication, and metrics are never invented.
 
 ## Latest design repair
 
 The audit found 23 desktop screens/copies with an incorrect vertical wrapper around sidebar and content. They were repaired to a horizontal shell, with fixed 224 px sidebars and intended screen widths. Oversized result empty-state cards and sample-product buttons were also corrected. Representative screenshots were reviewed; structural scans are not a guarantee that every pixel or live interaction has been validated.
+
+
+### Landing decorative accents
+Below the hero, use subtle white-to-pink background washes on the how-it-works introduction and review section. Keep other sections visually distinct. Decorative elements are separate and sparse: a pink curved stroke near the product-library section bottom and a single outline star in the sharing section. Do not repeat a star-and-glow cluster on every section. Treat accents as aria-hidden and pointer-events: none, scaled down on mobile and clear of content. Match Accent / Pink curved stroke and Accent / Single outline star in Figma.
+
+
+
+
+
+
+### Active-tab textured glass
+The selected mobile web tab now uses a blue glass gradient, 12 px backdrop blur, a thin white edge, inset pale-blue reflections, and very fine grain. The Figma layer Glass / Edge refraction and grain is an editable visual approximation of refraction, not physical lens distortion. Reproduce with layered CSS gradients and a low-opacity noise texture on a pointer-events:none, aria-hidden pseudo-element below the icon and bold label. Active highlights have 12 px rounded corners and a blue gradient at 35–42% opacity. Keep labels and icons fully opaque dark navy (#112154) for contrast; do not lower the opacity of the whole tab. The outer bar geometry stays unchanged. Use an opaque blue fallback when transparency is reduced. Do not animate the grain. The white-glass bar itself remains unchanged.
+
+
+
+### Mobile navigation revision
+All application screens now use Navigation / Mobile web tabs below the header, with 44 px touch targets inside a 64 px row. Labels are Inter Bold 12 px; redundant icons are hidden for a compact web layout. Keep the current rounded translucent glass active highlight. These are page navigation links, not ARIA tab widgets. Desktop sidebars are unchanged. Test browser Back/Forward, direct URLs, refresh and keyboard focus. Do not implement the historical fixed bottom bar described in earlier versions of this handoff.
+
+
+### Landing footer
+All landing states have Footer / Site information: wordmark, short description, How it works anchor, Sign in, Privacy policy, Terms of use and copyright. Use a semantic footer and navigation with 44 px link targets. Stack links on mobile and arrange horizontally on desktop. How it works scrolls to the feature introduction; Sign in goes to the app login route. Privacy and Terms are design placeholders without destinations: provide approved legal pages and actual routes before release. Do not invent legal text or ship dead links. Use the current year dynamically in the implementation.
+
+
+
+## Interaction repair verification — 2026-11-02
+
+The latest audit checked 1,814 internal links and found no missing destinations, self-navigation actions, panel-opening Figma URL links, oversized panel roots, or unintended horizontal container overflow. Intentional horizontal navigation/carousel viewports are excluded from overflow errors.
+
+- Dialog specimens now cap at 740 px mobile / 760 px desktop. The 48 px Close row remains outside the vertically scrolling body. This is an intentional clipping exception: only scroll viewports mask content; cards and shadows remain visible. In code use a responsive max-height such as min(740px, calc(100dvh - 32px)), with focus trapping, Escape, focus restoration and scroll-lock tested in the browser.
+- Mobile navigation labels are 13 px bold, with 88 px targets in a horizontally scrollable row. Ensure the active route scrolls into view in production and supports keyboard navigation. Activity now has a selected-state highlight.
+- Today slide controls scroll an inline carousel. The old slide2/slide3 helper panels remain source references, not separate app routes.
+- Inline operation component sets provide Ready, Loading, Complete and Error variants for caption preparation, scene regeneration, results refresh and product upload actions. The 2-second loading-to-complete transition is solely a Figma demo. Error is a separate review variant with retry. Production must use actual request/job state; do not copy the timer or display simulated success. Existing content remains in place while the control is pending.
+- Cross-feature panel specimens are copied locally where necessary to preserve an overlay chain. The canonical complete prototype remains authoritative; local copies are supporting handoff assets.
+- Today Skip now opens skip confirmation, not caption editing.
+- Browser focus handling, file-picker behavior, real request cancellation and API errors remain frontend integration work; structural Figma checks do not validate these runtime behaviors.

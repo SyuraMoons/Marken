@@ -27,6 +27,7 @@ export function ActivityPanel({ steps, calls, open }: { steps: Tables<"post_step
         {t("today.activity")}
         <span aria-hidden="true" className="text-sm transition group-open:rotate-180">▾</span>
       </summary>
+      {steps.length === 0 && <p role="status" className="px-5 py-4 text-sm text-muted">{t("activity.empty")}</p>}
       <ol className="flex flex-col divide-y divide-border px-5">
         {steps.map((s) => {
           const mine = calls.filter((c) => c.step === s.step);

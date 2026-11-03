@@ -1,23 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { t, type MessageKey } from "@/lib/i18n";
 import { Sprite } from "./sprite";
 
 const CATS = [0, 1, 2] as const;
 const DELAY = 3200; // FD-25
-
-// Off when the OS or the Settings switch asks for reduced motion.
-const subscribe = (cb: () => void) => {
-  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-  mq.addEventListener("change", cb);
-  window.addEventListener("marken-motion", cb);
-  return () => {
-    mq.removeEventListener("change", cb);
-    window.removeEventListener("marken-motion", cb);
-  };
-};
-const reduced = () => document.documentElement.dataset.motion === "reduce" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function Panel({ cat, big, side }: { cat: number; big?: boolean; side?: "left" | "right" }) {
   const tilt = side === "left" ? "rotate-2 skew-x-[-3.14deg] lg:skew-x-[7.15deg]" : side === "right" ? "-rotate-2 skew-x-[3.14deg] lg:skew-x-[-7.15deg]" : "skew-x-[-1.43deg] lg:skew-x-0";
@@ -49,7 +38,7 @@ export function LandingHero() {
   const [paused, setPaused] = useState(false);
   const [held, setHeld] = useState(false); // hover or focus inside
   const [visible, setVisible] = useState(true);
-  const still = useSyncExternalStore(subscribe, reduced, () => true);
+  const still = useReducedMotion();
   const root = useRef<HTMLDivElement>(null);
   const touchX = useRef<number | null>(null);
   const playing = !still && !paused && !held && visible;

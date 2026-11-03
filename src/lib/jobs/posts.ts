@@ -399,12 +399,21 @@ export const postsDaily = inngest.createFunction(
           .limit(1);
         if (!product?.length) continue;
 
+        // The morning post is one per day: skip when today already has a live post (an earlier
+        // tick, a retried step, or the owner's own Run now). The unique index no longer does this.
+        const { count } = await admin
+          .from("posts")
+          .select("id", { count: "exact", head: true })
+          .eq("shop_id", shop.id)
+          .eq("post_date", local.date)
+          .not("status", "in", "(skipped,failed)");
+        if (count) continue;
+
         const { data: post, error } = await admin
           .from("posts")
           .insert({ shop_id: shop.id, post_date: local.date, status: "generating" })
           .select("id")
           .single();
-        // 23505: today's post already exists (Run now or an earlier tick).
         if (error || !post) continue;
         out.push({ shopId: shop.id, postId: post.id });
       }

@@ -125,7 +125,7 @@ export function CreateFlow({ shopId, product, savedKit, hasDescription }: { shop
       }).catch(() => null);
       if (res?.ok) return router.push("/today");
       const code = res ? ((await res.json().catch(() => null)) as { error?: string } | null)?.error : null;
-      setError(code === "today_post_locked" ? "products.err.locked" : code === "queue_unavailable" ? "products.err.queue" : "common.error");
+      setError(code === "daily_post_limit" ? "products.err.limit" : code === "queue_unavailable" ? "products.err.queue" : "common.error");
     });
 
   const n = STEPS.indexOf(step) + 1;

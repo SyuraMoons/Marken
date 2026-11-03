@@ -1,3 +1,4 @@
+import { AppHelp } from "./app-help";
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { t } from "@/lib/i18n";
@@ -82,8 +83,9 @@ export function AppShell({ shopName, productName, children }: { shopName: string
         <div className="min-w-0 lg:hidden">
           <Nav variant="bar" />
         </div>
-        <main className="flex-1 px-5 pt-6 pb-8 lg:px-10 lg:pt-10 lg:pb-12">{children}</main>
+        <main className="flex-1 px-5 pt-6 pb-24 lg:px-10 lg:pt-10 lg:pb-24">{children}</main>
       </div>
+      <AppHelp />
     </div>
   );
 }

@@ -242,7 +242,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
       <PageHeader eyebrow={t("today.eyebrow")} title={t("today.title")} body={t("today.subtitle")} />
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,616fr)_minmax(0,496fr)]">
-        <section aria-label={t("today.carousel")} className="flex flex-col gap-2.5 lg:glass lg:gap-4 lg:rounded-2xl lg:p-6">
+        <section data-tour="carousel" aria-label={t("today.carousel")} className="flex flex-col gap-2.5 lg:glass lg:gap-4 lg:rounded-2xl lg:p-6">
           <div className="hidden justify-between text-xs leading-[1.45] text-muted lg:flex">
             <span className="font-semibold uppercase">{t("today.carousel")}</span>
             <span>{t("today.slidesMeta")}</span>

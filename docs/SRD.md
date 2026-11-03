@@ -394,3 +394,8 @@ Also: README with model routing and pilot results (`DM-03`); a seeded demo accou
 | Pilot sellers drop out | Recruit 4 to keep 3; the dogfood shop always runs |
 | Judges see "another caption tool" | Lead the video with the seller and the before and after shot |
 | Meta Model API limits from Indonesia | Confirm on 29 Oct; Muse Spark Open fallback for text |
+
+
+## Guided help and practice amendment — 3 Nov 2026
+
+User-requested addition: page-specific guided tours from a bottom-right `?` control, plus a fixed-input practice sandbox. Add public route `/sandbox`; it uses only fixed sample assets and preset choices, with no real uploads, model calls, publishing or owner-data access. Core app/API authentication is unchanged. Tour steps explain visible controls without activating actions. The sandbox must prominently identify simulated outcomes, support reset and an error/retry exercise, and never claim a real publication or real fidelity result. Both features must support keyboard navigation, mobile layouts and reduced motion.

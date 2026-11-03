@@ -368,7 +368,7 @@ function Row({ icon, n, onClick, href }: { icon: string; n: number; onClick?: ()
     </>
   );
   return (
-    <li>
+    <li data-tour={`settings-${n}`}>
       {href ? (
         <Link href={href} className={cls}>
           {inner}

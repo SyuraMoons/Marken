@@ -139,3 +139,9 @@ Feature panels use a 12-second camera drift, layered product movement and 1.8-se
 
 **FD-41 · Redesign only the animated feature canvases.**
 The surrounding landing sections, headings, copy, CTA buttons and composition are unchanged. `DemoScene` replaces the old static-card layouts inside `FeatureDemo` with five independent storyboards: photos assemble into a workspace; product scenes fan into a carousel; a caption editing overlay opens; a post branches toward sharing destinations; and a focus frame inspects Results. Native CSS transform/opacity transitions retain the existing playback controls and reduced-motion handling. Lint/build/typecheck passed; all five scenes visually checked, with no page overflow at 360/390/768/1280/1440. These remain sample walkthroughs, not live backend recordings.
+
+
+**FD-42 · Guided tours and a fixed-input practice sandbox.**
+A bottom-right question-mark button opens page-specific tours on the app shell and onboarding. It highlights visible targets, scrolls them into view, supports Back/Next/Skip/Finish and Escape, traps keyboard focus, and restores focus to the help button. Dynamic spotlight geometry uses measured inline positions; visual tokens remain in CSS. Missing controls are omitted instead of pointing at nonexistent UI.
+
+`/sandbox` is a public, isolated client-only practice route, exempted from the session proxy only at that exact path. It uses one fixed sample product/brief and two preset captions; it has no API calls, uploads, authentication actions or writes. Users can practise slide review, destination selection, approval, a simulated failure/retry and reset. Completion explicitly says nothing was published. Facebook selection here is a simulation, not evidence of a Facebook integration. Practice state resets on reload. Neither tours nor practice auto-start real generation or publishing.

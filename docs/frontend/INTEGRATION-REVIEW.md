@@ -40,3 +40,11 @@ With a test business account, verify: sign in → company setup → photo upload
 - Approved Privacy/Terms content and routes remain needed. No placeholder legal links are shipped.
 
 PM review should include the shared navigation on all signed-in routes and compare the animated examples against the latest Figma branding. Do not merge as a declaration of end-to-end production readiness.
+
+
+## Guided tours and sandbox
+
+Open `?` in the signed-in app or onboarding to start a page tour or enter `/sandbox`. Practice inputs are read-only; caption and destination choices are presets. The sandbox is accessible without credentials and makes no API requests. Its simulated success/error states are separate from live job statuses. Tours never submit highlighted controls. Reloading resets practice progress. Live-account testing of tour coverage on all authenticated subviews is still outstanding.
+
+
+Sandbox verification: the fixed product/brief remained read-only; caption and destination selections survived Back navigation; simulated approval, restart and failed-run retry passed. Browser checks at 360/390/768/1280/1440 found no horizontal overflow. The tutorial trapped Tab focus, supported Escape with focus restoration, and respected reduced motion. No API requests or browser exceptions occurred during the exercise. Exit links disable prefetch so merely viewing practice does not preload authenticated pages.

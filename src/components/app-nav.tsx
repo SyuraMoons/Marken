@@ -48,7 +48,7 @@ export function NavLinks({ items, variant, label, active }: Props & { active: st
   }, [active, variant]);
   if (variant === "side") {
     return (
-      <nav aria-label={label} className="flex flex-col gap-2">
+      <nav data-tour="navigation" aria-label={label} className="flex flex-col gap-2">
         {items.map(({ href, label, icon }) => {
           const on = href === active;
           return (
@@ -69,7 +69,7 @@ export function NavLinks({ items, variant, label, active }: Props & { active: st
   }
 
   return (
-    <nav ref={bar} aria-label={label} className="nav-glass flex h-16 max-w-full items-center gap-1 overflow-x-auto px-3 py-2">
+    <nav data-tour="navigation" ref={bar} aria-label={label} className="nav-glass flex h-16 max-w-full items-center gap-1 overflow-x-auto px-3 py-2">
       {items.map(({ href, label }) => {
         const on = href === active;
         return (

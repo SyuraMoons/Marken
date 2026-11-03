@@ -242,6 +242,59 @@ export async function callMockProvider(
         provider: "mock",
       };
 
+    case "rewrite_slide_text":
+      return {
+        rawOutput: { text: "Fresh every single morning" },
+        tokensIn: 120,
+        tokensOut: 12,
+        images: 0,
+        provider: "mock",
+      };
+
+    case "draft_brief":
+      return {
+        rawOutput: {
+          goal: "everyday",
+          audience: "Local shoppers who want something good and easy to buy.",
+          mood: "Fresh, friendly and clean",
+          highlight: "The product itself, shown clearly so people see exactly what they get.",
+        },
+        tokensIn: 220,
+        tokensOut: 50,
+        images: 0,
+        provider: "mock",
+      };
+
+    case "brand_directions":
+      return {
+        rawOutput: {
+          directions: [
+            { name: "Bold Pop", summary: "Bright and punchy for scroll-stopping launches.", colors: ["#2456db", "#ffd23f", "#ffffff"], heading_font: "bebas", body_font: "poppins-bold", design_guidance: "High contrast, big short headlines, product centred on a clean colour field.", photo_style: "Hard studio light on seamless coloured paper." },
+            { name: "Calm Premium", summary: "Quiet and refined for buyers who value quality.", colors: ["#1f2a37", "#c8b79e", "#f5f1ea"], heading_font: "dm-serif", body_font: "poppins", design_guidance: "Muted palette, lots of empty space, elegant understated headlines.", photo_style: "Soft diffused light on stone or linen with gentle shadows." },
+            { name: "Warm Handmade", summary: "Friendly and personal, like a local favourite.", colors: ["#c8553d", "#f4a261", "#fdf6ec"], heading_font: "poppins-bold", body_font: "poppins", design_guidance: "Warm tones, cosy everyday scenes, conversational headlines.", photo_style: "Natural window light on a wooden table with simple props." },
+          ],
+        },
+        tokensIn: 320,
+        tokensOut: 260,
+        images: 0,
+        provider: "mock",
+      };
+
+    case "suggest_brand_kit":
+      return {
+        rawOutput: {
+          colors: ["#2456db", "#f4a261", "#fdf6ec"],
+          heading_font: "dm-serif",
+          body_font: "poppins",
+          design_guidance: "Warm, handmade feel. Generous space around the product. Short, friendly headlines.",
+          photo_style: "Natural window light, wooden or linen surfaces, soft shadows.",
+        },
+        tokensIn: 260,
+        tokensOut: 90,
+        images: 0,
+        provider: "mock",
+      };
+
     case "weekly_learning":
       return {
         rawOutput: {

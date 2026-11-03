@@ -3,7 +3,7 @@ import { hasKey, t, type MessageKey } from "@/lib/i18n";
 
 type Call = Pick<Tables<"model_calls">, "step" | "latency_ms" | "cost_usd" | "cache_hit" | "fallback">;
 
-const stepName = (s: string) => {
+export const stepLabel = (s: string) => {
   const key = `step.${s}`;
   return hasKey(key) ? t(key) : s;
 };
@@ -37,7 +37,7 @@ export function ActivityPanel({ steps, calls, open }: { steps: Tables<"post_step
             <li key={s.id} className="flex items-start gap-3 py-3">
               <span aria-hidden="true" className={`mt-1.5 size-2.5 shrink-0 rounded-full ${DOT[s.status] ?? "bg-border"}`} />
               <div className="flex min-w-0 flex-1 flex-col">
-                <span className="font-medium">{stepName(s.step)}</span>
+                <span className="font-medium">{stepLabel(s.step)}</span>
                 <span className="text-sm text-muted">
                   {[s.model ?? t("activity.code"), t(`activity.${s.status}` as MessageKey), ms ? `${(ms / 1000).toFixed(1)} s` : null, cost ? usd(cost) : null]
                     .filter(Boolean)

@@ -1,5 +1,8 @@
 "use client";
 
+import { BrandKitEditor } from "./brand-kit-editor";
+import { saveBrandKit } from "@/lib/actions/brand-kit";
+import type { BrandKitValue } from "@/lib/brand-kit";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
@@ -42,11 +45,13 @@ type Props = {
   email: string;
   igConnected: boolean;
   rules: string[];
+  brandKit: BrandKitValue;
+  hasDescription: boolean;
   shop: { id: string; name: string; category: string; country: string; time_zone: string; content_language: Lang; tone: string | null; notify_time: string };
 };
 
 // Settings (Figma page 04, F-15). Saves go through owner-scoped server actions.
-export function SettingsView({ email, igConnected, rules: savedRules, shop }: Props) {
+export function SettingsView({ email, igConnected, rules: savedRules, brandKit, hasDescription, shop }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
@@ -59,6 +64,7 @@ export function SettingsView({ email, igConnected, rules: savedRules, shop }: Pr
   const [zone, setZone] = useState(shop.time_zone);
   const [tone, setTone] = useState<Tone>(asTone(shop.tone));
   const [rules, setRules] = useState<string[]>(savedRules.length ? savedRules : [""]);
+  const [kit, setKit] = useState(brandKit);
   const [time, setTime] = useState(shop.notify_time);
   const [typed, setTyped] = useState("");
   const reduceMotion = useSyncExternalStore(subscribeMotion, readMotion, () => false);
@@ -172,7 +178,8 @@ export function SettingsView({ email, igConnected, rules: savedRules, shop }: Pr
   if (view === "brand") {
     return (
       <StatusScreen title={t("settings.brandTitle")} body={t("settings.brandBody")}>
-        <Field n={1} cue="voice" label={t("settings.tone")}>
+        <BrandKitEditor shopId={shop.id} value={kit} onChange={setKit} hasDescription={hasDescription} />
+        <Field n={5} cue="voice" label={t("settings.tone")}>
           <select value={tone} onChange={(e) => setTone(e.target.value as Tone)} className={glassInput}>
             {TONES.map((x) => (
               <option key={x} value={x}>
@@ -182,7 +189,7 @@ export function SettingsView({ email, igConnected, rules: savedRules, shop }: Pr
           </select>
         </Field>
         {rules.map((r, i) => (
-          <Field key={i} n={i + 2} cue="rules" label={t("settings.rule", { n: i + 1 })}>
+          <Field key={i} n={i + 6} cue="rules" label={t("settings.rule", { n: i + 1 })}>
             <span className="flex gap-2">
               <input value={r} onChange={(e) => setRules(rules.map((x, j) => (j === i ? e.target.value : x)))} maxLength={200} placeholder={t("settings.rulePlaceholder")} className={glassInput} />
               {rules.length > 1 && (
@@ -203,7 +210,7 @@ export function SettingsView({ email, igConnected, rules: savedRules, shop }: Pr
           {t("ob4.sampleText")}
         </InfoCard>
         {error}
-        <Button onClick={() => run(() => saveBrand({ tone, rules: rules.map((r) => r.trim()).filter(Boolean) }))} disabled={pending} aria-busy={pending}>
+        <Button onClick={() => run(async () => ((await saveBrandKit(kit)).ok ? saveBrand({ tone, rules: rules.map((r) => r.trim()).filter(Boolean) }) : { ok: false }))} disabled={pending} aria-busy={pending}>
           {t("settings.saveBrand")}
         </Button>
         {cancel}

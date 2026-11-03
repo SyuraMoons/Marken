@@ -61,7 +61,7 @@ export async function getTodayData() {
         .maybeSingle()
     ).data;
   if (!latest) {
-    return { shop, post: null, slides: [] as Slide[], downloads: [] as string[], trend: null, photo: null, steps: [], calls: [] };
+    return { shop, post: null, slides: [] as Slide[], downloads: [] as string[], trend: null, photo: null, cutout: null, productName: null, steps: [], calls: [] };
   }
 
   const [trend, product, steps, calls] = await Promise.all([
@@ -69,7 +69,7 @@ export async function getTodayData() {
       ? supabase.from("trends").select("title, url").eq("id", latest.trend_id).maybeSingle()
       : Promise.resolve({ data: null }),
     latest.product_id
-      ? supabase.from("products").select("name, source_upload_id").eq("id", latest.product_id).maybeSingle()
+      ? supabase.from("products").select("name, source_upload_id, cutout_path").eq("id", latest.product_id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("post_steps").select("*").eq("post_id", latest.id).order("started_at"),
     supabase
@@ -91,10 +91,11 @@ export async function getTodayData() {
 
   const raw = asSlides(latest.slides);
   const paths = raw.map((s) => s.slide_path);
+  const cutoutPath = product.data?.cutout_path ?? null;
   const [view, files, original] = await Promise.all([
     sign(paths),
     sign(paths, true),
-    originalPath ? sign([originalPath]) : Promise.resolve(new Map<string, string>()),
+    sign([originalPath, cutoutPath].filter((p): p is string => Boolean(p))),
   ]);
   const slides: Slide[] = raw.map((s) => ({ ...s, slide_path: view.get(s.slide_path) ?? "", scene_path: "" }));
   const downloads = raw.map((s) => files.get(s.slide_path) ?? "");
@@ -106,6 +107,9 @@ export async function getTodayData() {
     downloads,
     trend: trend.data,
     photo: product.data && originalPath ? { src: original.get(originalPath) ?? "", name: product.data.name } : null,
+    // The confirmed cutout the studio shows while the scene is built around it.
+    cutout: cutoutPath ? (original.get(cutoutPath) ?? null) : null,
+    productName: product.data?.name ?? null,
     steps: steps.data ?? [],
     calls: calls.data ?? [],
   };

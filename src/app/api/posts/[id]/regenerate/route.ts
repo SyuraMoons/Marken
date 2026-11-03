@@ -37,6 +37,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/posts/[id]/rege
     .from("post_revisions")
     .select("id", { count: "exact", head: true })
     .eq("post_id", post.id)
+    .eq("target", "caption") // slide edits have their own limits (SRD A-09)
     .gte("created_at", shopDayStartIso(shop?.time_zone ?? null));
   const used = count ?? 0;
   if (used >= MAX_PER_DAY) return apiError("regenerate_limit", 429, { limit: MAX_PER_DAY });

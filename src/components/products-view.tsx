@@ -9,14 +9,14 @@ import { t } from "@/lib/i18n";
 import { CATEGORIES } from "@/lib/options";
 import { attributesText, parseAttributes, type Attributes } from "@/lib/product-fields";
 import { ACCEPT, uploadAndExtract, validPhoto } from "@/lib/upload";
-import { Button } from "./button";
+import { Button, ButtonLink } from "./button";
 import { Field, glassInput } from "./field";
 import { InfoCard } from "./info-card";
 import { PageHeader } from "./page-header";
 import { StatusScreen } from "./status-screen";
 import { UploadError } from "./upload-error";
 
-type View = { kind: "list" } | { kind: "add"; replace?: string } | { kind: "check"; id: string } | { kind: "edit"; id: string } | { kind: "delete"; id: string };
+type View = { kind: "list" } | { kind: "add"; replace?: string } | { kind: "check"; id: string } | { kind: "made"; id: string } | { kind: "edit"; id: string } | { kind: "delete"; id: string };
 
 const money = (p: ProductView) => `${p.currency ?? ""} ${Number(p.price).toLocaleString()}`.trim();
 
@@ -51,9 +51,10 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
     if (params.get("add")) setView({ kind: "add" });
     else if (edit && products.some((p) => p.id === edit)) setView({ kind: "edit", id: edit });
   }
+  // Drop the deep-link query without a router navigation: router.replace refetches the page and can remount it, resetting the view to "add".
   useEffect(() => {
-    if (query) router.replace("/products", { scroll: false });
-  }, [query, router]);
+    if (query) window.history.replaceState(null, "", "/products");
+  }, [query]);
   const current = "id" in view ? products.find((p) => p.id === view.id) : undefined;
 
   const run = (job: () => Promise<{ ok: boolean }>, after: View = { kind: "list" }) =>
@@ -61,8 +62,8 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
       setFailed(false);
       const res = await job().catch(() => ({ ok: false }));
       if (!res.ok) return setFailed(true);
-      router.refresh();
       setView(after);
+      router.refresh();
     });
 
   const error = failed && (
@@ -70,6 +71,24 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
       {t("common.error")}
     </p>
   );
+
+  // The new product is created but the refreshed list has not arrived yet: wait here instead of falling back to the list or add screen.
+  if (view.kind === "check" && !current) {
+    return (
+      <StatusScreen title={t("products.uploadingTitle")} body={t("products.uploadingBody")}>
+        <div aria-busy="true" aria-live="polite">
+          <InfoCard vector="photo" title={t("products.uploadingCard")}>
+            {t("products.uploadingCardBody")}
+          </InfoCard>
+        </div>
+        {!pending && (
+          <Button variant="text" onClick={() => setView({ kind: "list" })}>
+            {t("products.cancel")}
+          </Button>
+        )}
+      </StatusScreen>
+    );
+  }
 
   // Does this cutout look right? (228:13956)
   if (view.kind === "check" && current) {
@@ -86,7 +105,7 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
           <input value={current.price != null ? money(current) : t("products.notVisible")} readOnly className={glassInput} />
         </Field>
         {error}
-        <Button onClick={() => run(() => setCutoutConfirmed(current.id, true))} disabled={pending} aria-busy={pending}>
+        <Button onClick={() => run(() => setCutoutConfirmed(current.id, true), { kind: "made", id: current.id })} disabled={pending} aria-busy={pending}>
           {t("products.confirm")}
         </Button>
         {/* The old product is removed only after the new photo uploads, so cancelling or a failed upload loses nothing. */}
@@ -95,6 +114,20 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
         </Button>
         <Button variant="text" onClick={() => setView({ kind: "edit", id: current.id })}>
           {t("products.editDetails")}
+        </Button>
+      </StatusScreen>
+    );
+  }
+
+  // Confirmed: offer a post with this product (SRD A-11).
+  if (view.kind === "made" && current) {
+    return (
+      <StatusScreen title={t("products.madeTitle")} body={t("products.madeBody", { name: current.name })}>
+        <Photo src={current.cutout_url} alt={current.name} eyebrow={t("products.confirmedCutout")} caption={current.name} className="mx-auto w-full max-w-90" />
+        {/* Opens the create flow (brief → brand kit → review); nothing generates until the owner presses Generate (FD-46). */}
+        <ButtonLink href={`/create?product=${current.id}`}>{t("products.makePost")}</ButtonLink>
+        <Button variant="text" onClick={() => setView({ kind: "list" })}>
+          {t("products.notNow")}
         </Button>
       </StatusScreen>
     );
@@ -120,7 +153,7 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
   }
 
   if (view.kind === "add") {
-    return <AddProduct shopId={shopId} replace={view.replace} onCancel={() => setView({ kind: "list" })} onDone={(id) => { router.refresh(); setView(id ? { kind: "check", id } : { kind: "list" }); }} />;
+    return <AddProduct shopId={shopId} replace={view.replace} onCancel={() => setView({ kind: "list" })} onDone={(id) => { setView(id ? { kind: "check", id } : { kind: "list" }); start(() => router.refresh()); }} />;
   }
 
   if (view.kind === "edit" && current) {
@@ -164,6 +197,9 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
                 <br />
                 {p.price != null ? money(p) : t("products.priceNone")}
               </p>
+              {p.cutout_confirmed && (
+                <ButtonLink href={`/create?product=${p.id}`}>{t("products.makePost")}</ButtonLink>
+              )}
               <Button variant="secondary" onClick={() => setView(p.cutout_confirmed ? { kind: "edit", id: p.id } : { kind: "check", id: p.id })}>
                 {t(p.cutout_confirmed ? "products.edit" : "products.check")}
               </Button>

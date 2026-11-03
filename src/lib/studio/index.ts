@@ -32,6 +32,8 @@ import {
   type VerifySlideFidelityInput,
   type VerifySlideFidelityResult,
 } from "./fidelity";
+import { defaultTextBox, defaultTextLayer, type BrandStyle, type SlideLayers } from "./layers";
+import { pickTextColor, renderLayeredSlide } from "./render";
 import {
   buildScenePrompt,
   clampReservedBox,
@@ -100,11 +102,15 @@ export type RenderAndVerifySlideInput = {
   contentLanguage?: "en" | "id";
   /** Maximum rebuild retries when fidelity check fails (default: 1 per FR-FD-01..02) */
   maxRetries?: number;
+  /** Brand kit colours and fonts for the text layers (SRD A-09). */
+  brand?: BrandStyle;
   shopId?: string;
   postId?: string;
 };
 
 export type RenderAndVerifySlideResult = {
+  /** Editable layers behind the slide (SRD A-09): the owner can change text or product placement without a new scene */
+  layers: SlideLayers;
   /** Final 1080x1350 composited slide PNG buffer (`posts.slides[].slide_path`) */
   slideBuffer: Buffer;
   /** `data:image/png;base64,...` of the final slide */
@@ -187,6 +193,7 @@ export async function renderAndVerifySlide(
   const allTelemetry: ModelCallTelemetry[] = [];
   let lastScene!: GenerateSlideSceneResult;
   let lastComposite!: CompositeProductSlideResult;
+  let lastLayers!: SlideLayers;
   let lastFidelity!: VerifySlideFidelityResult;
   let attempts = 0;
 
@@ -198,10 +205,10 @@ export async function renderAndVerifySlide(
         ? ` Retry correction required: ${lastFidelity.issues.join("; ")}. Ensure the central product zone is completely unobstructed and slide text is spelled accurately.`
         : "";
 
-    // Step 1: Generate 1080x1350 scene with reserved empty product area (`FR-CG-04`)
+    // Step 1: Generate the 1080x1350 scene with a reserved empty product area and NO text (`FR-CG-04`, A-09).
     lastScene = await generateSlideScene({
       sceneBrief: `${input.sceneBrief.trim()}${retryNote}`,
-      slideText: input.slideText ?? "",
+      slideText: "",
       slideRole: input.slideRole,
       visualStyle: input.visualStyle,
       reservedBox: input.reservedBox,
@@ -211,13 +218,45 @@ export async function renderAndVerifySlide(
     });
     allTelemetry.push(lastScene.telemetry);
 
-    // Step 2: Deterministically composite confirmed cutout + soft drop shadow (`FR-CG-09`)
-    lastComposite = await compositeProductSlide({
+    // Step 2: Layers. Text is drawn by code in a readable brand colour; the product goes last (`FR-CG-09`).
+    const textBox = defaultTextBox(input.slideRole);
+    const textColor = await pickTextColor(lastScene.sceneBuffer, textBox, input.brand?.colors);
+    const inset = Math.round(lastScene.reservedBox.width * 0.06);
+    const insetY = Math.round(lastScene.reservedBox.height * 0.06);
+    lastLayers = {
+      sceneBrief: input.sceneBrief.trim(),
+      product: {
+        box: {
+          x: lastScene.reservedBox.x + inset,
+          y: lastScene.reservedBox.y + insetY,
+          width: lastScene.reservedBox.width - inset * 2,
+          height: lastScene.reservedBox.height - insetY * 2,
+        },
+      },
+      text: input.slideText?.trim()
+        ? [defaultTextLayer({ role: input.slideRole, text: input.slideText.trim(), color: textColor, brand: input.brand })]
+        : [],
+    };
+    const rendered = await renderLayeredSlide({
       scene: lastScene.sceneBuffer,
-      cutout: input.cutout,
-      reservedBox: lastScene.reservedBox,
+      cutout: Buffer.isBuffer(input.cutout) ? input.cutout : typeof input.cutout === "string" ? Buffer.from(input.cutout.replace(/^data:image\/[a-z+]+;base64,/, ""), "base64") : Buffer.from(input.cutout),
+      layers: lastLayers,
       shadow: input.shadow,
     });
+    // Store the tight placed box so later edits re-render the same size.
+    lastLayers = {
+      ...lastLayers,
+      product: { box: { x: rendered.placedBox.left, y: rendered.placedBox.top, width: rendered.placedBox.width, height: rendered.placedBox.height } },
+    };
+    lastComposite = {
+      slideBuffer: rendered.slideBuffer,
+      slideDataUrl: `data:image/png;base64,${rendered.slideBuffer.toString("base64")}`,
+      scaledCutoutBuffer: rendered.scaledCutoutBuffer,
+      placedBox: rendered.placedBox,
+      reservedBox: lastScene.reservedBox,
+      width: SLIDE_WIDTH,
+      height: SLIDE_HEIGHT,
+    };
 
     // Step 3: Verify pixel fidelity (`FR-FD-01`) + slide text spelling & rules (`FR-FD-02`)
     lastFidelity = await verifySlideFidelity({
@@ -255,6 +294,7 @@ export async function renderAndVerifySlide(
   const totalLatencyMs = Math.max(1, Date.now() - startedAt);
 
   return {
+    layers: lastLayers,
     slideBuffer: lastComposite.slideBuffer,
     slideDataUrl: lastComposite.slideDataUrl,
     sceneBuffer: lastScene.sceneBuffer,

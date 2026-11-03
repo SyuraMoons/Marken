@@ -1,6 +1,6 @@
 // Product Extraction & Cutout Pipeline (SRD v2.0 §7.2 — FR-SP-01, FR-SP-02, FR-SP-09).
 // Extracts structured product metadata with `Muse Spark` (`muse-spark-1.3`) and cuts out
-// each product into a transparent PNG with `SAM 3.1` in parallel (< 30s for 3-10 photos).
+// each product into a transparent PNG with `SAM 3.1` in parallel (< 30s for 1-10 photos).
 
 import { callModelWithTelemetry, type ModelCallTelemetry } from "../gateway";
 import {
@@ -242,7 +242,7 @@ async function mapWithLimit<T, R>(
 /**
  * Batch pipeline (`FR-SP-01`, `FR-SP-02`, `FR-SP-09`) consumed by `POST /api/shops/:id/extract`.
  * Runs `Muse Spark` metadata extraction and `SAM 3.1` product cutout in parallel across the
- * uploaded photos (3-10 photos under 30 seconds). A photo that fails lands in `failures`
+ * uploaded photos (1-10 photos under 30 seconds). A photo that fails lands in `failures`
  * and never costs the owner the rest of the batch.
  */
 export async function extractProductsAndCutouts(

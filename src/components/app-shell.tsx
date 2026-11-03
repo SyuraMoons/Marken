@@ -3,6 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import { t } from "@/lib/i18n";
 import { AppNav, Crumb, NavLinks, type NavItem } from "./app-nav";
 import { Logo } from "./logo";
+import { ProfileMenu, type Account } from "./profile-menu";
 import { ProductSwitcher, type SwitcherProduct } from "./product-switcher";
 
 const NAV: NavItem[] = [
@@ -11,12 +12,9 @@ const NAV: NavItem[] = [
   { href: "/results", label: t("nav.results"), icon: "results" },
   { href: "/settings", label: t("nav.settings"), icon: "settings" },
 ];
-// Desktop sidebar also opens today's agent activity (2 Nov design, supersedes DX-11).
-const SIDE: NavItem[] = [...NAV, { href: "/today?view=activity", label: t("nav.activity"), icon: "activity" }];
-
+// Agent activity is shown inline on Today and in the studio, so it no longer has its own tab (FD-45).
 function Nav({ variant }: { variant: "bar" | "side" }) {
-  const items = SIDE.map((item) => item.icon === "activity" && variant === "bar" ? { ...item, label: t("nav.activityShort") } : item);
-  const props = { items, variant, label: t("nav.label") };
+  const props = { items: NAV, variant, label: t("nav.label") };
   return (
     <Suspense fallback={<NavLinks {...props} active="" />}>
       <AppNav {...props} />
@@ -24,11 +22,8 @@ function Nav({ variant }: { variant: "bar" | "side" }) {
   );
 }
 
-const initials = (name: string) =>
-  name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-
 // One shell keeps mobile web tabs below the header and the desktop sidebar consistent.
-export function AppShell({ shopName, products, children }: { shopName: string; products: SwitcherProduct[]; children: ReactNode }) {
+export function AppShell({ shopName, products, account, children }: { shopName: string; products: SwitcherProduct[]; account?: Account; children: ReactNode }) {
   return (
     <div className="bg-app flex min-h-dvh">
       <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col justify-between bg-navy px-6 pt-8 pb-6 lg:flex">
@@ -52,9 +47,9 @@ export function AppShell({ shopName, products, children }: { shopName: string; p
               <Crumb root={t("nav.workspace")} />
             </Suspense>
           </span>
-          <span className="hidden text-[13px] font-medium text-ink lg:block">
-            {shopName}
-            <span aria-hidden="true">{"  ·  "}{initials(shopName)}</span>
+          <span className="flex items-center gap-3">
+            <span className="hidden text-[13px] font-medium text-ink lg:block">{shopName}</span>
+            <ProfileMenu shopName={shopName} account={account} />
           </span>
         </header>
         <div className="min-w-0 lg:hidden">

@@ -145,3 +145,25 @@ The surrounding landing sections, headings, copy, CTA buttons and composition ar
 A bottom-right question-mark button opens page-specific tours on the app shell and onboarding. It highlights visible targets, scrolls them into view, supports Back/Next/Skip/Finish and Escape, traps keyboard focus, and restores focus to the help button. Dynamic spotlight geometry uses measured inline positions; visual tokens remain in CSS. Missing controls are omitted instead of pointing at nonexistent UI.
 
 `/sandbox` is a public, isolated client-only practice route, exempted from the session proxy only at that exact path. It uses one fixed sample product/brief and two preset captions; it has no API calls, uploads, authentication actions or writes. Users can practise slide review, destination selection, approval, a simulated failure/retry and reset. Completion explicitly says nothing was published. Facebook selection here is a simulation, not evidence of a Facebook integration. Practice state resets on reload. Neither tours nor practice auto-start real generation or publishing.
+
+
+**FD-43 · Onboarding needs 1 photo, not 3 (SRD v2.1 A-10).**
+Step 2 accepts 1–10 photos and the route answers `need_a_photo` only when nothing was uploaded. Replaces the "3–10 photos / `need_3_photos`" part of FD-36.
+
+
+**FD-44 · Make a post with this product (SRD v2.1 A-11).**
+After confirming a cutout, /products offers "Make post" (also on each confirmed product card). It calls the generate route with `productId` and opens /today, which shows the generating screen with the product name and live steps. A product post replaces today's post only while it is `ready`; approved posts answer `today_post_locked`. One live post per day is unchanged.
+
+**FD-45 · Generate image post opens one studio; agent activity is inline (supersedes the Activity link in FD-37 and FD-44).**
+Each confirmed product card on /products has a one-tap "Generate image post" button. It calls the generate route with `productId` and opens /today. While the post is `generating`, Today shows the studio: the confirmed cutout ("never redrawn"), three slide placeholders (hook, product, call to action), the step that is running now, and the live Agent Activity Panel, all on one screen. The panel also sits inline on the ready, publishing, failed and skipped screens, so the separate Activity nav item is removed. `?view=activity` and `?view=details` still resolve for old links and tours.
+
+## FD-46 · Generate image post opens a create flow; nothing generates before the brief and brand kit (amends FD-45)
+
+**Decision:** "Generate image post" (Products card and the post-confirm screen) links to `/create?product=<id>` instead of starting the job. The flow has three steps:
+1. **Brief:** Marken drafts it on arrival. `POST /api/shops/:id/brand-kit/brief` (Muse Spark via the gateway, step `draft_brief`) reads the shop and product data and returns a goal plus three short fields: who it is for, look and feel, and what to show. The owner edits any field, changes the goal chip, or presses **Write it again**. If drafting fails, the fields stay empty and editable. The fields are joined into one brief, max 600 characters. Most owners have never written a brief, so they start from a draft instead of an empty box.
+2. **Brand kit:** `POST /api/shops/:id/brand-kit/directions` (Muse Spark via the gateway, step `brand_directions`) drafts three brand directions (name, colours, heading/body font, design guidance, photo style) from the brief. The owner picks one, keeps their saved kit, or sets it up by hand with `BrandKitEditor`.
+3. **Review:** product, brief, kit and what they will get. **Generate image post** saves the chosen kit to `brand_kits` if it changed, then calls `POST /api/shops/:id/posts/generate` with `{ productId, brief }` and opens the studio on Today (FD-45).
+
+The brief travels on the `post/generate.requested` event to the planner, which follows it for angle, audience and mood. The truth guardrails still apply: no invented prices, discounts or claims.
+
+**Why:** The owner said the old one-tap start felt like nothing happened, and that a post should come from their brief and a chosen brand identity. Nothing runs until they press Generate, so the AI does no work the owner did not ask for.

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Carousel } from "./carousel";
 import { Button, ButtonLink } from "./button";
 import { InfoCard } from "./info-card";
+import { SlideEditor } from "./slide-editor";
 import { StatusScreen } from "./status-screen";
 import { t } from "@/lib/i18n";
 import type { Slide } from "@/lib/posts/slides";
@@ -82,28 +83,8 @@ export function CaptionEditor({ postId, slides, captions, initial = 0, product }
 
   const preview = <Carousel slides={slides} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} eyebrow={product} />;
 
-  // Edit the image background (228:11424). The regenerate route only accepts captions (F-11b, P1), so it is shown but disabled.
-  if (scene) {
-    return (
-      <StatusScreen title={t("imageEdit.title")} body={t("imageEdit.body")}>
-        <div className="mx-auto w-full max-w-90">{preview}</div>
-        <label className="flex flex-col gap-4 text-sm font-medium">
-          {t("imageEdit.feedback")}
-          <textarea rows={2} maxLength={200} placeholder={t("imageEdit.feedbackPlaceholder")} className={`${field} font-normal`} />
-        </label>
-        <InfoCard vector="check" title={t("imageEdit.keptTitle")}>
-          {t("imageEdit.keptBody")}
-        </InfoCard>
-        <p role="status" className="text-sm text-muted">
-          {t("imageEdit.unavailable")}
-        </p>
-        <Button disabled>{t("imageEdit.regenerate")}</Button>
-        <Button variant="text" onClick={() => setScene(false)}>
-          {t("edit.cancel")}
-        </Button>
-      </StatusScreen>
-    );
-  }
+  // Slide editor (SRD A-09): replaces the disabled background screen (228:11424).
+  if (scene) return <SlideEditor postId={postId} slides={slides} onClose={() => setScene(false)} />;
 
   return (
     <StatusScreen title={t("edit.title")} body={t("edit.body")}>
@@ -140,7 +121,7 @@ export function CaptionEditor({ postId, slides, captions, initial = 0, product }
       )}
       <div className="mx-auto w-full max-w-90">{preview}</div>
       <Button variant="secondary" onClick={() => setScene(true)}>
-        {t("edit.background")}
+        {t("edit.slides")}
       </Button>
       <ButtonLink href="/today" variant="text">
         {t("edit.cancel")}

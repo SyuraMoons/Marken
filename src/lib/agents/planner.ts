@@ -173,6 +173,8 @@ export type PlanDailyCarouselInput = {
   };
   products: ProductCandidate[];
   trend: TrendCandidateForPlan;
+  /** The owner's brief from the create flow (FD-46): what this post is for. Never overrides the truth guardrails. */
+  brief?: string;
   last7Posts?: PostHistoryItem[];
   postId?: string;
   maxRetries?: number;
@@ -216,6 +218,9 @@ export async function planDailyCarousel(
       : "",
     forbidPrices
       ? "CRITICAL TRUTH GUARDRAIL (FR-SP-02): NEVER invent or mention any price, cost, discount figure, or currency anywhere in slide text or captions."
+      : "",
+    input.brief?.trim()
+      ? `Owner's brief for this post (follow it for angle, audience and mood, but never invent prices, discounts or claims it does not state): ${input.brief.trim()}`
       : "",
     "Carousel Structure (3 slides):",
     "1. `order: 1`, `role: 'hook'`: Attention-grabbing sensory/problem-solution headline that hooks the audience into swiping.",

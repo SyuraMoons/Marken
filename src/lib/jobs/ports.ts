@@ -7,6 +7,7 @@ import {
 import { planDailyCarousel as agentPlanDailyCarousel } from "@/lib/agents/planner";
 import { renderAndVerifySlide as studioRenderAndVerifySlide } from "@/lib/studio";
 import { regenerateCaptionFromFeedback as agentRegenerateCaption } from "@/lib/agents/caption";
+import type { BrandStyle, SlideLayers } from "@/lib/studio/layers";
 
 // The AI steps the jobs call (docs/TEAM.md §2).
 // Wired to the real modules:
@@ -46,6 +47,8 @@ export type PlanInput = {
   products: { id: string; name: string | null; cutoutPath: string | null }[];
   trend: { id: string; title: string } & TrendAnalysisResult;
   postId: string;
+  /** Owner's brief from the create flow (FD-46). */
+  brief?: string;
 };
 
 export type CarouselPlan = {
@@ -61,6 +64,8 @@ export type RenderedSlide = {
   slidePng: Buffer;
   fidelityScore: number;
   fidelityPassed: boolean;
+  /** Editable layers (SRD A-09); absent only when a test double omits them. */
+  layers?: SlideLayers;
 };
 
 export type RenderSlideInput = {
@@ -76,6 +81,7 @@ export type RenderSlideInput = {
   shopTone?: string;
   styleRules?: string[];
   contentLanguage?: "en" | "id";
+  brand?: BrandStyle;
 };
 
 export async function researchAndScoreTrends(input: {
@@ -181,6 +187,7 @@ export async function planDailyCarousel(input: PlanInput): Promise<CarouselPlan>
         fromVideo: input.trend.fromVideo,
       },
       postId: input.postId,
+      brief: input.brief,
     });
 
     if (res && res.slides && res.slides.length > 0) {
@@ -256,10 +263,12 @@ export async function renderAndVerifySlide(input: RenderSlideInput): Promise<Ren
     shopTone: input.shopTone,
     styleRules: input.styleRules,
     contentLanguage: input.contentLanguage,
+    brand: input.brand,
     shopId: input.shopId,
     postId: input.postId,
   });
   return {
+    layers: res.layers,
     scenePng: res.sceneBuffer,
     slidePng: res.slideBuffer,
     fidelityScore: res.fidelityScore,

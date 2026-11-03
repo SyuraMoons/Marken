@@ -5,6 +5,7 @@ import { sendPostReadyEmail } from "@/lib/notify";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/database.types";
 import type { Slide } from "@/lib/posts/slides";
+import { isFontId, type BrandStyle } from "@/lib/studio/layers";
 import { inngest, type JobEvents } from "./client";
 import {
   planDailyCarousel,
@@ -57,7 +58,7 @@ export const generatePost = inngest.createFunction(
     },
   },
   async ({ event, step }) => {
-    const { shopId, postId } = event.data as JobEvents["post/generate.requested"];
+    const { shopId, postId, productId, brief } = event.data as JobEvents["post/generate.requested"];
     const ctx = { shopId, postId };
 
     const input = await step.run("load", async () => {
@@ -67,7 +68,7 @@ export const generatePost = inngest.createFunction(
       // Replayed event for a post that already moved on: nothing to do.
       if (post.status !== "generating") return null;
 
-      const [{ data: shop }, { data: rules }, { data: products }] = await Promise.all([
+      const [{ data: shop }, { data: rules }, { data: products }, { data: kit }] = await Promise.all([
         admin.from("shops").select("*").eq("id", shopId).single(),
         admin.from("style_rules").select("text").eq("shop_id", shopId).order("position"),
         admin
@@ -76,9 +77,14 @@ export const generatePost = inngest.createFunction(
           .eq("shop_id", shopId)
           .eq("hidden", false)
           .eq("cutout_confirmed", true),
+        admin.from("brand_kits").select("colors, heading_font, body_font, design_guidance, photo_style").eq("shop_id", shopId).maybeSingle(),
       ]);
       if (!shop) throw new NonRetriableError("shop not found");
       if (!products?.length) throw new NonRetriableError("no confirmed product");
+      // "Make a post with this product" (A-11): only that product is offered to the planner. If it was hidden or
+      // unconfirmed since the tap, fail the post instead of quietly posting a different product.
+      const eligible = productId ? products.filter((p) => p.id === productId) : products;
+      if (!eligible.length) throw new NonRetriableError("requested product is no longer available");
 
       // Rotate: the product that went longest without a post goes first.
       const { data: recent } = await admin
@@ -90,7 +96,7 @@ export const generatePost = inngest.createFunction(
         .limit(20);
       const lastUsed = new Map<string, string>();
       for (const r of recent ?? []) if (r.product_id && !lastUsed.has(r.product_id)) lastUsed.set(r.product_id, r.post_date);
-      const ordered = [...products].sort((a, b) =>
+      const ordered = [...eligible].sort((a, b) =>
         (lastUsed.get(a.id) ?? "").localeCompare(lastUsed.get(b.id) ?? ""),
       );
 
@@ -106,6 +112,14 @@ export const generatePost = inngest.createFunction(
           styleRules: (rules ?? []).map((r) => r.text),
         },
         products: ordered.map((p) => ({ id: p.id, name: p.name, cutoutPath: p.cutout_path })),
+        // Brand kit colours and fonts style the text layers on every slide (SRD A-09).
+        brand: {
+          colors: Array.isArray(kit?.colors) ? kit.colors.filter((c): c is string => typeof c === "string") : [],
+          headingFont: isFontId(kit?.heading_font) ? kit.heading_font : null,
+          bodyFont: isFontId(kit?.body_font) ? kit.body_font : null,
+        } satisfies BrandStyle,
+        // Guidance and photo style go into every scene brief like tone and rules (SRD A-09).
+        brandNote: [kit?.design_guidance, kit?.photo_style].map((x) => x?.trim()).filter(Boolean).join(" "),
       };
     });
     if (!input) return { skipped: "not_generating" };
@@ -119,6 +133,7 @@ export const generatePost = inngest.createFunction(
           products: input.products,
           trend,
           postId,
+          brief,
         }),
       ),
     ) as CarouselPlan;
@@ -137,11 +152,12 @@ export const generatePost = inngest.createFunction(
             renderSlide(
               shopId,
               postId,
-              s,
+              input.brandNote ? { ...s, sceneBrief: `${s.sceneBrief} Brand style: ${input.brandNote}` } : s,
               chosenProduct?.cutoutPath,
               input.shop.tone ?? undefined,
               input.shop.styleRules,
               input.shop.contentLanguage,
+              input.brand,
             ),
           (r) => ({ fidelity_score: r.fidelity_score, fidelity_passed: r.fidelity_passed }),
         ),
@@ -266,6 +282,7 @@ async function renderSlide(
   shopTone?: string,
   styleRules?: string[],
   contentLanguage?: "en" | "id",
+  brand?: BrandStyle,
 ): Promise<Slide> {
   const admin = createAdminClient();
   // The studio rebuilds a failed slide once (FR-FD-01), then flags it. Retrying here too
@@ -278,6 +295,7 @@ async function renderSlide(
     shopTone,
     styleRules,
     contentLanguage,
+    brand,
   });
   const scene_path = `${shopId}/scenes/${postId}-${s.order}.png`;
   const slide_path = `${shopId}/slides/${postId}-${s.order}.png`;
@@ -298,6 +316,7 @@ async function renderSlide(
     slide_path,
     fidelity_score: result.fidelityScore,
     fidelity_passed: result.fidelityPassed,
+    layers: result.layers,
   };
 }
 

@@ -63,7 +63,7 @@ Breaking any of these fails SRD v2.0 acceptance criteria:
 - **Flow:** Landing `/` → `/login` → `/onboarding/[step]` (**5 steps**, saved server-side per step) → `/today`. Logged-in users hitting `/` are redirected server-side (`FR-LP-03`).
 - **5 Onboarding Steps:**
   1. Shop basics (required): name, category, country, content language, time zone.
-  2. Upload products (required): 3–10 photos (`SAM 3.1` cutout + `Muse Spark` extraction).
+  2. Upload products (required): 1–10 photos (`SAM 3.1` cutout + `Muse Spark` extraction).
   3. Review (required): edit/delete/add products; owner confirms each cutout.
   4. Voice & Instagram (optional): tone, rules, live sample caption; connect IG or skip.
   5. First post + tour (optional tour): coach marks run on a sample post while the real 3-slide carousel generates, swapping to the real post when ready.

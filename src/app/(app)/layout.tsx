@@ -19,7 +19,7 @@ async function Shell({ children }: { children: React.ReactNode }) {
     ? ((await (await createClient()).from("products").select("id, name").eq("shop_id", owner.shop.id).order("created_at")).data ?? [])
     : [];
   return (
-    <AppShell shopName={owner?.shop.name ?? ""} products={products}>
+    <AppShell shopName={owner?.shop.name ?? ""} products={products} account={{ email: owner?.user.email ?? null, provider: owner?.user.provider ?? null }}>
       {children}
     </AppShell>
   );

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { SETUP_STEPS, SetupShell } from "@/components/setup-shell";
 import { SetupSteps } from "@/components/setup-steps";
+import { getBrandKit } from "@/lib/data/brand-kit";
 import { getProducts } from "@/lib/data/products";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -43,9 +44,10 @@ async function Step({ params }: Pick<PageProps<"/onboarding/[step]">, "params">)
   if (step > shop.onboarding_step) redirect(`/onboarding/${shop.onboarding_step}`);
 
   const supabase = await createClient();
-  const [products, rules] = await Promise.all([
+  const [products, rules, brandKit] = await Promise.all([
     getProducts(shop.id),
     supabase.from("style_rules").select("text").eq("shop_id", shop.id).order("position"),
+    getBrandKit(shop.id),
   ]);
 
   return (
@@ -66,6 +68,7 @@ async function Step({ params }: Pick<PageProps<"/onboarding/[step]">, "params">)
         }}
         products={products}
         rules={(rules.data ?? []).map((r) => r.text)}
+        brandKit={brandKit}
       />
     </SetupShell>
   );

@@ -28,6 +28,10 @@ export type Step =
   | "verify_slide"
   | "regenerate_caption"
   | "regenerate_image"
+  | "rewrite_slide_text"
+  | "suggest_brand_kit"
+  | "brand_directions"
+  | "draft_brief"
   | "weekly_learning";
 
 export type ModelModality = "text" | "vision-text" | "browse" | "image" | "segmentation";

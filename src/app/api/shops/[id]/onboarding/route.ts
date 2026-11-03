@@ -69,7 +69,8 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/shops/[id]/onb
         .from("media_uploads")
         .select("id", { count: "exact", head: true })
         .eq("shop_id", shop.id);
-      if ((count ?? 0) < 3) return conflict("need_3_photos");
+      // One photo is enough to start (SRD A-10); more photos are optional.
+      if ((count ?? 0) < 1) return conflict("need_a_photo");
     }
     if (step === 3) {
       const { data: products } = await supabase

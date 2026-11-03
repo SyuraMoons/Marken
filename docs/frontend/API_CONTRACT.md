@@ -62,7 +62,7 @@ Client then uploads the file to `signedUrl`. Validate type and size in the brows
 ### `POST /api/shops/:id/extract` — run extraction + cutout (F-04, FR-SP-09) **[confirm: Harfi]**
 ```ts
 // req
-{ uploadIds: string[] }        // 3–10
+{ uploadIds: string[] }        // 1–10
 // 202
 { jobId: string }
 ```
@@ -82,6 +82,12 @@ Step 1 `data` = `{ name, category, country, content_language, time_zone }`. Step
 // 202
 { postId: string }
 // 409 { error: "post_exists" }  — today already has a live post
+// Optional req body (SRD A-11, "Make a post with this product"): { productId?: string }
+//   no body            -> Run now, rotation picks the product
+//   productId          -> post uses that product; a `ready` (not approved) post for today is skipped
+//                         (skip_reason "replaced_by_owner") and replaced
+// 409 { error: "product_not_ready" }   — productId is not this shop's visible, cutout-confirmed product
+// 409 { error: "today_post_locked" }   — today's post is approved/publishing/published, never replaced
 ```
 
 ### `POST /api/posts/:id/approve` (FR-TD-02, F-12) **[confirm: Harfi]**

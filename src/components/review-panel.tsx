@@ -105,9 +105,6 @@ export function ReviewPanel({ postId, captions, hashtags, children }: { postId: 
           {t("today.skip")}
         </Button>
       </div>
-      <ButtonLink href="/today?view=activity" variant="text">
-        {t("today.activityLink")}
-      </ButtonLink>
     </div>
   );
 }

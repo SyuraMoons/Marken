@@ -123,6 +123,8 @@ async function buildCanvasShadowLayer(params: {
           raw: { width: SLIDE_WIDTH, height: SLIDE_HEIGHT, channels: 1 },
         })
           .blur(blurSigma)
+          // blur returns 3 channels for a 1-channel input; the loop below indexes one byte per pixel.
+          .extractChannel(0)
           .raw()
           .toBuffer()
       : canvasAlpha;

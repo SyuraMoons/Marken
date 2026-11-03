@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
       : [],
   },
   /* config options here */
+  // Keep the dev badge off the sidebar's product switcher (bottom-left).
+  devIndicators: { position: "bottom-right" },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

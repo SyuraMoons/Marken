@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 // Auth guard lives in src/proxy.ts (FR-AU-04).
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
-    <Suspense fallback={<AppShell shopName="" productName="">{children}</AppShell>}>
+    <Suspense fallback={<AppShell shopName="" products={[]}>{children}</AppShell>}>
       <Shell>{children}</Shell>
     </Suspense>
   );
@@ -14,12 +14,12 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
 
 async function Shell({ children }: { children: React.ReactNode }) {
   const owner = await getOwnerShop();
-  // shortcut: shows the first product until a selected product exists (SRD v2.1 A-05).
-  const product = owner
-    ? (await (await createClient()).from("products").select("name").eq("shop_id", owner.shop.id).order("created_at").limit(1).maybeSingle()).data
-    : null;
+  // shortcut: lists every product; the first one is shown until a selected product exists (SRD v2.1 A-05).
+  const products = owner
+    ? ((await (await createClient()).from("products").select("id, name").eq("shop_id", owner.shop.id).order("created_at")).data ?? [])
+    : [];
   return (
-    <AppShell shopName={owner?.shop.name ?? ""} productName={product?.name ?? ""}>
+    <AppShell shopName={owner?.shop.name ?? ""} products={products}>
       {children}
     </AppShell>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { deleteProduct, saveProduct, setCutoutConfirmed } from "@/lib/actions/products";
 import type { ProductView } from "@/lib/data/products";
@@ -41,6 +41,19 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
   const [view, setView] = useState<View>({ kind: "list" });
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
+  // The product switcher deep-links here (?add=1 / ?edit=<id>), including while already on this page.
+  const params = useSearchParams();
+  const query = params.toString();
+  const [seen, setSeen] = useState("");
+  if (query !== seen) {
+    setSeen(query);
+    const edit = params.get("edit");
+    if (params.get("add")) setView({ kind: "add" });
+    else if (edit && products.some((p) => p.id === edit)) setView({ kind: "edit", id: edit });
+  }
+  useEffect(() => {
+    if (query) router.replace("/products", { scroll: false });
+  }, [query, router]);
   const current = "id" in view ? products.find((p) => p.id === view.id) : undefined;
 
   const run = (job: () => Promise<{ ok: boolean }>, after: View = { kind: "list" }) =>

@@ -9,6 +9,8 @@ export type NavItem = { href: string; label: string; icon: string };
 // Post screens live under Today (DX-23).
 function section(pathname: string) {
   if (pathname.startsWith("/create")) return "/products";
+  // The list is History; a single post's screens (edit) live under Today.
+  if (pathname === "/posts") return "/posts";
   return pathname.startsWith("/posts") ? "/today" : "/" + pathname.split("/")[1];
 }
 

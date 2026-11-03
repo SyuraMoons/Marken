@@ -111,7 +111,7 @@ export function CaptionEditor({ postId, slides, captions, initial = 0, product }
         {t("edit.rewrite")}
       </Button>
       {text.trim() ? (
-        <ButtonLink href={`/today?view=share&caption=${encodeURIComponent(text.trim())}`} variant="secondary">
+        <ButtonLink href={`/today?view=share&post=${postId}&caption=${encodeURIComponent(text.trim())}`} variant="secondary">
           {t("edit.save")}
         </ButtonLink>
       ) : (
@@ -123,7 +123,7 @@ export function CaptionEditor({ postId, slides, captions, initial = 0, product }
       <Button variant="secondary" onClick={() => setScene(true)}>
         {t("edit.slides")}
       </Button>
-      <ButtonLink href="/today" variant="text">
+      <ButtonLink href={`/today?post=${postId}`} variant="text">
         {t("edit.cancel")}
       </ButtonLink>
     </StatusScreen>

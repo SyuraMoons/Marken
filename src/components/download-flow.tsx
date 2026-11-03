@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button, ButtonLink } from "./button";
 import { CopyButton } from "./copy-button";
 import { InfoCard } from "./info-card";
@@ -9,7 +9,7 @@ import { t } from "@/lib/i18n";
 import type { Slide } from "@/lib/posts/slides";
 
 // Download fallback (FR-PB-04, 228:10910 / 228:12397): complete only after the slides are saved, and complete is not published.
-export function DownloadFlow({ slides, downloads = [], captionText, connected }: { slides: Slide[]; downloads?: string[]; captionText: string; connected: boolean }) {
+export function DownloadFlow({ slides, downloads = [], captionText, connected, backHref = "/today", children }: { slides: Slide[]; downloads?: string[]; captionText: string; connected: boolean; backHref?: string; children?: ReactNode }) {
   const [done, setDone] = useState(false);
 
   const downloadAll = () => {
@@ -28,7 +28,7 @@ export function DownloadFlow({ slides, downloads = [], captionText, connected }:
         <InfoCard vector="plan" title={t("status.filesReady.cardTitle")}>
           {t("status.filesReady.cardBody")}
         </InfoCard>
-        <ButtonLink href="/today">{t("status.backToday")}</ButtonLink>
+        <ButtonLink href={backHref}>{t("status.backToday")}</ButtonLink>
         <Button variant="secondary" onClick={() => setDone(false)}>
           {t("status.filesReady.instructions")}
         </Button>
@@ -46,9 +46,10 @@ export function DownloadFlow({ slides, downloads = [], captionText, connected }:
         {t("status.download.all")}
       </Button>
       <CopyButton text={captionText} variant="secondary" />
-      <ButtonLink href="/today" variant="text">
+      <ButtonLink href={backHref} variant="text">
         {t("status.backToday")}
       </ButtonLink>
+      {children}
     </StatusScreen>
   );
 }

@@ -167,3 +167,25 @@ Each confirmed product card on /products has a one-tap "Generate image post" but
 The brief travels on the `post/generate.requested` event to the planner, which follows it for angle, audience and mood. The truth guardrails still apply: no invented prices, discounts or claims.
 
 **Why:** The owner said the old one-tap start felt like nothing happened, and that a post should come from their brief and a chosen brand identity. Nothing runs until they press Generate, so the AI does no work the owner did not ask for.
+
+## FD-47 · Company switcher replaces the product switcher (SRD v2.1 A-12)
+
+**Decision:** The control at the bottom of the sidebar (header pill on mobile) switches **company**, not product. Each company has its own products, brand kit, posts and Instagram connection, so switching shows a fresh workspace. "+ Add company" creates a company (max 3) and opens its onboarding; while it is unfinished the app is locked to that onboarding, so the setup shell shows "Back to <company>" for finished companies. Switching does a full reload to /today so no data of the previous company stays cached. Products are chosen on the Products page.
+
+**Why:** The owner runs more than one business and expects each to be separate, not one shop with a list of products.
+
+## FD-48 · Post history
+
+**Decision:** A generated post is never lost when a newer run replaces it on Today. `/posts` lists every post of the active company, newest first, grouped by day, with a slide-1 thumbnail, product, status chip and the first caption line. A card opens `/today?post=<id>`, which shows that post on the normal Today screens (review, share, download, compare, activity); all links on those screens keep `post=`. A post from an earlier day shows a "Post from <date>" banner with a link back to the list. A `ready` post from any day can still be approved, edited or skipped. A post id outside the active company returns 404. No schema or API change.
+
+**Why:** The owner generated posts but, if they did not publish right away, they could not find them again, because Today only showed the newest post of the current day.
+
+## FD-49 · Download images and delete a post
+
+**Decision:** A post's screen on Today (ready, skipped, published) has **Download all images** and one link per slide, using the existing signed `download` URLs. Slides that failed the product check are never offered (FR-FD-01). **Delete this post** asks once inline, then calls `DELETE /api/posts/:id`, which removes the post's files from `slides`, `scenes` and `publish` and then the row (steps and revisions cascade; `model_calls` keep their cost rows with `post_id` null). Allowed for `ready`, `skipped` and `failed` posts that were never approved. Not allowed while `generating`, `approved` or `publishing`, nor once `published` (Results depend on it, and Instagram keeps the live post). The API answers 409 `invalid_status` in those cases.
+
+**Why:** The owner wanted to keep the generated images and to clear posts they do not want in History.
+
+**Addendum (FD-49):** History cards carry the same **Download** and **Delete** actions (compact), outside the card link so no control is nested in a link. Deleting there refreshes the list in place. A post opened from History (`?post=`) shows a "← Back to history" bar with its date above every sub-view.
+
+**Addendum 2 (FD-49):** An `approved` post can be deleted when Instagram is not connected, because Approve then queues no publish job and the owner downloads the images by hand. With Instagram connected it stays blocked (a job may be queued). `publishing` and `published` are never deletable. The rule lives in `src/lib/posts/deletable.ts` and is shared by the API route, History cards and Today.

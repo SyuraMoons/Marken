@@ -49,6 +49,8 @@ export type ExtractProductFromPhotoInput = Omit<PhotoInputItem, "photo"> & {
 
 export type ExtractProductFromPhotoResult = {
   product: ExtractedProduct;
+  /** English noun phrase for SAM 3.1 (e.g. "bowl of food"); not stored on the product. */
+  segmentPhrase: string | null;
   telemetry: ModelCallTelemetry;
 };
 
@@ -99,7 +101,8 @@ Examine the uploaded product photo and return strictly valid JSON matching this 
   "price": number | null,
   "currency": "IDR" | "USD" | string | null,
   "attributes": ["material/color/finish/feature 1", "feature 2", "feature 3"],
-  "description": "1-2 sentence factual description of the visible physical product"
+  "description": "1-2 sentence factual description of the visible physical product",
+  "segment_phrase": "1-3 word plain ENGLISH noun phrase naming the physical object to cut out, as it looks (e.g. \"bowl of food\", \"glass bottle\", \"handbag\", \"jar\"). Always English, never a brand or local dish name."
 }
 
 STRICT TRUTH GUARDRAIL (FR-SP-02):
@@ -151,11 +154,34 @@ export async function extractProductFromPhoto(
     source_photo: input.sourcePhotoId,
   });
 
-  return { product, telemetry };
+  return { product, segmentPhrase: raw.segment_phrase || null, telemetry };
 }
 
 function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason);
+}
+
+async function cutoutWithHints(
+  photo: PhotoInput,
+  hints: string[],
+  input: ExtractProductsAndCutoutsInput,
+): Promise<PromiseSettledResult<Awaited<ReturnType<typeof cutoutProduct>>>> {
+  let last: PromiseRejectedResult | undefined;
+  for (const labelHint of hints) {
+    try {
+      const value = await cutoutProduct({
+        photo,
+        labelHint,
+        shopId: input.shopId,
+        postId: input.postId,
+      });
+      return { status: "fulfilled", value };
+    } catch (reason) {
+      last = { status: "rejected", reason };
+      if (!(reason instanceof CutoutFailedError)) break;
+    }
+  }
+  return last ?? { status: "rejected", reason: new Error("no cutout hint") };
 }
 
 async function processPhoto(
@@ -171,8 +197,10 @@ async function processPhoto(
     return { sourcePhotoId, error: errorMessage(reason), telemetry: [] };
   }
 
-  // Run Muse Spark vision extraction and SAM 3.1 cutout concurrently per photo
-  const [extractRes, cutoutRes] = await Promise.allSettled([
+  // SAM 3.1 segments a short concrete English concept phrase ("bowl", "glass bottle"). Abstract
+  // words ("product", "object") and local product names ("bakso") return an empty answer, so
+  // extraction runs first and its English segment phrase drives the cutout.
+  const [extractRes] = await Promise.allSettled([
     extractProductFromPhoto({
       ...item,
       photo,
@@ -180,13 +208,15 @@ async function processPhoto(
       postId: input.postId,
       contentLanguage: input.contentLanguage,
     }),
-    cutoutProduct({
-      photo,
-      labelHint: item.labelHint ?? "main product",
-      shopId: input.shopId,
-      postId: input.postId,
-    }),
   ]);
+
+  const extracted = extractRes.status === "fulfilled" ? extractRes.value : null;
+  // Each try is a paid SAM call, so at most three.
+  const hints = [item.labelHint, extracted?.segmentPhrase, extracted?.product.name, "object"]
+    .filter((h, i, all): h is string => !!h?.trim() && all.indexOf(h) === i)
+    .slice(0, 3);
+
+  const cutoutRes = await cutoutWithHints(photo, hints, input);
 
   if (extractRes.status === "fulfilled" && cutoutRes.status === "fulfilled") {
     const { telemetry: cutoutTelemetry, ...cutout } = cutoutRes.value;

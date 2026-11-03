@@ -5,6 +5,7 @@ import { SetupSteps } from "@/components/setup-steps";
 import { getBrandKit } from "@/lib/data/brand-kit";
 import { getProducts } from "@/lib/data/products";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { listShops } from "@/lib/supabase/active-shop";
 import { createClient } from "@/lib/supabase/server";
 
 // 5 steps per SRD §6 (FD-03); DB checks onboarding_step between 1 and 5.
@@ -21,15 +22,14 @@ export default function OnboardingStepPage({ params }: PageProps<"/onboarding/[s
   );
 }
 
-// One shop per owner: created on first visit, or returned if it already exists.
+// The active company, or a first one created on a brand-new owner's first visit. Further companies
+// are only added through POST /api/shops. The one-unfinished-shop index makes a racing create safe.
 async function ensureShop(ownerId: string) {
   const supabase = await createClient();
-  const found = await supabase.from("shops").select("*").eq("owner_id", ownerId).maybeSingle();
-  if (found.data) return found.data;
-  const created = await supabase.from("shops").insert({ owner_id: ownerId }).select("*").single();
-  if (created.data) return created.data;
-  const again = await supabase.from("shops").select("*").eq("owner_id", ownerId).single();
-  return again.data;
+  const found = await listShops(supabase, ownerId);
+  if (found.shop || found.error) return found;
+  await supabase.from("shops").insert({ owner_id: ownerId });
+  return listShops(supabase, ownerId);
 }
 
 async function Step({ params }: Pick<PageProps<"/onboarding/[step]">, "params">) {
@@ -38,8 +38,10 @@ async function Step({ params }: Pick<PageProps<"/onboarding/[step]">, "params">)
 
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  const shop = await ensureShop(user.id);
+  const { shop, shops } = await ensureShop(user.id);
   if (!shop) throw new Error("shop_unavailable");
+  // Other finished companies the owner can go back to while this one is being set up.
+  const others = shops.filter((s) => s.id !== shop.id && s.onboarding_completed_at).map((s) => ({ id: s.id, name: s.name ?? "" }));
   // No jumping ahead of the saved step (the PATCH route enforces the same).
   if (step > shop.onboarding_step) redirect(`/onboarding/${shop.onboarding_step}`);
 
@@ -51,7 +53,7 @@ async function Step({ params }: Pick<PageProps<"/onboarding/[step]">, "params">)
   ]);
 
   return (
-    <SetupShell step={step} shopId={shop.id} shopName={shop.name ?? ""}>
+    <SetupShell step={step} shopId={shop.id} shopName={shop.name ?? ""} others={others}>
       <SetupSteps
         step={step}
         shop={{

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { t, type MessageKey } from "@/lib/i18n";
 import { ButtonLink } from "./button";
 import { Logo } from "./logo";
+import { BackToCompany } from "./back-to-company";
 import { SaveAndExit } from "./save-and-exit";
 
 export const SETUP_STEPS = 5;
@@ -14,7 +15,7 @@ const CUES: Record<number, [string, string]> = { 1: ["shop", "product"], 2: ["ca
 const name = (n: number) => t(`setup.step${n}` as MessageKey);
 
 // Onboarding frame (Figma page 05 setup-*): eyebrow, 5-part bar, Back / Save and exit; navy step list on desktop.
-export function SetupShell({ step, shopId, shopName, children }: { step: number; shopId: string; shopName: string; children: ReactNode }) {
+export function SetupShell({ step, shopId, shopName, others = [], children }: { step: number; shopId: string; shopName: string; others?: { id: string; name: string }[]; children: ReactNode }) {
   return (
     <div className="bg-app flex min-h-dvh">
       <aside className="flex w-56 shrink-0 flex-col gap-6 bg-navy px-6 pt-8 pb-4 leading-[1.4] text-white max-lg:hidden">
@@ -35,6 +36,7 @@ export function SetupShell({ step, shopId, shopName, children }: { step: number;
         </ol>
         <p className="text-[13px]">{t("setup.required")}</p>
         <SaveAndExit shopId={shopId} step={step} className="text-white!" />
+        <BackToCompany others={others} className="text-white!" />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -66,6 +68,7 @@ export function SetupShell({ step, shopId, shopName, children }: { step: number;
             )}
             <SaveAndExit shopId={shopId} step={step} className="h-12 flex-[1.27]" />
           </div>
+          <BackToCompany others={others} className="lg:hidden" />
           <div className="flex items-center gap-3.5" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element -- static design illustration */}
             <img src={`/figma/setup-${CUES[step][0]}.svg`} width={64} height={64} alt="" />

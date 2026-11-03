@@ -531,7 +531,7 @@ export type Database = {
           {
             foreignKeyName: "shops_owner_id_fkey"
             columns: ["owner_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -654,6 +654,7 @@ export type Database = {
       }
       users: {
         Row: {
+          active_shop_id: string | null
           created_at: string
           email: string | null
           id: string
@@ -661,6 +662,7 @@ export type Database = {
           ui_locale: string
         }
         Insert: {
+          active_shop_id?: string | null
           created_at?: string
           email?: string | null
           id: string
@@ -668,13 +670,22 @@ export type Database = {
           ui_locale?: string
         }
         Update: {
+          active_shop_id?: string | null
           created_at?: string
           email?: string | null
           id?: string
           name?: string | null
           ui_locale?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_active_shop_id_fkey"
+            columns: ["active_shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

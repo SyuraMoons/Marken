@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { findActiveShop } from "./active-shop";
 import type { Database } from "./database.types";
 
 // Session refresh + routing for src/proxy.ts (FR-AU-04, FR-LP-03).
@@ -67,11 +68,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (pathname === "/" || pathname === "/login") {
-    const { data: shop, error } = await supabase
-      .from("shops")
-      .select("onboarding_step, onboarding_completed_at")
-      .eq("owner_id", userId)
-      .maybeSingle();
+    const { shop, error } = await findActiveShop(supabase, userId);
     // On a query failure stay put rather than send an existing owner back to step 1.
     if (error) return response;
     return redirectTo(destinationFor(shop));
@@ -79,11 +76,7 @@ export async function updateSession(request: NextRequest) {
 
   // Signed-in owners with unfinished setup land on their saved step, not on the app (FR-OB-11).
   if (!pathname.startsWith("/onboarding") && !isAuthRoute) {
-    const { data: shop, error } = await supabase
-      .from("shops")
-      .select("onboarding_step, onboarding_completed_at")
-      .eq("owner_id", userId)
-      .maybeSingle();
+    const { shop, error } = await findActiveShop(supabase, userId);
     if (!error && !shop?.onboarding_completed_at) return redirectTo(destinationFor(shop));
   }
 

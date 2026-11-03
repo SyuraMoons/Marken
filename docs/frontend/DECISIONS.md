@@ -145,3 +145,7 @@ The surrounding landing sections, headings, copy, CTA buttons and composition ar
 A bottom-right question-mark button opens page-specific tours on the app shell and onboarding. It highlights visible targets, scrolls them into view, supports Back/Next/Skip/Finish and Escape, traps keyboard focus, and restores focus to the help button. Dynamic spotlight geometry uses measured inline positions; visual tokens remain in CSS. Missing controls are omitted instead of pointing at nonexistent UI.
 
 `/sandbox` is a public, isolated client-only practice route, exempted from the session proxy only at that exact path. It uses one fixed sample product/brief and two preset captions; it has no API calls, uploads, authentication actions or writes. Users can practise slide review, destination selection, approval, a simulated failure/retry and reset. Completion explicitly says nothing was published. Facebook selection here is a simulation, not evidence of a Facebook integration. Practice state resets on reload. Neither tours nor practice auto-start real generation or publishing.
+
+
+**FD-43 · Onboarding needs 1 photo, not 3 (SRD v2.1 A-10).**
+Step 2 accepts 1–10 photos and the route answers `need_a_photo` only when nothing was uploaded. Replaces the "3–10 photos / `need_3_photos`" part of FD-36.

@@ -62,7 +62,7 @@ Client then uploads the file to `signedUrl`. Validate type and size in the brows
 ### `POST /api/shops/:id/extract` — run extraction + cutout (F-04, FR-SP-09) **[confirm: Harfi]**
 ```ts
 // req
-{ uploadIds: string[] }        // 3–10
+{ uploadIds: string[] }        // 1–10
 // 202
 { jobId: string }
 ```

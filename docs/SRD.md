@@ -77,6 +77,7 @@ Where this table disagrees with the rest of the SRD, this table wins. Items mark
 | A-05 | Product scope (F-10, F-04) | One shop; the daily loop picks one product | The app is scoped to a **selected product** (product switcher in the header). Today, Products, Results and Settings show that product. A shop can hold a sample product with no photos yet. **To decide:** post cadence per product, and how this works with one live post per shop per day (`posts_one_live_per_shop_day`) |
 | A-06 | Company details (onboarding step 1, Settings) | name, category, country, content language, time zone | Adds a free-text **company description** ("what you sell and who it's for"), injected into prompts like tone and rules. Needs a `shops` column |
 | A-07 | Loading states (NFR-17) | Not specified | Uploading, preparing cutouts, regenerating scene, preparing captions and refreshing results each have a screen state; they advance on real completion only |
+| A-10 | Upload minimum (onboarding step 2, FR-OB-03) | 3 to 10 photos | **1 to 10** photos. One clear photo is enough to start; each photo becomes its own product until A-08 (several photos per product) ships |
 
 Out of scope changes: service businesses and Facebook publishing are no longer out of scope (A-02, A-04).
 
@@ -139,7 +140,7 @@ Marken is an agent, not a chat window. It runs this loop every day for each shop
 
 | Step | What happens | Model |
 | :--- | :--- | :--- |
-| 1. Learn the shop | Owner uploads 3 to 10 product photos; products, prices and attributes are extracted | Muse Spark |
+| 1. Learn the shop | Owner uploads 1 to 10 product photos; products, prices and attributes are extracted | Muse Spark |
 | 2a. Research trends **CHG** | An agent browses TikTok Creative Center and Google Trends and collects candidates | Muse Wonder (fallback: Muse Spark web search) |
 | 2b. Score trends **CHG** | Each candidate scored 0 to 100 for fit and momentum | Muse Spark Open |
 | 2c. Analyse trends **CHG** | Top trends analysed once (video and audio where they exist); cached 7 days for all shops | Muse Spark |
@@ -192,7 +193,7 @@ If time runs short before the gate, cut in this order: F-13 email, F-15 settings
 A new owner goes Landing → Login → 5 step onboarding → Today. A returning owner goes straight to Today; an unfinished setup resumes at its saved step.
 
 1. **Shop basics (required):** shop name, category, country, content language, time zone.
-2. **Upload products (required):** 3 to 10 photos. SAM 3.1 cuts out each product; Muse Spark extracts name, price and attributes.
+2. **Upload products (required):** 1 to 10 photos. SAM 3.1 cuts out each product; Muse Spark extracts name, price and attributes.
 3. **Review (required):** edit, delete or add products. Owner confirms each cutout looks right.
 4. **Voice and Instagram (optional):** tone, rules, live sample caption; connect Instagram or skip.
 5. **First post + tour (optional tour):** the first real carousel is generated; coach marks walk through Today, the "Real product" badge and the activity panel.

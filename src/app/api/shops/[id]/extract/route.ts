@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/database.types";
 
 // Run product extraction and SAM 3.1 cutout over the uploaded photos (F-04, FR-SP-01/02/09).
-// Synchronous on purpose: 3-10 photos finish well under the function limit and step 3
+// Synchronous on purpose: 1-10 photos finish well under the function limit and step 3
 // needs the products straight away.
 export const maxDuration = 120;
 

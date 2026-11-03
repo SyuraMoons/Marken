@@ -39,7 +39,7 @@ Standard text-to-image models redraw physical products, warping logos, packaging
 ```mermaid
 flowchart TD
     subgraph OB["1. Onboarding Upload (Issue #3)"]
-        P["Owner Uploads 3-10 Product Photos"] --> EX["extractProductsAndCutouts()"]
+        P["Owner Uploads 1-10 Product Photos"] --> EX["extractProductsAndCutouts()"]
         EX -->|Vision JSON| MS1["Muse Spark: Extract Name, Attributes, Price (null if unseen)"]
         EX -->|Segmentation| SAM["SAM 3.1: Cutout Product -> Transparent PNG"]
         SAM --> CONF["Owner Confirms Cutout in Step 3"]

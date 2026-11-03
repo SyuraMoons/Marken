@@ -211,14 +211,14 @@ function Loading({ phase }: { phase: "uploading" | "preparing" }) {
   );
 }
 
-// Add one product (228:16642 / 228:16711). Onboarding still needs 3–10 photos (route need_3_photos).
+// Add one product (228:16642 / 228:16711). Onboarding needs at least 1 photo, up to 10 (route need_a_photo, SRD A-10).
 function Step2({ ctx, hasProducts }: { ctx: Ctx; hasProducts: boolean }) {
   const pick = useRef<HTMLInputElement>(null);
   const next = useRef(1);
   const [photos, setPhotos] = useState<Picked[]>([]);
   const [error, setError] = useState<MessageKey | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
-  const ok = photos.length >= 3;
+  const ok = photos.length >= 1;
   const busy = phase !== "idle";
 
   // Free the preview blobs on leave.

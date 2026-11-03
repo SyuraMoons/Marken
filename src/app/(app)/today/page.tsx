@@ -1,6 +1,6 @@
 import { asCaptions } from "@/lib/posts/captions";
 import Image from "next/image";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ActionButton } from "@/components/action-button";
 import { ActivityPanel, stepLabel } from "@/components/activity-panel";
@@ -10,12 +10,14 @@ import { Carousel } from "@/components/carousel";
 import { DownloadFlow } from "@/components/download-flow";
 import { InfoCard } from "@/components/info-card";
 import { PageHeader } from "@/components/page-header";
+import { PostTools } from "@/components/post-tools";
+import { canDeletePost } from "@/lib/posts/deletable";
 import { ReviewPanel } from "@/components/review-panel";
 import { StatusScreen } from "@/components/status-screen";
 import { t } from "@/lib/i18n";
 import { getTodayData } from "@/lib/data/today";
 
-type TodayData = NonNullable<Awaited<ReturnType<typeof getTodayData>>>;
+type TodayData = Extract<NonNullable<Awaited<ReturnType<typeof getTodayData>>>, { missing: false }>;
 import { allSlidesPassed } from "@/lib/posts/slides";
 
 // Today (F-10, FR-TD-01..04, FR-FD-03, F-24). One screen per post status; ?view= opens the post's sub-pages (Figma page 01).
@@ -29,11 +31,38 @@ export default function TodayPage({ searchParams }: PageProps<"/today">) {
 
 async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">) {
   const q = await searchParams;
-  const data = await getTodayData();
+  // ?post= opens one earlier post from History; every link below carries it so sub-views stay on that post.
+  const data = await getTodayData(typeof q.post === "string" ? q.post : undefined);
   if (!data) redirect("/login");
+  if (data.missing) notFound();
+  return (
+    <>
+      {data.post && typeof q.post === "string" && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-control bg-powder px-4 py-3 text-sm">
+          <ButtonLink href="/posts" variant="text" className="w-auto! font-semibold!">
+            {t("history.back")}
+          </ButtonLink>
+          <span className="text-muted">{t("history.from", { date: formatDay(data.post.post_date) })}</span>
+        </div>
+      )}
+      <TodayView q={q} data={data} />
+    </>
+  );
+}
+
+function formatDay(date: string) {
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+}
+
+function TodayView({ q, data }: { q: Awaited<PageProps<"/today">["searchParams"]>; data: TodayData }) {
   const { shop, post, steps, calls } = data;
+  // Links to this screen keep the open post, so a post from History stays open through share, download and compare.
+  const today = (extra: Record<string, string> = {}) => {
+    const params = new URLSearchParams({ ...(post && q.post ? { post: post.id } : {}), ...extra });
+    return params.size ? `/today?${params}` : "/today";
+  };
   const back = (
-    <ButtonLink href="/today" variant="text">
+    <ButtonLink href={today()} variant="text">
       {t("status.backToday")}
     </ButtonLink>
   );
@@ -61,9 +90,9 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
       <StatusScreen title={t("activity.title")} body={t("activity.body")}>
         {(post.status === "generating" || post.status === "publishing" || post.status === "approved") && <AutoRefresh />}
         <ActivityPanel steps={steps} calls={calls} open />
-        <ButtonLink href="/today">{t("status.backToday")}</ButtonLink>
+        <ButtonLink href={today()}>{t("status.backToday")}</ButtonLink>
         {allSlidesPassed(slides) && photo?.src && (
-          <ButtonLink href="/today?view=compare" variant="secondary">
+          <ButtonLink href={today({ view: "compare" })} variant="secondary">
             {t("activity.accuracy")}
           </ButtonLink>
         )}
@@ -108,13 +137,13 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
 
   // Download instead (228:10910): from the publish screen or a failed publish.
   if (q.view === "download" && allSlidesPassed(slides)) {
-    return <DownloadFlow slides={slides} downloads={downloads} captionText={captionText} connected={connected} />;
+    return <DownloadFlow slides={slides} downloads={downloads} captionText={captionText} connected={connected} backHref={today()} />;
   }
 
   // A ready post with a failed product check never offers Approve (FR-FD-01).
   const unchecked = post.status === "ready" ? slides.find((s) => !s.fidelity_passed) : undefined;
   if (unchecked || (post.status === "ready" && slides.length === 0)) {
-    return <FidelityFailed shopId={shop.id} slide={unchecked?.order ?? 1} steps={steps} calls={calls} />;
+    return <FidelityFailed shopId={shop.id} postId={post.id} slide={unchecked?.order ?? 1} steps={steps} calls={calls} />;
   }
 
   // Publish this post? (228:10628, SRD v2.1 A-04): Approve opens it so the owner sees where it goes.
@@ -133,10 +162,10 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
         <InfoCard vector="check" title={t("share.readyTitle")}>
           {t("share.readyBody")}
         </InfoCard>
-        <ActionButton url={`/api/posts/${post.id}/approve`} body={{ caption }} then="/today">
+        <ActionButton url={`/api/posts/${post.id}/approve`} body={{ caption }} then={today()}>
           {t("share.approve")}
         </ActionButton>
-        <ButtonLink href={`/today?view=download&caption=${encodeURIComponent(caption)}`} variant="secondary">
+        <ButtonLink href={today({ view: "download", caption })} variant="secondary">
           {t("share.download")}
         </ButtonLink>
         <ButtonLink href={`/posts/${post.id}/edit`} variant="text">
@@ -153,7 +182,13 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
     case "approved":
     case "publishing":
       // Not connected: download + copy caption, approve still completes (FR-PB-04).
-      if (!connected) return <DownloadFlow slides={slides} downloads={downloads} captionText={captionText} connected={false} />;
+      if (!connected) {
+        return (
+          <DownloadFlow slides={slides} downloads={downloads} captionText={captionText} connected={false} backHref={today()}>
+            {canDeletePost(post, false) && <PostTools postId={post.id} downloads={[]} canDelete />}
+          </DownloadFlow>
+        );
+      }
       return (
         <StatusScreen title={t("status.publishing.title")} body={t("status.publishing.body")}>
           <AutoRefresh />
@@ -175,17 +210,19 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
           <InfoCard vector="plan" title={t("status.published.nextTitle")}>
             {t("status.published.nextBody")}
           </InfoCard>
+          <PostTools postId={post.id} downloads={downloads} canDelete={false} />
         </StatusScreen>
       );
 
     case "failed": {
       const bad = slides.find((s) => !s.fidelity_passed);
       // A failed product check never offers Approve (FR-FD-01); a failed publish retries via Approve.
-      if (bad) return <FidelityFailed shopId={shop.id} slide={bad.order} steps={steps} calls={calls} />;
+      if (bad) return <FidelityFailed shopId={shop.id} postId={post.id} slide={bad.order} steps={steps} calls={calls} />;
       if (!post.approved_at) {
         return (
           <StatusScreen title={t("status.genFailed.title")} body={t("status.genFailed.body")}>
             <ActionButton url={`/api/shops/${shop.id}/posts/generate`}>{t("status.fidelity.action")}</ActionButton>
+            <PostTools postId={post.id} downloads={[]} canDelete />
             <ActivityPanel steps={steps} calls={calls} open />
           </StatusScreen>
         );
@@ -198,7 +235,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
           <ActionButton url={`/api/posts/${post.id}/approve`} body={{ caption }}>
             {t("status.failed.action")}
           </ActionButton>
-          <ButtonLink href="/today?view=download" variant="secondary">
+          <ButtonLink href={today({ view: "download" })} variant="secondary">
             {t("status.failed.download")}
           </ButtonLink>
           <ActivityPanel steps={steps} calls={calls} />
@@ -212,6 +249,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
           <InfoCard vector="clock" title={t("status.skipped.cardTitle")}>
             {t("status.skipped.cardBody")}
           </InfoCard>
+          <PostTools postId={post.id} downloads={allSlidesPassed(slides) ? downloads : []} canDelete />
           <ActivityPanel steps={steps} calls={calls} />
         </StatusScreen>
       );
@@ -234,15 +272,16 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
             </div>
           </div>
           {allSlidesPassed(slides) && photo?.src && (
-            <ButtonLink href="/today?view=compare" variant="secondary">
+            <ButtonLink href={today({ view: "compare" })} variant="secondary">
               {t("today.compare")}
             </ButtonLink>
           )}
+          <PostTools postId={post.id} downloads={downloads} canDelete />
           {/* How this post was made sits under the result, not in a separate tab. */}
           <ActivityPanel steps={steps} calls={calls} />
         </section>
 
-        <ReviewPanel postId={post.id} captions={captions} hashtags={post.hashtags}>
+        <ReviewPanel postId={post.id} scoped={Boolean(q.post)} captions={captions} hashtags={post.hashtags}>
           <section className="flex flex-col gap-3 max-lg:glass max-lg:rounded-card max-lg:px-5 max-lg:py-6 lg:py-6">
             {/* eslint-disable-next-line @next/next/no-img-element -- static design illustration */}
             <img src="/figma/vector-research.svg" width={78} height={50} alt="" />
@@ -264,13 +303,15 @@ type Steps = TodayData["steps"];
 type Calls = TodayData["calls"];
 
 // Product check failed (228:11908): Approve is never offered (FR-FD-01).
-function FidelityFailed({ shopId, slide, steps, calls }: { shopId: string; slide: number; steps: Steps; calls: Calls }) {
+function FidelityFailed({ shopId, postId, slide, steps, calls }: { shopId: string; postId: string; slide: number; steps: Steps; calls: Calls }) {
   return (
     <StatusScreen title={t("status.fidelity.title")} body={t("status.fidelity.body")}>
       <InfoCard vector="check" title={t("status.fidelity.cardTitle", { n: slide })}>
         {t("status.fidelity.cardBody")}
       </InfoCard>
       <ActionButton url={`/api/shops/${shopId}/posts/generate`}>{t("status.fidelity.action")}</ActionButton>
+      {/* No image download here: slides that failed the product check are not offered (FR-FD-01). */}
+      <PostTools postId={postId} downloads={[]} canDelete />
       <ActivityPanel steps={steps} calls={calls} open />
     </StatusScreen>
   );

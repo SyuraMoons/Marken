@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { findActiveShop } from "@/lib/supabase/active-shop";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { apiError, conflict, parseJson, unauthorized } from "@/lib/http";
 
@@ -31,11 +32,7 @@ export async function POST(req: Request) {
   const { mimeType, bytes } = parsed.data;
 
   const supabase = await createClient();
-  const { data: shop } = await supabase
-    .from("shops")
-    .select("id")
-    .eq("owner_id", user.id)
-    .maybeSingle();
+  const { shop } = await findActiveShop(supabase, user.id);
   if (!shop) return conflict("no_shop");
 
   const { count } = await supabase

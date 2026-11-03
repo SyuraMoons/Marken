@@ -3,8 +3,11 @@ import { cache } from "react";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { shopToday } from "@/lib/api/owner";
-import { asSlides, type Slide } from "@/lib/posts/slides";
+import { findActiveShop } from "@/lib/supabase/active-shop";
+import { shopToday, type Post, type Shop } from "@/lib/api/owner";
+import { asCaptions } from "@/lib/posts/captions";
+import { canDeletePost } from "@/lib/posts/deletable";
+import { allSlidesPassed, asSlides, type Slide } from "@/lib/posts/slides";
 
 const TTL_S = 60 * 60;
 
@@ -12,8 +15,8 @@ export const getOwnerShop = cache(async () => {
   const user = await getCurrentUser();
   if (!user) return null;
   const supabase = await createClient();
-  const { data } = await supabase.from("shops").select("*").eq("owner_id", user.id).maybeSingle();
-  return data ? { shop: data, user } : null;
+  const { shop } = await findActiveShop(supabase, user.id);
+  return shop ? { shop, user } : null;
 });
 
 // Storage paths become short-lived signed URLs; the browser never sees a path (NFR-13).
@@ -31,11 +34,23 @@ export async function signPath(path: string | null) {
   return path ? ((await sign([path])).get(path) ?? null) : null;
 }
 
-export async function getTodayData() {
+const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+// `postId` opens one earlier post from History; without it Today shows its own latest post.
+// A post id outside the active shop finds nothing (RLS plus the shop filter) and comes back as `missing`.
+export async function getTodayData(postId?: string) {
   const owner = await getOwnerShop();
   if (!owner) return null;
   const { shop } = owner;
   const supabase = await createClient();
+
+  if (postId) {
+    const { data: picked } = isUuid(postId)
+      ? await supabase.from("posts").select("*").eq("id", postId).eq("shop_id", shop.id).maybeSingle()
+      : { data: null };
+    if (!picked) return { shop, missing: true as const };
+    return { ...(await loadPost(supabase, shop, picked)), missing: false as const };
+  }
 
   const { data: post } = await supabase
     .from("posts")
@@ -61,9 +76,14 @@ export async function getTodayData() {
         .maybeSingle()
     ).data;
   if (!latest) {
-    return { shop, post: null, slides: [] as Slide[], downloads: [] as string[], trend: null, photo: null, cutout: null, productName: null, steps: [], calls: [] };
+    return { shop, post: null, slides: [] as Slide[], downloads: [] as string[], trend: null, photo: null, cutout: null, productName: null, steps: [], calls: [], missing: false as const };
   }
+  return { ...(await loadPost(supabase, shop, latest)), missing: false as const };
+}
 
+type Db = Awaited<ReturnType<typeof createClient>>;
+
+async function loadPost(supabase: Db, shop: Shop, latest: Post) {
   const [trend, product, steps, calls] = await Promise.all([
     latest.trend_id
       ? supabase.from("trends").select("title, url").eq("id", latest.trend_id).maybeSingle()
@@ -113,4 +133,51 @@ export async function getTodayData() {
     steps: steps.data ?? [],
     calls: calls.data ?? [],
   };
+}
+
+export type HistoryItem = {
+  id: string;
+  status: string;
+  postDate: string;
+  createdAt: string;
+  productName: string | null;
+  caption: string;
+  thumb: string | null;
+  /** Signed attachment URLs, only when every slide passed the product check (FR-FD-01). */
+  downloads: string[];
+  canDelete: boolean;
+};
+
+// Every post the active shop ever generated, newest first, so nothing is lost when a newer run
+// replaces it on Today. Only slide 1 is signed, as the thumbnail.
+export async function getPostHistory(limit = 60): Promise<HistoryItem[] | null> {
+  const owner = await getOwnerShop();
+  if (!owner) return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("posts")
+    .select("id, status, post_date, created_at, approved_at, slides, chosen_caption, caption_options, products(name)")
+    .eq("shop_id", owner.shop.id)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  const rows = data ?? [];
+  const first = rows.map((r) => asSlides(r.slides)[0]?.slide_path ?? "");
+  const savable = rows.map((r) => {
+    const slides = asSlides(r.slides);
+    return allSlidesPassed(slides) ? slides.map((s) => s.slide_path) : [];
+  });
+  const [signed, files] = await Promise.all([sign(first), sign(savable.flat(), true)]);
+  return rows.map((r, i) => {
+    return {
+      id: r.id,
+      status: r.status,
+      postDate: r.post_date,
+      createdAt: r.created_at,
+      productName: r.products?.name ?? null,
+      caption: r.chosen_caption ?? asCaptions(r.caption_options)[0] ?? "",
+      thumb: signed.get(first[i]) ?? null,
+      downloads: savable[i].map((p) => files.get(p) ?? ""),
+      canDelete: canDeletePost(r, Boolean(owner.shop.ig_account_id)),
+    };
+  });
 }

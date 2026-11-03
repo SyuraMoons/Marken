@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { saveBrandKit } from "@/lib/actions/brand-kit";
 import { BRIEF_GOALS, hasBrandKit, type BrandDirection, type BrandKitValue, type BriefGoal, type DraftedBrief } from "@/lib/brand-kit";
 import { t, type MessageKey } from "@/lib/i18n";
@@ -53,8 +53,9 @@ export function CreateFlow({ shopId, product, savedKit, hasDescription }: { shop
   const [step, setStep] = useState<Step>("brief");
   const [goal, setGoal] = useState<BriefGoal | null>(null);
   const [brief, setBrief] = useState<BriefFields>(EMPTY_BRIEF);
-  // The brief is drafted on arrival, so a first-time owner edits a suggestion instead of facing an empty box.
-  const [writing, setWriting] = useState(true);
+  // The brief is drafted only when the owner presses Generate brief; nothing calls the model on arrival.
+  const [writing, setWriting] = useState(false);
+  const [written, setWritten] = useState(false);
   const [writeFailed, setWriteFailed] = useState(false);
   const [directions, setDirections] = useState<BrandDirection[] | null>(null);
   const [drafting, setDrafting] = useState(false);
@@ -77,19 +78,12 @@ export function CreateFlow({ shopId, product, savedKit, hasDescription }: { shop
   const applyBrief = (d: DraftedBrief | null) => {
     setWriting(false);
     if (!d) return setWriteFailed(true);
+    setWritten(true);
     setGoal(d.goal);
     setBrief({ audience: d.audience, mood: d.mood, highlight: d.highlight });
   };
 
-  useEffect(() => {
-    const ac = new AbortController();
-    void requestBrief(shopId, product.id, undefined, ac.signal).then((d) => {
-      if (!ac.signal.aborted) applyBrief(d);
-    });
-    return () => ac.abort();
-  }, [shopId, product.id]);
-
-  const rewrite = async () => {
+  const writeBrief = async () => {
     setWriting(true);
     setWriteFailed(false);
     applyBrief(await requestBrief(shopId, product.id, goal ?? undefined));
@@ -173,10 +167,16 @@ export function CreateFlow({ shopId, product, savedKit, hasDescription }: { shop
           <div className="glass flex flex-col gap-4 rounded-card p-5" aria-busy={writing}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-blue" role="status">
-                {writing ? t("create.brief.writing") : writeFailed ? t("create.brief.writeError") : t("create.brief.written")}
+                {writing
+                  ? t("create.brief.writing")
+                  : writeFailed
+                    ? t("create.brief.writeError")
+                    : written
+                      ? t("create.brief.written")
+                      : t("create.brief.idle")}
               </p>
-              <Button variant="secondary" className="w-auto! px-4" onClick={rewrite} disabled={writing}>
-                {t(writeFailed ? "create.brief.writeRetry" : "create.brief.rewrite")}
+              <Button variant="secondary" className="w-auto! px-4" onClick={writeBrief} disabled={writing}>
+                {t(writeFailed ? "create.brief.writeRetry" : written ? "create.brief.rewrite" : "create.brief.generate")}
               </Button>
             </div>
             {FIELDS.map((f) => (

@@ -15,6 +15,9 @@ export const RawProductExtractionModelSchema = z.object({
   currency: z.string().min(1).max(10).nullable().default(null),
   attributes: z.array(z.string()).default([]),
   description: z.string().min(1),
+  // SAM 3.1 concept prompt: a short concrete English noun phrase for the object ("bowl of food").
+  // Optional so an older-style answer still validates; the cutout falls back to other hints.
+  segment_phrase: z.string().trim().max(60).optional(),
 });
 
 /**

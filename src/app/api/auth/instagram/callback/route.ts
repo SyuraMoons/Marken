@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { connectShop } from "@/lib/instagram";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { isUuid } from "@/lib/http";
 import { createClient } from "@/lib/supabase/server";
 
 // Instagram OAuth callback (FR-OB-06, FR-PB-05): verifies state, stores the encrypted
@@ -19,7 +20,7 @@ function sameState(a: string, b: string) {
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const jar = await cookies();
-  const [cookieState = "", next = ""] = (jar.get(STATE_COOKIE)?.value ?? "").split(".");
+  const [cookieState = "", next = "", shopId = ""] = (jar.get(STATE_COOKIE)?.value ?? "").split(".");
   jar.delete({ name: STATE_COOKIE, path: "/api/auth/instagram" });
 
   const back = (ig: "connected" | "error") =>
@@ -34,8 +35,9 @@ export async function GET(req: Request) {
   if (url.searchParams.has("error") || !code || !cookieState || !sameState(state, cookieState)) return back("error");
 
   const supabase = await createClient();
-  const { data: shop } = await supabase.from("shops").select("id").eq("owner_id", user.id).maybeSingle();
-  if (!shop) return back("error");
+  // The shop the connect started from, re-checked against the owner (RLS) in case it was deleted since.
+  const { data: shop } = await supabase.from("shops").select("id").eq("id", shopId).eq("owner_id", user.id).maybeSingle();
+  if (!shop || !isUuid(shopId)) return back("error");
 
   try {
     await connectShop(shop.id, code);

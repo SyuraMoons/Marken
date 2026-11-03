@@ -2,7 +2,8 @@ import "server-only";
 import { getCurrentUser, type CurrentUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
-import { isUuid, notFound, unauthorized } from "@/lib/http";
+import { findActiveShop } from "@/lib/supabase/active-shop";
+import { conflict, isUuid, notFound, unauthorized } from "@/lib/http";
 
 // Every API route must resolve ownership here: the proxy skips /api, and the admin
 // client bypasses RLS. Lookups go through the owner's RLS client, so another owner's
@@ -13,13 +14,20 @@ export type Post = Database["public"]["Tables"]["posts"]["Row"];
 
 type Guard<T> = { ok: true; user: CurrentUser; value: T } | { ok: false; response: Response };
 
-export async function getOwnedShop(shopId: string): Promise<Guard<Shop>> {
+// Owner-scoped routes also require the shop to be the active one: RLS and Storage scope by the
+// active shop, so working on another shop would silently read one shop and write another.
+// Switching itself passes `requireActive: false`.
+export async function getOwnedShop(shopId: string, opts: { requireActive?: boolean } = {}): Promise<Guard<Shop>> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, response: unauthorized() };
   if (!isUuid(shopId)) return { ok: false, response: notFound() };
   const supabase = await createClient();
   const { data } = await supabase.from("shops").select("*").eq("id", shopId).maybeSingle();
   if (!data) return { ok: false, response: notFound() };
+  if (opts.requireActive !== false) {
+    const { shop: active } = await findActiveShop(supabase, user.id);
+    if (active?.id !== data.id) return { ok: false, response: conflict("not_active_shop") };
+  }
   return { ok: true, user, value: data };
 }
 

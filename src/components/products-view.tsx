@@ -16,7 +16,7 @@ import { PageHeader } from "./page-header";
 import { StatusScreen } from "./status-screen";
 import { UploadError } from "./upload-error";
 
-type View = { kind: "list" } | { kind: "add"; replace?: string } | { kind: "check"; id: string } | { kind: "made"; id: string } | { kind: "edit"; id: string } | { kind: "delete"; id: string };
+type View = { kind: "list"; made?: string } | { kind: "add"; replace?: string } | { kind: "check"; id: string } | { kind: "edit"; id: string } | { kind: "delete"; id: string };
 
 const money = (p: ProductView) => `${p.currency ?? ""} ${Number(p.price).toLocaleString()}`.trim();
 
@@ -32,6 +32,51 @@ export function Photo({ src, alt, eyebrow, caption, className = "" }: { src: str
         <span className="lg:text-xs">{caption}</span>
       </figcaption>
     </figure>
+  );
+}
+
+const STEPS = ["products.stepUpload", "products.stepCutout", "products.stepDetails", "products.stepFinish"] as const;
+// Rough timings for when each step usually starts; the last active step keeps spinning until the work finishes.
+const STEP_AT_MS = [0, 3000, 9000, 16000];
+
+// Photo being processed: a scan line sweeps the photo and a step list shows what is happening now.
+function ProcessingPhoto({ src, from = 0 }: { src?: string; from?: number }) {
+  const [step, setStep] = useState(from);
+  useEffect(() => {
+    const timers = STEP_AT_MS.map((ms, i) => (i > from ? setTimeout(() => setStep(i), ms - STEP_AT_MS[from]) : undefined));
+    return () => timers.forEach((id) => id && clearTimeout(id));
+  }, [from]);
+
+  return (
+    <div aria-busy="true" aria-live="polite" className="flex flex-col gap-6">
+      <figure className="mx-auto flex w-full max-w-90 flex-col gap-2 leading-[1.35] font-semibold">
+        <div className="photo-processing relative aspect-[4/5] overflow-hidden rounded-card bg-[radial-gradient(circle_at_30%_40%,#e5f0ff,#f9f9ff)]">
+          {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
+          {src && <img src={src} alt="" className="size-full object-contain" />}
+          <div aria-hidden="true" className="photo-shimmer absolute inset-0" />
+          <div aria-hidden="true" className="photo-scan-line" />
+        </div>
+        <figcaption className="flex flex-col gap-2">
+          <span className="text-[10px] uppercase">{t("products.processingEyebrow")}</span>
+          <span>{t("products.processingCaption")}</span>
+        </figcaption>
+      </figure>
+      <ol className="glass flex flex-col gap-3 rounded-card p-5 leading-[1.4]">
+        {STEPS.map((key, i) => {
+          const state = i < step ? "done" : i === step ? "active" : "todo";
+          return (
+            <li key={key} aria-current={state === "active" ? "step" : undefined} className={`flex items-center gap-3 text-[15px] transition-opacity duration-300 ${state === "todo" ? "text-muted opacity-60" : "font-semibold"}`}>
+              <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center">
+                {state === "done" && <span className="flex size-6 items-center justify-center rounded-full bg-blue text-xs text-white">✓</span>}
+                {state === "active" && <span className="size-5 animate-spin rounded-full border-2 border-powder border-t-blue" />}
+                {state === "todo" && <span className="size-2 rounded-full bg-powder" />}
+              </span>
+              {t(key)}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
@@ -75,12 +120,8 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
   // The new product is created but the refreshed list has not arrived yet: wait here instead of falling back to the list or add screen.
   if (view.kind === "check" && !current) {
     return (
-      <StatusScreen title={t("products.uploadingTitle")} body={t("products.uploadingBody")}>
-        <div aria-busy="true" aria-live="polite">
-          <InfoCard vector="photo" title={t("products.uploadingCard")}>
-            {t("products.uploadingCardBody")}
-          </InfoCard>
-        </div>
+      <StatusScreen title={t("products.processingTitle")} body={t("products.processingBody")}>
+        <ProcessingPhoto from={STEPS.length - 1} />
         {!pending && (
           <Button variant="text" onClick={() => setView({ kind: "list" })}>
             {t("products.cancel")}
@@ -105,7 +146,7 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
           <input value={current.price != null ? money(current) : t("products.notVisible")} readOnly className={glassInput} />
         </Field>
         {error}
-        <Button onClick={() => run(() => setCutoutConfirmed(current.id, true), { kind: "made", id: current.id })} disabled={pending} aria-busy={pending}>
+        <Button onClick={() => run(() => setCutoutConfirmed(current.id, true), { kind: "list", made: current.id })} disabled={pending} aria-busy={pending}>
           {t("products.confirm")}
         </Button>
         {/* The old product is removed only after the new photo uploads, so cancelling or a failed upload loses nothing. */}
@@ -114,20 +155,6 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
         </Button>
         <Button variant="text" onClick={() => setView({ kind: "edit", id: current.id })}>
           {t("products.editDetails")}
-        </Button>
-      </StatusScreen>
-    );
-  }
-
-  // Confirmed: offer a post with this product (SRD A-11).
-  if (view.kind === "made" && current) {
-    return (
-      <StatusScreen title={t("products.madeTitle")} body={t("products.madeBody", { name: current.name })}>
-        <Photo src={current.cutout_url} alt={current.name} eyebrow={t("products.confirmedCutout")} caption={current.name} className="mx-auto w-full max-w-90" />
-        {/* Opens the create flow (brief → brand kit → review); nothing generates until the owner presses Generate (FD-46). */}
-        <ButtonLink href={`/create?product=${current.id}`}>{t("products.makePost")}</ButtonLink>
-        <Button variant="text" onClick={() => setView({ kind: "list" })}>
-          {t("products.notNow")}
         </Button>
       </StatusScreen>
     );
@@ -171,10 +198,24 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
     );
   }
 
+  // Just confirmed: offer a post with this product as a dismissible banner, so the rest of the list stays in view (SRD A-11).
+  const made = view.kind === "list" && view.made ? products.find((p) => p.id === view.made) : undefined;
+
   // Your products (228:13455 / 228:13510)
   return (
     <div className="flex flex-col gap-6 lg:gap-7">
       <PageHeader eyebrow={t("products.eyebrow")} title={t("products.title")} body={t("products.body")} eyebrowDesktop />
+      {made && (
+        <section role="status" className="glass flex flex-col gap-3 rounded-card p-5 leading-[1.4] lg:max-w-[544px]">
+          <h2 className="text-lg font-semibold">{t("products.madeTitle")}</h2>
+          <p className="text-[15px] text-muted">{t("products.madeBody", { name: made.name })}</p>
+          {/* Opens the create flow (brief → brand kit → review); nothing generates until the owner presses Generate (FD-46). */}
+          <ButtonLink href={`/create?product=${made.id}`}>{t("products.makePost")}</ButtonLink>
+          <Button variant="text" onClick={() => setView({ kind: "list" })}>
+            {t("products.notNow")}
+          </Button>
+        </section>
+      )}
       <Button data-tour="add-product" className="max-lg:hidden lg:w-50!" onClick={() => setView({ kind: "add" })}>
         {t("products.add")}
       </Button>
@@ -263,12 +304,8 @@ function AddProduct({ shopId, replace, onDone, onCancel }: { shopId: string; rep
 
   if (pending) {
     return (
-      <StatusScreen title={t("products.uploadingTitle")} body={t("products.uploadingBody")}>
-        <div aria-busy="true" aria-live="polite">
-          <InfoCard vector="photo" title={t("products.uploadingCard")}>
-            {t("products.uploadingCardBody")}
-          </InfoCard>
-        </div>
+      <StatusScreen title={t("products.processingTitle")} body={t("products.processingBody")}>
+        <ProcessingPhoto src={previews[0]} />
         <InfoCard vector="check" title={t("loading.waitTitle")}>
           {t("loading.waitBody")}
         </InfoCard>

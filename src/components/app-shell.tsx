@@ -4,10 +4,11 @@ import { t } from "@/lib/i18n";
 import { AppNav, Crumb, NavLinks, type NavItem } from "./app-nav";
 import { Logo } from "./logo";
 import { ProfileMenu, type Account } from "./profile-menu";
-import { ProductSwitcher, type SwitcherProduct } from "./product-switcher";
+import { ShopSwitcher, type SwitcherShop } from "./shop-switcher";
 
 const NAV: NavItem[] = [
   { href: "/today", label: t("nav.today"), icon: "today" },
+  { href: "/posts", label: t("nav.history"), icon: "activity" },
   { href: "/products", label: t("nav.products"), icon: "products" },
   { href: "/results", label: t("nav.results"), icon: "results" },
   { href: "/settings", label: t("nav.settings"), icon: "settings" },
@@ -23,7 +24,7 @@ function Nav({ variant }: { variant: "bar" | "side" }) {
 }
 
 // One shell keeps mobile web tabs below the header and the desktop sidebar consistent.
-export function AppShell({ shopName, products, account, children }: { shopName: string; products: SwitcherProduct[]; account?: Account; children: ReactNode }) {
+export function AppShell({ shopName, shops, account, children }: { shopName: string; shops: SwitcherShop[]; account?: Account; children: ReactNode }) {
   return (
     <div className="bg-app flex min-h-dvh">
       <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col justify-between bg-navy px-6 pt-8 pb-6 lg:flex">
@@ -31,7 +32,7 @@ export function AppShell({ shopName, products, account, children }: { shopName: 
           <Logo href="/today" tone="white" />
           <Nav variant="side" />
         </div>
-        <ProductSwitcher products={products} variant="side" />
+        <ShopSwitcher shops={shops} variant="side" />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -40,7 +41,7 @@ export function AppShell({ shopName, products, account, children }: { shopName: 
             <Logo href="/today" />
           </span>
           <span className="lg:hidden">
-            <ProductSwitcher products={products} variant="pill" />
+            <ShopSwitcher shops={shops} variant="pill" />
           </span>
           <span className="hidden lg:block">
             <Suspense fallback={<span className="text-[13px] text-muted">{t("nav.workspace")}</span>}>

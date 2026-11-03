@@ -11,6 +11,8 @@ import { normalizePhoto, photoToModelDataUrl, type PhotoInput } from "./photo";
 // Larger than the extraction image: the mask is upscaled onto full-resolution pixels,
 // so this sets how clean the cutout edge is.
 const SAM_INPUT_MAX_SIDE = 2048;
+/** Longest side of the stored cutout PNG; keeps it well under the 10 MB media bucket limit. */
+const CUTOUT_MAX_SIDE = 2048;
 
 export type NormalizedBBox = {
   x: number;
@@ -273,22 +275,36 @@ export async function cutoutProduct(
           .raw()
           .toBuffer();
 
-  // Combine 3-channel RGB crop + 1-channel Alpha mask into transparent RGBA PNG
-  const cutoutBuffer = await sharp(croppedRgbBuffer, {
+  // Combine 3-channel RGB crop + 1-channel Alpha mask into transparent RGBA PNG.
+  // A full-resolution phone crop can pass the 10 MB bucket limit as PNG, and a slide never
+  // shows the product above ~1350 px, so the stored cutout is capped (aspect kept).
+  const rgba = await sharp(croppedRgbBuffer, {
     raw: { width: cropWidth, height: cropHeight, channels: 3 },
   })
     .joinChannel(alphaChannel, {
       raw: { width: cropWidth, height: cropHeight, channels: 1 },
     })
-    .png()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const cutoutBuffer = await sharp(rgba.data, {
+    raw: { width: rgba.info.width, height: rgba.info.height, channels: 4 },
+  })
+    .resize({
+      width: CUTOUT_MAX_SIDE,
+      height: CUTOUT_MAX_SIDE,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .png({ compressionLevel: 9, adaptiveFiltering: true })
     .toBuffer();
+  const outMeta = await sharp(cutoutBuffer).metadata();
 
   return {
     cutoutBuffer,
     cutoutDataUrl: `data:image/png;base64,${cutoutBuffer.toString("base64")}`,
     bbox,
-    width: cropWidth,
-    height: cropHeight,
+    width: outMeta.width ?? cropWidth,
+    height: outMeta.height ?? cropHeight,
     confidence: samOut.confidence ?? null,
     telemetry,
   };

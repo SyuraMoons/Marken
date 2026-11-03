@@ -55,7 +55,7 @@ Breaking any of these fails SRD v2.0 acceptance criteria:
    - Prices are `null` when not visible in product photos (never invent prices or claims).
    - Shop tone, style rules (up to 10), and content language are injected into every prompt, and captions/slide text pass a rule check (regenerate once on fail, then flag).
 7. **Security & Mobile-First PWA (`NFR-01..14`):**
-   - Secrets and Instagram tokens stay server-side; IG tokens encrypted at rest. RLS scopes all data to the owner's single shop (`one shop per owner`). Media served only via signed URLs.
+   - Secrets and Instagram tokens stay server-side; IG tokens encrypted at rest. RLS scopes all data to the owner's active shop (an owner may have up to 3 companies, SRD v2.1 A-12; `private.current_shop_id()` resolves the active one). Media served only via signed URLs.
    - Works from 360 px wide; Today loads in `< 2 s`.
 
 ## Routes and User Flow (SRD v2.0 §6 & §9)
@@ -67,7 +67,7 @@ Breaking any of these fails SRD v2.0 acceptance criteria:
   3. Review (required): edit/delete/add products; owner confirms each cutout.
   4. Voice & Instagram (optional): tone, rules, live sample caption; connect IG or skip.
   5. First post + tour (optional tour): coach marks run on a sample post while the real 3-slide carousel generates, swapping to the real post when ready.
-- **Routes:** `/` · `/login` · `/onboarding/[step]` · `/today` · `/posts/[id]/edit` · `/products` · `/results` (P1) · `/settings`
+- **Routes:** `/` · `/login` · `/onboarding/[step]` · `/today` (`?post=<id>` opens an earlier post) · `/posts` (history of generated posts) · `/posts/[id]/edit` · `/products` · `/results` (P1) · `/settings`
 - **API:** `POST /api/shops` · `DELETE /api/shops/:id` · `POST /api/uploads` (returns a signed upload URL; the browser uploads straight to Storage) · `POST /api/shops/:id/extract` · `PATCH /api/shops/:id/onboarding` · `POST /api/shops/:id/posts/generate` · `POST /api/posts/:id/approve` · `POST /api/posts/:id/skip` · `POST /api/posts/:id/regenerate` · `GET /api/posts/:id/activity` · `GET /api/auth/instagram/callback` · cron `trends.daily` · cron `posts.daily`
 
 <!-- BEGIN:nextjs-agent-rules -->

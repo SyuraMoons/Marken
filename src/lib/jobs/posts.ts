@@ -57,7 +57,7 @@ export const generatePost = inngest.createFunction(
     },
   },
   async ({ event, step }) => {
-    const { shopId, postId } = event.data as JobEvents["post/generate.requested"];
+    const { shopId, postId, productId } = event.data as JobEvents["post/generate.requested"];
     const ctx = { shopId, postId };
 
     const input = await step.run("load", async () => {
@@ -79,6 +79,10 @@ export const generatePost = inngest.createFunction(
       ]);
       if (!shop) throw new NonRetriableError("shop not found");
       if (!products?.length) throw new NonRetriableError("no confirmed product");
+      // "Make a post with this product" (A-11): only that product is offered to the planner. If it was hidden or
+      // unconfirmed since the tap, fail the post instead of quietly posting a different product.
+      const eligible = productId ? products.filter((p) => p.id === productId) : products;
+      if (!eligible.length) throw new NonRetriableError("requested product is no longer available");
 
       // Rotate: the product that went longest without a post goes first.
       const { data: recent } = await admin
@@ -90,7 +94,7 @@ export const generatePost = inngest.createFunction(
         .limit(20);
       const lastUsed = new Map<string, string>();
       for (const r of recent ?? []) if (r.product_id && !lastUsed.has(r.product_id)) lastUsed.set(r.product_id, r.post_date);
-      const ordered = [...products].sort((a, b) =>
+      const ordered = [...eligible].sort((a, b) =>
         (lastUsed.get(a.id) ?? "").localeCompare(lastUsed.get(b.id) ?? ""),
       );
 

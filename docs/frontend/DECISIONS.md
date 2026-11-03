@@ -149,3 +149,7 @@ A bottom-right question-mark button opens page-specific tours on the app shell a
 
 **FD-43 · Onboarding needs 1 photo, not 3 (SRD v2.1 A-10).**
 Step 2 accepts 1–10 photos and the route answers `need_a_photo` only when nothing was uploaded. Replaces the "3–10 photos / `need_3_photos`" part of FD-36.
+
+
+**FD-44 · Make a post with this product (SRD v2.1 A-11).**
+After confirming a cutout, /products offers "Make post" (also on each confirmed product card). It calls the generate route with `productId` and opens /today, which shows the generating screen with the product name and live steps. A product post replaces today's post only while it is `ready`; approved posts answer `today_post_locked`. One live post per day is unchanged.

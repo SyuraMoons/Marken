@@ -78,6 +78,7 @@ Where this table disagrees with the rest of the SRD, this table wins. Items mark
 | A-06 | Company details (onboarding step 1, Settings) | name, category, country, content language, time zone | Adds a free-text **company description** ("what you sell and who it's for"), injected into prompts like tone and rules. Needs a `shops` column |
 | A-07 | Loading states (NFR-17) | Not specified | Uploading, preparing cutouts, regenerating scene, preparing captions and refreshing results each have a screen state; they advance on real completion only |
 | A-10 | Upload minimum (onboarding step 2, FR-OB-03) | 3 to 10 photos | **1 to 10** photos. One clear photo is enough to start; each photo becomes its own product until A-08 (several photos per product) ships |
+| A-11 | Make a post with a chosen product (F-08) | Run now only rotates products | Products screen offers **Make post** after a cutout is confirmed and on each confirmed product. `POST .../posts/generate` takes optional `productId`; it replaces today's post only while that post is `ready`, never after approval |
 
 Out of scope changes: service businesses and Facebook publishing are no longer out of scope (A-02, A-04).
 

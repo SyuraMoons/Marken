@@ -36,6 +36,9 @@ async function createMockScenePngBase64(): Promise<string> {
 export async function callMockProvider(
   req: ProviderRequest,
 ): Promise<ProviderRawResponse> {
+  console.warn(
+    `[Gateway] Step "${req.step}" running with MOCK provider. Configure META_MODEL_API_KEY in .env.local to invoke live Meta models (SAM 3.1, Muse Spark, Muse Wonder, Muse Image).`,
+  );
   switch (req.step) {
     case "extract_products":
       return {

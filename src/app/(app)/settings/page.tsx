@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { SettingsView } from "@/components/settings-view";
+import { getBrandKit } from "@/lib/data/brand-kit";
 import { getOwnerShop } from "@/lib/data/today";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,11 +24,14 @@ async function Settings() {
     .eq("shop_id", owner.shop.id)
     .order("position");
   const { shop } = owner;
+  const brandKit = await getBrandKit(shop.id);
   return (
     <SettingsView
       email={owner.user.email ?? ""}
       igConnected={Boolean(shop.ig_account_id)}
       rules={(rules ?? []).map((r) => r.text)}
+      brandKit={brandKit}
+      hasDescription={Boolean(shop.description?.trim())}
       shop={{
         id: shop.id,
         name: shop.name ?? "",

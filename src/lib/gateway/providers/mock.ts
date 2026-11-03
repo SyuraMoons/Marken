@@ -242,6 +242,30 @@ export async function callMockProvider(
         provider: "mock",
       };
 
+    case "rewrite_slide_text":
+      return {
+        rawOutput: { text: "Fresh every single morning" },
+        tokensIn: 120,
+        tokensOut: 12,
+        images: 0,
+        provider: "mock",
+      };
+
+    case "suggest_brand_kit":
+      return {
+        rawOutput: {
+          colors: ["#2456db", "#f4a261", "#fdf6ec"],
+          heading_font: "dm-serif",
+          body_font: "poppins",
+          design_guidance: "Warm, handmade feel. Generous space around the product. Short, friendly headlines.",
+          photo_style: "Natural window light, wooden or linen surfaces, soft shadows.",
+        },
+        tokensIn: 260,
+        tokensOut: 90,
+        images: 0,
+        provider: "mock",
+      };
+
     case "weekly_learning":
       return {
         rawOutput: {

@@ -7,6 +7,7 @@ import {
 import { planDailyCarousel as agentPlanDailyCarousel } from "@/lib/agents/planner";
 import { renderAndVerifySlide as studioRenderAndVerifySlide } from "@/lib/studio";
 import { regenerateCaptionFromFeedback as agentRegenerateCaption } from "@/lib/agents/caption";
+import type { BrandStyle, SlideLayers } from "@/lib/studio/layers";
 
 // The AI steps the jobs call (docs/TEAM.md §2).
 // Wired to the real modules:
@@ -61,6 +62,8 @@ export type RenderedSlide = {
   slidePng: Buffer;
   fidelityScore: number;
   fidelityPassed: boolean;
+  /** Editable layers (SRD A-09); absent only when a test double omits them. */
+  layers?: SlideLayers;
 };
 
 export type RenderSlideInput = {
@@ -76,6 +79,7 @@ export type RenderSlideInput = {
   shopTone?: string;
   styleRules?: string[];
   contentLanguage?: "en" | "id";
+  brand?: BrandStyle;
 };
 
 export async function researchAndScoreTrends(input: {
@@ -256,10 +260,12 @@ export async function renderAndVerifySlide(input: RenderSlideInput): Promise<Ren
     shopTone: input.shopTone,
     styleRules: input.styleRules,
     contentLanguage: input.contentLanguage,
+    brand: input.brand,
     shopId: input.shopId,
     postId: input.postId,
   });
   return {
+    layers: res.layers,
     scenePng: res.sceneBuffer,
     slidePng: res.slideBuffer,
     fidelityScore: res.fidelityScore,

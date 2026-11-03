@@ -17,6 +17,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      brand_kits: {
+        Row: {
+          body_font: string | null
+          colors: Json
+          created_at: string
+          design_guidance: string | null
+          heading_font: string | null
+          id: string
+          photo_style: string | null
+          shop_id: string
+          updated_at: string
+        }
+        Insert: {
+          body_font?: string | null
+          colors?: Json
+          created_at?: string
+          design_guidance?: string | null
+          heading_font?: string | null
+          id?: string
+          photo_style?: string | null
+          shop_id: string
+          updated_at?: string
+        }
+        Update: {
+          body_font?: string | null
+          colors?: Json
+          created_at?: string
+          design_guidance?: string | null
+          heading_font?: string | null
+          id?: string
+          photo_style?: string | null
+          shop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_kits_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: true
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       media_uploads: {
         Row: {
           bytes: number

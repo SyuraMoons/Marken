@@ -121,7 +121,7 @@ export function buildScenePrompt(
     styleClause,
     cleanText
       ? `Render this exact slide headline text cleanly in the top header zone (y < ${Math.max(160, box.y - 20)}px) or bottom footer zone (y > ${Math.min(1260, y2 + 20)}px): "${cleanText}".`
-      : "",
+      : "Do not render any text, letters, numbers, logos or watermarks anywhere in the image. Slide text is added separately by code (SRD A-09), so keep the top and bottom bands calm and uncluttered.",
     `MANDATORY RESERVED EMPTY PRODUCT AREA: Leave the central rectangle x=${box.x}..${x2}, y=${box.y}..${y2} (${box.width}x${box.height}px) completely empty, unobstructed, and clean (flat surface, pedestal, or uncluttered negative space) so the real product cutout can be composited later.`,
     `CRITICAL RULE (FR-CG-04): NEVER draw, render, or hallucinate any product, bottle, jar, package, box, container, or merchandise in the reserved area or anywhere as the hero subject.`,
   ]

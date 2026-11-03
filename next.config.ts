@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
   /* config options here */
   // Keep the dev badge off the sidebar's product switcher (bottom-left).
   devIndicators: { position: "bottom-right" },
+  // The layered slide renderer reads its bundled fonts from disk (SRD A-09), so serverless builds must ship them.
+  outputFileTracingIncludes: { "/api/**/*": ["./src/lib/studio/fonts/**"] },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

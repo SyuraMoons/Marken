@@ -1,5 +1,8 @@
 "use client";
 
+import { BrandKitEditor } from "./brand-kit-editor";
+import { saveBrandKit } from "@/lib/actions/brand-kit";
+import type { BrandKitValue } from "@/lib/brand-kit";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
@@ -31,7 +34,7 @@ export type SetupShop = {
 type Ctx = { shop: SetupShop; go: (step: number) => void; save: (body: Record<string, unknown>) => Promise<boolean> };
 
 // All 5 onboarding steps (F-03, FR-OB, Figma page 05). Each step saves server-side before moving on (FR-OB-11).
-export function SetupSteps({ step, shop, products, rules }: { step: number; shop: SetupShop; products: ProductView[]; rules: string[] }) {
+export function SetupSteps({ step, shop, products, rules, brandKit }: { step: number; shop: SetupShop; products: ProductView[]; rules: string[]; brandKit: BrandKitValue }) {
   const router = useRouter();
   const ctx: Ctx = {
     shop,
@@ -50,7 +53,7 @@ export function SetupSteps({ step, shop, products, rules }: { step: number; shop
       {step === 2 && <Step2 ctx={ctx} hasProducts={products.length > 0} />}
       {/* Keyed by ids so a replaced photo (router.refresh) resets the list. */}
       {step === 3 && <Step3 key={products.map((p) => p.id).join()} ctx={ctx} initial={products} />}
-      {step === 4 && <Step4 ctx={ctx} initialRules={rules} />}
+      {step === 4 && <Step4 ctx={ctx} initialRules={rules} initialKit={brandKit} />}
       {step === 5 && <Step5 ctx={ctx} />}
     </>
   );
@@ -448,10 +451,11 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
 }
 
 // Voice & Instagram (228:16936 / 228:17005), connected state (228:18124).
-function Step4({ ctx, initialRules }: { ctx: Ctx; initialRules: string[] }) {
+function Step4({ ctx, initialRules, initialKit }: { ctx: Ctx; initialRules: string[]; initialKit: BrandKitValue }) {
   const igResult = useSearchParams().get("ig");
   const [tone, setTone] = useState<Tone>(asTone(ctx.shop.tone));
   const [rules, setRules] = useState<string[]>(initialRules.length ? initialRules : [""]);
+  const [kit, setKit] = useState(initialKit);
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
 
@@ -459,6 +463,8 @@ function Step4({ ctx, initialRules }: { ctx: Ctx; initialRules: string[] }) {
     start(async () => {
       setFailed(false);
       const data = { tone, rules: rules.map((r) => r.trim()).filter(Boolean) };
+      // Skipping leaves the kit as it was; Continue saves what the owner chose (SRD A-09).
+      if (action === "finish" && !(await saveBrandKit(kit)).ok) return setFailed(true);
       if (!(await ctx.save(action === "finish" ? { action, data } : { action }))) return setFailed(true);
       ctx.go(5);
     });
@@ -484,7 +490,8 @@ function Step4({ ctx, initialRules }: { ctx: Ctx; initialRules: string[] }) {
       <Split
         left={
           <>
-            <Field n={1} cue="voice" label={t("ob4.tone")}>
+            <BrandKitEditor shopId={ctx.shop.id} value={kit} onChange={setKit} hasDescription={Boolean(ctx.shop.description?.trim())} />
+            <Field n={5} cue="voice" label={t("ob4.tone")}>
               <select value={tone} onChange={(e) => setTone(e.target.value as Tone)} className={glassInput}>
                 {TONES.map((x) => (
                   <option key={x} value={x}>
@@ -494,7 +501,7 @@ function Step4({ ctx, initialRules }: { ctx: Ctx; initialRules: string[] }) {
               </select>
             </Field>
             {rules.map((r, i) => (
-              <Field key={i} n={i + 2} cue="rules" label={t("ob4.rule", { n: i + 1 })}>
+              <Field key={i} n={i + 6} cue="rules" label={t("ob4.rule", { n: i + 1 })}>
                 <span className="flex gap-2">
                   <input value={r} onChange={(e) => setRules(rules.map((x, j) => (j === i ? e.target.value : x)))} maxLength={200} placeholder={t("ob4.rulePlaceholder")} className={glassInput} />
                   {rules.length > 1 && (

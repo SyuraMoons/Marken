@@ -89,7 +89,7 @@ The 2 Nov design adds things SRD v2.0 rules out or the backend cannot store. We 
 - Landing headline "Turn product photos into social posts." and "products or services" copy. FR-LP-01 requires "Your real product, never redrawn." and §2 puts service businesses out of scope.
 - Facebook publishing (`share/publishing/published/download/downloaded-facebook`). §2: Facebook publishing is out of scope; there is no Facebook route.
 - Meta sign-in (`auth-meta-opening/success/retry`). FR-AU-01 is Google + email magic link only.
-- Product switcher and product-scoped Today/Products/Results/Settings (`Product switcher overlay`, `today-sample-product`). The data model allows one live post per shop per day (`posts_one_live_per_shop_day`), so a per-product Today needs a backend change.
+- Product switcher and product-scoped Today/Products/Results/Settings (`Product switcher overlay`, `today-sample-product`). A shop may have up to 5 live posts per day (`posts_daily_cap`); Today still shows only the newest, so a per-product Today needs more work.
 - "Company description" field in setup step 1 and Settings. `shops` has no description column.
 
 **FD-27 · New copy is adopted where it does not conflict with the SRD.**
@@ -152,7 +152,7 @@ Step 2 accepts 1–10 photos and the route answers `need_a_photo` only when noth
 
 
 **FD-44 · Make a post with this product (SRD v2.1 A-11).**
-After confirming a cutout, /products offers "Make post" (also on each confirmed product card). It calls the generate route with `productId` and opens /today, which shows the generating screen with the product name and live steps. A product post replaces today's post only while it is `ready`; approved posts answer `today_post_locked`. One live post per day is unchanged.
+After confirming a cutout, /products offers "Make post" (also on each confirmed product card). It calls the generate route with `productId` and opens /today, which shows the generating screen with the product name and live steps. Up to 5 live posts per shop per day (`posts_daily_cap`); a sixth answers `daily_post_limit`. Earlier posts are kept, and Today shows the newest.
 
 **FD-45 · Generate image post opens one studio; agent activity is inline (supersedes the Activity link in FD-37 and FD-44).**
 Each confirmed product card on /products has a one-tap "Generate image post" button. It calls the generate route with `productId` and opens /today. While the post is `generating`, Today shows the studio: the confirmed cutout ("never redrawn"), three slide placeholders (hook, product, call to action), the step that is running now, and the live Agent Activity Panel, all on one screen. The panel also sits inline on the ready, publishing, failed and skipped screens, so the separate Activity nav item is removed. `?view=activity` and `?view=details` still resolve for old links and tours.

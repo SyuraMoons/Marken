@@ -30,7 +30,7 @@
   "products.madeBody": "Generate a 3-slide image post with {name}. You write a short brief and pick a brand kit first; your real product is placed into each scene, never redrawn.",
   "products.makePost": "Generate image post",
   "products.notNow": "Not now",
-  "products.err.locked": "Today's post is already approved. Try again tomorrow.",
+  "products.err.limit": "You've made 5 posts today. Try again tomorrow.",
   "products.err.queue": "The post maker is offline. Try again in a minute.",
   "status.generating.forProduct": "Making a post for {name}.",
   "products.edit": "Edit product",

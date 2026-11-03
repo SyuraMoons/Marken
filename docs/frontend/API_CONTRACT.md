@@ -84,10 +84,12 @@ Step 1 `data` = `{ name, category, country, content_language, time_zone }`. Step
 // 409 { error: "post_exists" }  — today already has a live post
 // Optional req body (SRD A-11, "Make a post with this product"): { productId?: string }
 //   no body            -> Run now, rotation picks the product
-//   productId          -> post uses that product; a `ready` (not approved) post for today is skipped
-//                         (skip_reason "replaced_by_owner") and replaced
-// 409 { error: "product_not_ready" }   — productId is not this shop's visible, cutout-confirmed product
-// 409 { error: "today_post_locked" }   — today's post is approved/publishing/published, never replaced
+//   productId          -> post uses that product; earlier posts today are kept
+// Up to 5 live (not skipped/failed) posts per shop per day. A post still `generating` for the same
+// request (any for Run now, same product for productId) is returned as { post, created: false }.
+// Today's `ready` posts that failed the fidelity check are skipped (skip_reason "fidelity_failed").
+// 409 { error: "product_not_ready" }          — productId is not this shop's visible, cutout-confirmed product
+// 409 { error: "daily_post_limit", limit: 5 } — today already has 5 live posts
 ```
 
 ### `POST /api/posts/:id/approve` (FR-TD-02, F-12) **[confirm: Harfi]**
@@ -155,7 +157,7 @@ Delete shop (NFR-14) uses `DELETE /api/shops/:id` with `{ "confirm": true }` (re
 The UI is in scope (FD-29) but no route or column exists. Do not infer contracts from Figma copy; the backend owner defines them.
 - **A-03 Meta sign-in:** Supabase Auth `facebook` provider + a `signInWithMeta` server action next to `signInWithGoogle`.
 - **A-04 Facebook publishing:** a destination choice on Approve (Instagram / Facebook / both), Page connection, publish job and status per destination. Post format **to decide**.
-- **A-05 Product scope:** a way to read and generate posts per product; today `posts_one_live_per_shop_day` allows one live post per shop per day. Cadence **to decide**.
+- **A-05 Product scope:** a way to read and generate posts per product; a shop may have up to 5 live posts per day (`posts_daily_cap` trigger); the morning cron still makes one. Per-product cadence **to decide**.
 - **A-08 Several photos per product (Figma "One product · 3 photos"):** today every upload becomes its own product (`products_source_upload_id_key`). The UI collects up to 3 photos but sends only photo 1 until the backend can attach extra photos to one product (e.g. a `product_photos` table and `extract` grouping `uploadIds` into one product).
 - **A-06 Company description:** a `shops.description` column, saved by onboarding step 1 and Settings, and injected into prompts.
 

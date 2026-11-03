@@ -18,6 +18,7 @@ import { ACCEPT, patchOnboarding, uploadAndExtract, validPhoto } from "@/lib/upl
 export type SetupShop = {
   id: string;
   name: string;
+  description?: string | null;
   category: string | null;
   country: string | null;
   content_language: "en" | "id";
@@ -101,6 +102,7 @@ function Guide({ eyebrow, caption }: { eyebrow: string; caption: string }) {
 function Step1({ ctx }: { ctx: Ctx }) {
   const { shop } = ctx;
   const [name, setName] = useState(shop.name);
+  const [description, setDescription] = useState(shop.description ?? "");
   const [category, setCategory] = useState(shop.category ?? CATEGORIES[0]);
   const [country, setCountry] = useState(shop.country ?? COUNTRIES[0]);
   const [language, setLanguage] = useState<"en" | "id">(shop.content_language);
@@ -111,7 +113,7 @@ function Step1({ ctx }: { ctx: Ctx }) {
   const submit = () =>
     start(async () => {
       setFailed(false);
-      const ok = await ctx.save({ action: "finish", data: { name, category, country, content_language: language, time_zone: zone || Intl.DateTimeFormat().resolvedOptions().timeZone } });
+      const ok = await ctx.save({ action: "finish", data: { name, description, category, country, content_language: language, time_zone: zone || Intl.DateTimeFormat().resolvedOptions().timeZone } });
       if (!ok) return setFailed(true);
       ctx.go(2);
     });
@@ -131,13 +133,9 @@ function Step1({ ctx }: { ctx: Ctx }) {
             <Field n={1} cue="shop" label={t("ob1.name")}>
               <input name="name" required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("ob1.namePlaceholder")} autoComplete="organization" className={glassInput} />
             </Field>
-            {/* shortcut: no shops.description column yet (SRD A-06), so the field is shown but not saved. */}
             <Field n={2} cue="text" label={t("ob1.description")}>
-              <textarea disabled rows={3} placeholder={t("ob1.descriptionPlaceholder")} aria-describedby="ob1-desc-note" className={`${glassInput} disabled:opacity-60`} />
+              <textarea name="description" rows={3} maxLength={1000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("ob1.descriptionPlaceholder")} className={glassInput} />
             </Field>
-            <p id="ob1-desc-note" className="-mt-2 text-[13px] text-muted">
-              {t("ob1.descriptionSoon")}
-            </p>
             <Field n={3} cue="tag" label={t("ob1.category")}>
               <select name="category" value={category} onChange={(e) => setCategory(e.target.value)} className={glassInput}>
                 {[...new Set([category, ...CATEGORIES])].map((c) => (

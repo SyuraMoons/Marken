@@ -55,6 +55,7 @@ async function Step({ params }: Pick<PageProps<"/onboarding/[step]">, "params">)
         shop={{
           id: shop.id,
           name: shop.name ?? "",
+          description: shop.description,
           category: shop.category,
           country: shop.country,
           content_language: shop.content_language === "id" ? "id" : "en",

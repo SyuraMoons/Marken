@@ -47,6 +47,8 @@ export type PlanInput = {
   products: { id: string; name: string | null; cutoutPath: string | null }[];
   trend: { id: string; title: string } & TrendAnalysisResult;
   postId: string;
+  /** Owner's brief from the create flow (FD-46). */
+  brief?: string;
 };
 
 export type CarouselPlan = {
@@ -185,6 +187,7 @@ export async function planDailyCarousel(input: PlanInput): Promise<CarouselPlan>
         fromVideo: input.trend.fromVideo,
       },
       postId: input.postId,
+      brief: input.brief,
     });
 
     if (res && res.slides && res.slides.length > 0) {

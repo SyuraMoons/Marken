@@ -44,3 +44,30 @@ export function toBrandKit(row: Row): BrandKitValue {
     photo_style: row.photo_style ?? "",
   };
 }
+
+export const MAX_BRIEF = 600;
+
+/** Post goals offered as chips on the brief step. */
+export const BRIEF_GOALS = ["launch", "bestseller", "event", "everyday"] as const;
+export type BriefGoal = (typeof BRIEF_GOALS)[number];
+
+/** A brief Marken drafts from the shop and product, so first-time owners never start from an empty box. */
+export const DraftedBrief = z.object({
+  goal: z.enum(BRIEF_GOALS).catch("everyday"),
+  audience: z.string().trim().min(1).max(160),
+  mood: z.string().trim().min(1).max(100),
+  highlight: z.string().trim().min(1).max(200),
+});
+export type DraftedBrief = z.infer<typeof DraftedBrief>;
+
+/** Three brand directions drafted from the owner's brief, shown as cards before a post is generated. */
+export const BrandDirections = z.object({
+  directions: z
+    .array(BrandKitSuggestion.extend({ name: z.string().trim().min(1).max(40), summary: z.string().trim().max(200) }))
+    .min(1)
+    .max(3),
+});
+export type BrandDirection = z.infer<typeof BrandDirections>["directions"][number];
+
+/** A saved kit counts as set up once it has any colour, font or guidance. */
+export const hasBrandKit = (k: BrandKitValue) => k.colors.length > 0 || !!k.heading_font || !!k.body_font || !!k.design_guidance.trim() || !!k.photo_style.trim();

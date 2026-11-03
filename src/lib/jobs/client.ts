@@ -6,7 +6,7 @@ import { Inngest } from "inngest";
 export const inngest = new Inngest({ id: "marken" });
 
 export type JobEvents = {
-  "post/generate.requested": { shopId: string; postId: string; productId?: string };
+  "post/generate.requested": { shopId: string; postId: string; productId?: string; brief?: string };
   "post/publish.requested": { shopId: string; postId: string };
   "post/regenerate.requested": {
     shopId: string;

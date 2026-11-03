@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_BRIEF } from "@/lib/brand-kit";
 import { getOwnedShop, shopToday } from "@/lib/api/owner";
 import { apiError, conflict } from "@/lib/http";
 import { enqueue } from "@/lib/jobs/client";
@@ -7,8 +8,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 // Run now: create today's post and hand generation to the job (F-08, FR-CG-06).
-// Optional body { productId }: make a post with one product (SRD A-11). No body = Run now, rotation picks the product.
-const Body = z.object({ productId: z.uuid().optional() });
+// Optional body { productId, brief }: "Generate image post" for one product (SRD A-11) with the owner's brief
+// from the create flow (FD-46). No body = Run now, rotation picks the product.
+const Body = z.object({ productId: z.uuid().optional(), brief: z.string().trim().max(MAX_BRIEF).optional() });
 
 export async function POST(req: Request, ctx: RouteContext<"/api/shops/[id]/posts/generate">) {
   const { id } = await ctx.params;
@@ -20,6 +22,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/shops/[id]/post
   const body = Body.safeParse(raw ?? {});
   if (!body.success) return apiError("invalid_body", 400);
   const productId = body.data.productId;
+  const brief = body.data.brief || undefined;
 
   const supabase = await createClient();
   let query = supabase
@@ -85,7 +88,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/shops/[id]/post
   const post = created.data;
   const queued = await enqueue(
     "post/generate.requested",
-    { shopId: shop.id, postId: post.id, ...(productId ? { productId } : {}) },
+    { shopId: shop.id, postId: post.id, ...(productId ? { productId } : {}), ...(brief ? { brief } : {}) },
     post.id,
   );
   if (!queued) {

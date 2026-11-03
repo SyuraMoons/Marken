@@ -156,3 +156,14 @@ After confirming a cutout, /products offers "Make post" (also on each confirmed 
 
 **FD-45 · Generate image post opens one studio; agent activity is inline (supersedes the Activity link in FD-37 and FD-44).**
 Each confirmed product card on /products has a one-tap "Generate image post" button. It calls the generate route with `productId` and opens /today. While the post is `generating`, Today shows the studio: the confirmed cutout ("never redrawn"), three slide placeholders (hook, product, call to action), the step that is running now, and the live Agent Activity Panel, all on one screen. The panel also sits inline on the ready, publishing, failed and skipped screens, so the separate Activity nav item is removed. `?view=activity` and `?view=details` still resolve for old links and tours.
+
+## FD-46 · Generate image post opens a create flow; nothing generates before the brief and brand kit (amends FD-45)
+
+**Decision:** "Generate image post" (Products card and the post-confirm screen) links to `/create?product=<id>` instead of starting the job. The flow has three steps:
+1. **Brief:** Marken drafts it on arrival. `POST /api/shops/:id/brand-kit/brief` (Muse Spark via the gateway, step `draft_brief`) reads the shop and product data and returns a goal plus three short fields: who it is for, look and feel, and what to show. The owner edits any field, changes the goal chip, or presses **Write it again**. If drafting fails, the fields stay empty and editable. The fields are joined into one brief, max 600 characters. Most owners have never written a brief, so they start from a draft instead of an empty box.
+2. **Brand kit:** `POST /api/shops/:id/brand-kit/directions` (Muse Spark via the gateway, step `brand_directions`) drafts three brand directions (name, colours, heading/body font, design guidance, photo style) from the brief. The owner picks one, keeps their saved kit, or sets it up by hand with `BrandKitEditor`.
+3. **Review:** product, brief, kit and what they will get. **Generate image post** saves the chosen kit to `brand_kits` if it changed, then calls `POST /api/shops/:id/posts/generate` with `{ productId, brief }` and opens the studio on Today (FD-45).
+
+The brief travels on the `post/generate.requested` event to the planner, which follows it for angle, audience and mood. The truth guardrails still apply: no invented prices, discounts or claims.
+
+**Why:** The owner said the old one-tap start felt like nothing happened, and that a post should come from their brief and a chosen brand identity. Nothing runs until they press Generate, so the AI does no work the owner did not ask for.

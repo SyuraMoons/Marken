@@ -8,6 +8,7 @@ export type NavItem = { href: string; label: string; icon: string };
 
 // Post screens live under Today (DX-23).
 function section(pathname: string) {
+  if (pathname.startsWith("/create")) return "/products";
   return pathname.startsWith("/posts") ? "/today" : "/" + pathname.split("/")[1];
 }
 

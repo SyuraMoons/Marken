@@ -58,7 +58,7 @@ export const generatePost = inngest.createFunction(
     },
   },
   async ({ event, step }) => {
-    const { shopId, postId, productId } = event.data as JobEvents["post/generate.requested"];
+    const { shopId, postId, productId, brief } = event.data as JobEvents["post/generate.requested"];
     const ctx = { shopId, postId };
 
     const input = await step.run("load", async () => {
@@ -133,6 +133,7 @@ export const generatePost = inngest.createFunction(
           products: input.products,
           trend,
           postId,
+          brief,
         }),
       ),
     ) as CarouselPlan;

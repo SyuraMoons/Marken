@@ -12,6 +12,7 @@ const Step1 = z.object({
   name: z.string().trim().min(1).max(120),
   category: z.string().trim().min(1).max(120),
   country: z.string().trim().min(2).max(80),
+  description: z.string().trim().max(1000).optional(),
   content_language: z.enum(["en", "id"]),
   time_zone: z.string().refine(isValidTimeZone, "invalid time zone"),
 });

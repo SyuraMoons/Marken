@@ -442,6 +442,7 @@ export type Database = {
           onboarding_step: number
           owner_id: string
           time_zone: string | null
+          description: string | null
           tone: string | null
           tour_completed_at: string | null
           updated_at: string
@@ -459,6 +460,7 @@ export type Database = {
           onboarding_step?: number
           owner_id: string
           time_zone?: string | null
+          description?: string | null
           tone?: string | null
           tour_completed_at?: string | null
           updated_at?: string
@@ -476,6 +478,7 @@ export type Database = {
           onboarding_step?: number
           owner_id?: string
           time_zone?: string | null
+          description?: string | null
           tone?: string | null
           tour_completed_at?: string | null
           updated_at?: string

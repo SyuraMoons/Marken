@@ -168,6 +168,7 @@ async function dispatchProvider(params: {
         fallback: false,
       };
     }
+    assertMockAllowed(params.model);
     const response = await callMockProvider(params);
     return {
       response,
@@ -205,6 +206,7 @@ async function dispatchProvider(params: {
         };
       }
 
+      assertMockAllowed(params.model);
       const response = await callMockProvider({
         ...params,
         model: "muse-spark-open",
@@ -232,7 +234,8 @@ async function dispatchProvider(params: {
     };
   }
 
-  // Offline / Local dev deterministic mock provider
+  // Offline / Local dev deterministic mock provider (explicit opt-in only)
+  assertMockAllowed(params.model);
   const response = await callMockProvider(params);
   return {
     response,
@@ -245,6 +248,14 @@ async function dispatchProvider(params: {
  * Executes a model call through the Single Model Gateway and returns both the validated
  * output and the `model_calls` telemetry record (`FR-CL-01`, `NFR-16`, `NFR-18`).
  */
+function assertMockAllowed(model: string): void {
+  if (process.env.GATEWAY_MODE !== "mock") {
+    throw new Error(
+      `No model provider configured for ${model}. Set META_MODEL_API_KEY / META_MODEL_API_BASE_URL (or GATEWAY_MODE=mock for offline dev).`,
+    );
+  }
+}
+
 export async function callModelWithTelemetry<TInput, TOutput>(
   call: ModelCall<TInput, TOutput>,
 ): Promise<ModelCallResult<TOutput>> {

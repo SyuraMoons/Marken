@@ -228,14 +228,20 @@ export async function renderAndVerifySlide(input: RenderSlideInput): Promise<Ren
 
   // If cutout buffer not directly passed, attempt download from Supabase Storage
   if (!cutoutBuffer && input.cutoutPath) {
+    // A Storage failure is infrastructure, not a bad product photo: surface the real cause.
+    let cause: string;
     try {
       const admin = createAdminClient();
       const { data, error } = await admin.storage.from("media").download(input.cutoutPath);
-      if (!error && data) {
-        cutoutBuffer = Buffer.from(await data.arrayBuffer());
-      }
+      if (error || !data) throw new Error(error?.message ?? "empty response");
+      cutoutBuffer = Buffer.from(await data.arrayBuffer());
+      cause = "";
     } catch (e) {
-      console.warn(`[ports.renderAndVerifySlide] Could not download cutout from ${input.cutoutPath}:`, e);
+      cause = e instanceof Error ? e.message : String(e);
+    }
+    if (cause) {
+      console.warn(`[ports.renderAndVerifySlide] Could not download cutout from ${input.cutoutPath}: ${cause}`);
+      throw new Error(`Could not load the product cutout from storage (${cause}). Try again shortly.`);
     }
   }
 

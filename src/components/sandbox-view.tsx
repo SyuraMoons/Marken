@@ -8,7 +8,7 @@ import { AppHelp } from "./app-help";
 import { t } from "@/lib/i18n";
 import type { Slide } from "@/lib/posts/slides";
 
-const slides: Slide[] = [1, 2, 3].map((order) => ({ order, text: "", alt: "Sample serum product", scene_path: "", slide_path: "/mock/sample-product.png", fidelity_score: 0, fidelity_passed: false }));
+const slides: Slide[] = [1, 2, 3].map((order) => ({ order, text: "", alt: t("practice.productAlt"), scene_path: "", slide_path: "/mock/sample-product.png", fidelity_score: 0, fidelity_passed: false }));
 
 // This isolated practice flow has no API calls, uploads, storage writes or publishing actions.
 export function SandboxView() {

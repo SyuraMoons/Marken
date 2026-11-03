@@ -1,9 +1,7 @@
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
-  // The practice route contains only fixed fixtures and never reads owner data.
-  if (request.nextUrl.pathname === "/sandbox") return NextResponse.next();
   return updateSession(request);
 }
 

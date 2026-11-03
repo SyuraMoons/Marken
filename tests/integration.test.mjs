@@ -42,7 +42,16 @@ test('missing product pixels fail before rendering', async () => {
   let called = false;
   const adapter = ports(async () => { called = true; });
   await assert.rejects(adapter.renderAndVerifySlide(input), /cutout is unavailable/);
-  await assert.rejects(adapter.renderAndVerifySlide({ ...input, cutoutPath: 'missing.png' }), /cutout is unavailable/);
+  assert.equal(called, false);
+});
+
+test('a storage outage reports the real cause, not a bad product photo', async () => {
+  let called = false;
+  const adapter = ports(async () => { called = true; });
+  await assert.rejects(
+    adapter.renderAndVerifySlide({ ...input, cutoutPath: 'present.png' }),
+    (error) => /Storage unavailable/.test(error.message) && !/upload the product photo again/.test(error.message),
+  );
   assert.equal(called, false);
 });
 

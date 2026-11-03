@@ -19,7 +19,7 @@ export function DemoScene({ feature }: { feature: number }) {
     <div className="scene-orbit" /><div className="scene-spark">✦</div>
     {feature === 1 && <>
       <div className="scene-workspace scene-window">
-        <div className="scene-toolbar"><b>marken ✦</b><span>01 / {t("nav.products")}</span></div>
+        <div className="scene-toolbar"><b>{t("demo.toolbar")}</b><span>01 / {t("nav.products")}</span></div>
         <div className="scene-library"><div className="scene-slot" /><div className="scene-slot" /><div className="scene-slot" /></div>
         <Lines />
       </div>
@@ -44,7 +44,7 @@ export function DemoScene({ feature }: { feature: number }) {
       {(["instagram", "facebook"] as const).map((platform, index) => <div key={platform} className={`scene-destination scene-destination-${index}`}>
         {/* eslint-disable-next-line @next/next/no-img-element -- existing exported platform vector */}
         <img src={`/figma/platform-${platform}.svg`} alt="" width={32} height={32} /><span>{t(`share.${platform}`)}</span><i /></div>)}
-      <div className="scene-floating-label">{t("demo.3.state2")}</div><Cursor />
+      <div className="scene-floating-label">{t("demo.4.state2")}</div><Cursor />
     </>}
     {feature === 5 && <>
       <div className="scene-report scene-window"><div className="scene-toolbar"><b>{t("nav.results")}</b><span>✦</span></div>

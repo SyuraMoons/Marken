@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "./button";
+import { prefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { t, type MessageKey } from "@/lib/i18n";
 
 type Step = { selector: string; body: MessageKey };
@@ -36,7 +37,8 @@ function Help({ scope }: { scope: string }) {
   const [mode, setMode] = useState<"closed" | "menu" | "tour">("closed");
   const [steps, setSteps] = useState<Step[]>([]);
   const [index, setIndex] = useState(0);
-  const [rect, setRect] = useState({ left: 0, top: 0, width: 0, height: 0 });
+  // `step` ties a measurement to the step it was taken for, so a stale spotlight is never shown under another step's text.
+  const [rect, setRect] = useState({ step: "", left: 0, top: 0, width: 0, height: 0 });
   const dialog = useRef<HTMLDialogElement>(null);
   const card = useRef<HTMLElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -55,15 +57,14 @@ function Help({ scope }: { scope: string }) {
   useEffect(() => {
     if (mode !== "tour" || !active) return;
     const target = visibleTarget(active.selector);
-    if (!target) return;
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "reduce";
+    if (!target) return; // No spotlight is drawn for it: `rect.step` no longer matches the active step.
     const box = target.getBoundingClientRect();
-    window.scrollBy({ top: box.top - window.innerHeight * .2, behavior: reduced ? "instant" : "smooth" });
+    window.scrollBy({ top: box.top - window.innerHeight * .2, behavior: prefersReducedMotion() ? "instant" : "smooth" });
     const measure = () => {
       const bounds = target.getBoundingClientRect();
       const top = Math.max(4, bounds.top - 6);
       const room = (card.current?.getBoundingClientRect().top ?? innerHeight) - top - 20;
-      setRect({ left: Math.max(4, bounds.left - 6), top, width: Math.min(bounds.width + 12, innerWidth - 8), height: Math.min(bounds.height + 12, Math.max(48, room), innerHeight * .5) });
+      setRect({ step: active.selector, left: Math.max(4, bounds.left - 6), top, width: Math.min(bounds.width + 12, innerWidth - 8), height: Math.min(bounds.height + 12, Math.max(48, room), innerHeight * .5) });
     };
     measure();
     const observer = new ResizeObserver(measure); observer.observe(target);
@@ -88,7 +89,7 @@ function Help({ scope }: { scope: string }) {
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }}>
-      {mode === "tour" && rect.width > 0 && <div aria-hidden="true" className="tour-spotlight" style={rect}><span className="tour-pointer">↖</span></div>}
+      {mode === "tour" && rect.width > 0 && rect.step === active?.selector && <div aria-hidden="true" className="tour-spotlight" style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}><span className="tour-pointer">↖</span></div>}
       <section ref={card} className="tour-card flex flex-col gap-4 rounded-card border border-powder bg-white p-5 text-ink shadow-2xl">
         <div className="flex items-center justify-between gap-4"><h2 id="help-title" className="text-xl font-semibold">{t(mode === "tour" ? "tour.title" : "tour.help")}</h2><button type="button" onClick={close} className="flex size-11 shrink-0 items-center justify-center rounded-control text-xl focus-visible:outline-2 focus-visible:outline-blue" aria-label={t("tour.close")}>×</button></div>
         {mode === "menu" && <><p className="text-sm text-muted">{t("tour.menuBody")}</p><Button onClick={start}>{t("tour.start")}</Button><Link href="/sandbox" onClick={close} className="flex min-h-13 items-center justify-center rounded-control border border-border bg-surface px-4 text-center font-medium">{t("tour.practiceLink")}</Link></>}

@@ -1,19 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { t, type MessageKey } from "@/lib/i18n";
 import { DemoScene } from "./demo-scene";
-
-const subscribe = (callback: () => void) => {
-  const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-  query.addEventListener("change", callback);
-  window.addEventListener("marken-motion", callback);
-  return () => {
-    query.removeEventListener("change", callback);
-    window.removeEventListener("marken-motion", callback);
-  };
-};
-const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "reduce";
 
 function DemoCopy({ texts, step, className = "" }: { texts: string[]; step: number; className?: string }) {
   return <span className={`demo-copy grid ${className}`}>
@@ -27,7 +17,7 @@ export function FeatureDemo({ feature }: { feature: number }) {
   const [paused, setPaused] = useState(false);
   const [visible, setVisible] = useState(false);
   const [held, setHeld] = useState(false);
-  const still = useSyncExternalStore(subscribe, reduced, () => true);
+  const still = useReducedMotion();
   const root = useRef<HTMLDivElement>(null);
   const playing = visible && !paused && !held && !still;
   const key = (part: string) => t(`demo.${feature}.${part}` as MessageKey);

@@ -67,6 +67,7 @@ export function SettingsView({ email, igConnected, rules: savedRules, brandKit, 
   const [kit, setKit] = useState(brandKit);
   const [time, setTime] = useState(shop.notify_time);
   const [typed, setTyped] = useState("");
+  const [next, setNext] = useState<{ id: string; name: string } | null>(null);
   const reduceMotion = useSyncExternalStore(subscribeMotion, readMotion, () => false);
 
   const go = (v: View) => {
@@ -92,6 +93,8 @@ export function SettingsView({ email, igConnected, rules: savedRules, brandKit, 
         body: JSON.stringify({ confirm: true }),
       }).catch(() => null);
       if (!res?.ok) return setFailed(true);
+      const body = (await res.json().catch(() => null)) as { next?: { id: string; name: string } | null } | null;
+      setNext(body?.next ?? null);
       setView("deleted");
     });
 
@@ -110,19 +113,24 @@ export function SettingsView({ email, igConnected, rules: savedRules, brandKit, 
     </Button>
   );
 
-  // Your shop has been deleted (228:15840)
+  // The organization has been deleted (228:15840). Full page loads: nothing from the deleted
+  // organization may linger in cached layouts, and the proxy routes an unfinished one to its setup.
   if (view === "deleted") {
     return (
       <StatusScreen title={t("settings.deletedTitle")} body={t("settings.deletedBody")}>
         <InfoCard vector="build" title={t("settings.deletedCardTitle")}>
           {t("settings.deletedCardBody")}
         </InfoCard>
-        <ButtonLink href="/">{t("settings.startAgain")}</ButtonLink>
+        {next ? (
+          <AnchorButton href="/today">{t("settings.continueOther", { name: next.name || t("nav.newCompany") })}</AnchorButton>
+        ) : (
+          <AnchorButton href="/">{t("settings.startAgain")}</AnchorButton>
+        )}
       </StatusScreen>
     );
   }
 
-  // Delete your shop? (228:15761): typing the shop name unlocks the button.
+  // Delete this organization? (228:15761): typing its name unlocks the button.
   if (view === "delete") {
     return (
       <StatusScreen title={t("settings.deleteTitle")} body={t("settings.deleteBody")}>
@@ -136,14 +144,14 @@ export function SettingsView({ email, igConnected, rules: savedRules, brandKit, 
         <Button variant="danger" onClick={remove} disabled={pending || typed.trim() !== shop.name.trim()} aria-busy={pending}>
           {t("settings.deleteConfirm")}
         </Button>
-        <Button variant="secondary" onClick={() => go("account")}>
+        <Button variant="secondary" onClick={() => go("main")}>
           {t("settings.keepShop")}
         </Button>
       </StatusScreen>
     );
   }
 
-  // Company details (228:15162)
+  // Organization details (228:15162)
   if (view === "shop") {
     return (
       <StatusScreen title={t("settings.shopTitle")} body={t("settings.shopBody")}>
@@ -170,6 +178,9 @@ export function SettingsView({ email, igConnected, rules: savedRules, brandKit, 
           {t("settings.saveShop")}
         </Button>
         {cancel}
+        <Button variant="text" className="text-danger!" onClick={() => go("delete")}>
+          {t("settings.deleteOrg")}
+        </Button>
       </StatusScreen>
     );
   }

@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { getOwnedShop } from "@/lib/api/owner";
 import { apiError, parseJson } from "@/lib/http";
+import { listShops, setActiveShop } from "@/lib/supabase/active-shop";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
-// Delete the shop and all its media (NFR-14). Row deletes cascade through the schema,
+// Delete an organization (shop) and all its media (NFR-14). Row deletes cascade through the schema,
 // but Storage files do not, so they are removed first. If a file delete fails the shop
 // row stays, and the owner can simply retry.
 // `publish` holds the JPEG copies made for Instagram, so it must go too.
@@ -40,5 +42,12 @@ export async function DELETE(req: Request, ctx: RouteContext<"/api/shops/[id]">)
   const { error } = await admin.from("shops").delete().eq("id", shop.id);
   if (error) return apiError("shop_delete_failed", 500);
 
-  return Response.json({ deleted: true });
+  // An owner may have other organizations (SRD v2.1 A-12). Deleting the active one clears the
+  // pointer, so point it at a finished organization if there is one, else whatever is left.
+  const supabase = await createClient();
+  const left = await listShops(supabase, guard.user.id);
+  const next = left.shops.find((s) => s.onboarding_completed_at) ?? left.shops[0] ?? null;
+  if (next) await setActiveShop(supabase, guard.user.id, next.id);
+
+  return Response.json({ deleted: true, next: next ? { id: next.id, name: next.name ?? "" } : null });
 }

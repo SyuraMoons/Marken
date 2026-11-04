@@ -1,17 +1,26 @@
 // Contemporary commercial poster templates (inspired by high-performance social creative like BLU).
 // Provides deterministic typography, color card blocks, and product positioning.
 
-import { CANVAS_H, CANVAS_W, defaultTextBox, fitFontSize, type Box, type FontId, type SlideLayers, type TextLayer } from "./layers";
+import {
+  CANVAS_H,
+  CANVAS_W,
+  defaultTextBox,
+  fitFontSize,
+  MAX_TEXT_SIZE,
+  type Box,
+  type FontId,
+  type SlideBackground,
+  type SlideLayers,
+  type TemplateId,
+  type TextLayer,
+} from "./layers";
 import type { ProductPalette } from "./palette";
 
+export type { TemplateId } from "./layers";
 export type PostCategory = "product-highlight" | "product-poster" | "product-with-name";
 
-export type TemplateId =
-  | PostCategory
-  | "big-type-behind"
-  | "color-block"
-  | "pedestal-hero"
-  | "tilted-hero";
+/** Templates whose headline sits on a drawn card or banner, so its colour is fixed by the template. */
+export const TEMPLATES_WITH_TEXT_ON_SHAPE: ReadonlySet<TemplateId> = new Set(["color-block", "product-poster", "tilted-hero"]);
 
 export type TemplateInput = {
   templateId: TemplateId;
@@ -29,7 +38,10 @@ export type TemplateInput = {
 /**
  * Creates SVG for background graphic shapes (cards, pills, blocks) matching the template style.
  */
-export function buildTemplateBackgroundShapes(templateId: TemplateId, palette: ProductPalette): Buffer | null {
+export function buildTemplateBackgroundShapes(
+  templateId: TemplateId,
+  palette: Pick<ProductPalette, "dominant" | "accent">,
+): Buffer | null {
   if (templateId === "color-block" || templateId === "product-poster") {
     // Large stylish rounded rectangular card in the upper portion of the canvas (BLU style)
     const cardSvg = `
@@ -59,6 +71,13 @@ export function buildTemplateBackgroundShapes(templateId: TemplateId, palette: P
 /**
  * Applies a contemporary template to generate ready-to-render SlideLayers.
  */
+/** The colours a template's graphics need, stored on the layers so edits redraw them. */
+export function templateBackground(templateId: TemplateId, palette: ProductPalette): SlideBackground | undefined {
+  return buildTemplateBackgroundShapes(templateId, palette)
+    ? { template: templateId, dominant: palette.dominant, accent: palette.accent }
+    : undefined;
+}
+
 export function applyTemplateLayout(input: TemplateInput): SlideLayers {
   const { templateId, sceneBrief, headline, subline, cta, bigWord, palette } = input;
   const fontH: FontId = input.fontHeading ?? (templateId === "big-type-behind" ? "bebas" : "poppins-bold");
@@ -154,11 +173,12 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
     case "big-type-behind": {
       // 1. Giant typography word behind product (BLU "BLU?" style)
       // E.g. "COLD", "PURE", "HYDRO" - spans broadly across the upper body
-      const keyword = (bigWord || headline.split(" ")[0] || "COLD").toUpperCase().slice(0, 6);
+      // Whole word, never cut: long words get a smaller size instead.
+      const keyword = (bigWord || headline.split(" ")[0] || "COLD").toUpperCase();
       const bgTextBox: Box = { x: 20, y: 190, width: 1040, height: 420 };
-      const calcSize = Math.min(340, Math.max(220, Math.round(1000 / (keyword.length * 0.42))));
+      const calcSize = fitFontSize(keyword, "bebas", bgTextBox, MAX_TEXT_SIZE);
       // Use vibrant neon/accent color from palette or hot contrast
-      const bgWordColor = palette.accent.toLowerCase() === "#ffffff" ? "#ff007f" : palette.accent;
+      const bgWordColor = palette.accent;
       textLayers.push({
         id: "big-type-behind",
         role: "headline",
@@ -179,7 +199,7 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
           text: headline.toUpperCase(),
           box: hBox,
           font: fontH,
-          size: fitFontSize(headline, fontH, hBox, 64),
+          size: fitFontSize(headline.toUpperCase(), fontH, hBox, 64),
           color: "#ffffff",
           align: "center",
         });
@@ -261,7 +281,7 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
         text: headline.toUpperCase(),
         box: hBox,
         font: "bebas",
-        size: fitFontSize(headline, "bebas", hBox, 110),
+        size: fitFontSize(headline.toUpperCase(), "bebas", hBox, 110),
         color: "#ffffff",
         align: "left",
       });
@@ -351,9 +371,11 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
     productBox = { ...productBox, ...input.productBox };
   }
 
+  const background = templateBackground(templateId, palette);
   return {
     sceneBrief,
     product: { box: productBox },
     text: textLayers,
+    ...(background ? { background } : {}),
   };
 }

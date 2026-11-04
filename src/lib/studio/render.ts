@@ -8,6 +8,7 @@ import { createElement } from "react";
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
 import { compositeProductSlide, type DropShadowOptions, type PlacedProductBox } from "./composite";
+import { buildTemplateBackgroundShapes } from "./templates";
 import { CANVAS_H, CANVAS_W, FONTS, normalizeLayers, textLineHeight, type Box, type FontId, type SlideLayers, type TextLayer } from "./layers";
 
 const FONT_DIR = path.join(process.cwd(), "src/lib/studio/fonts");
@@ -89,7 +90,7 @@ export type RenderLayeredInput = {
   cutout: Buffer;
   layers: SlideLayers;
   shadow?: DropShadowOptions;
-  /** Optional background graphic shapes (cards, banners) rendered under text and product */
+  /** Background graphics (cards, banners) under text and product. Defaults to the ones `layers.background` describes. */
   backgroundShapes?: Buffer | null;
 };
 
@@ -104,9 +105,13 @@ export async function renderLayeredSlide(input: RenderLayeredInput): Promise<Ren
   const layers = normalizeLayers(input.layers);
   let base = await sharp(input.scene).resize(CANVAS_W, CANVAS_H, { fit: "cover" }).ensureAlpha().png().toBuffer();
 
-  if (input.backgroundShapes) {
+  // Rebuilt from the stored layers, so a slide edit keeps the template card or banner.
+  const shapes =
+    input.backgroundShapes ??
+    (layers.background ? buildTemplateBackgroundShapes(layers.background.template, layers.background) : null);
+  if (shapes) {
     base = await sharp(base)
-      .composite([{ input: input.backgroundShapes, left: 0, top: 0 }])
+      .composite([{ input: shapes, left: 0, top: 0 }])
       .png()
       .toBuffer();
   }

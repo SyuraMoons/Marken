@@ -2,7 +2,7 @@
 // Chains `generateSlideScene` (Muse Image 1080x1350 with reserved empty area) ->
 // `compositeProductSlide` (deterministic `sharp` cutout + shadow compositing) ->
 // `verifySlideFidelity` (`sharp` pixel comparison + `Muse Spark` text & style rule check).
-// Automatically rebuilds once on failure (`FR-FD-01`, `FR-FD-02`), then flags if still failing.
+// Only the product check blocks Approve; a text issue is returned as a note for the owner.
 
 import type { ModelCallTelemetry } from "../gateway";
 import {
@@ -112,8 +112,6 @@ export type RenderAndVerifySlideInput = {
   styleRules?: string[];
   /** Content language ("en" | "id") */
   contentLanguage?: "en" | "id";
-  /** Maximum rebuild retries when fidelity check fails (default: 1 per FR-FD-01..02) */
-  maxRetries?: number;
   /** Brand kit colours and fonts for the text layers (SRD A-09). */
   brand?: BrandStyle;
   shopId?: string;
@@ -137,19 +135,23 @@ export type RenderAndVerifySlideResult = {
   reservedBox: ReservedBox;
   /** Exact coordinates where the scaled product cutout was placed */
   placedBox: PlacedProductBox;
-  /** Whether the slide passed both pixel and text/rule fidelity checks (`posts.slides[].fidelity_passed`) */
+  /** Product check (`FR-FD-01`, `posts.slides[].fidelity_passed`): the only result that blocks Approve */
   fidelityPassed: boolean;
-  /** Combined `[0..1]` fidelity score (`posts.slides[].fidelity_score`) */
+  /** Product pixel score `[0..1]` (`posts.slides[].fidelity_score`) */
   fidelityScore: number;
+  /** Spelling and style rules passed (`FR-FD-02`, `posts.slides[].text_passed`) */
+  textPassed: boolean;
+  /** Text problems for the owner to fix in the slide editor (`posts.slides[].text_issues`) */
+  textIssues: string[];
   /** Eligibility for the "Real product" badge on Today (`FR-FD-03`) */
   realProductBadge: boolean;
-  /** True when the slide still failed after the 1x auto-rebuild (`FR-FD-01..02`) */
+  /** True when the product check failed (`FR-FD-01`) */
   flagged: boolean;
   /** Full fidelity breakdown (`pixelPassed`, `spellingPassed`, `rulesPassed`, `issues`) */
   fidelity: VerifySlideFidelityResult;
-  /** Number of render attempts executed (1 on first-try pass, 2 when rebuilt once) */
+  /** Render attempts executed (always 1: a new scene cannot change either check) */
   attempts: number;
-  /** Ordered gateway telemetry records across all steps (`render_image`, `verify_slide`, optional `regenerate_image`) */
+  /** Ordered gateway telemetry records (`render_image`, `verify_slide`) */
   telemetry: ModelCallTelemetry[];
   /** Sum of `costUsd` across all model calls for this slide */
   totalCostUsd: number;
@@ -162,7 +164,7 @@ export type RenderAndVerifySlideResult = {
  * 1. `generateSlideScene` (`Muse Image` 1080x1350 with reserved empty area)
  * 2. `compositeProductSlide` (deterministic `sharp` auto-fit + drop shadow)
  * 3. `verifySlideFidelity` (`sharp` pixel check + `Muse Spark` spelling & style rule check)
- * 4. If fidelity fails, automatically rebuilds once (`step: "regenerate_image"`), then flags if still failing.
+ * 4. Flags the slide when the product check fails; text issues come back as notes.
  *
  * Supports both `renderAndVerifySlide(inputObj)` and `renderAndVerifySlide(sceneBrief, cutoutBuffer)`.
  */
@@ -195,12 +197,6 @@ export async function renderAndVerifySlide(
       "renderAndVerifySlide requires a valid, non-empty product cutout buffer",
     );
   }
-
-  const maxRetries =
-    typeof input.maxRetries === "number" && input.maxRetries >= 0
-      ? Math.min(2, Math.round(input.maxRetries))
-      : 1;
-  const maxAttempts = 1 + maxRetries;
 
   const cutoutBuf = Buffer.isBuffer(input.cutout)
     ? input.cutout
@@ -248,19 +244,13 @@ export async function renderAndVerifySlide(
   let lastComposite!: CompositeProductSlideResult;
   let lastLayers!: SlideLayers;
   let lastFidelity!: VerifySlideFidelityResult;
-  let attempts = 0;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    attempts = attempt;
-    const isRetry = attempt > 1;
-    const retryNote =
-      isRetry && lastFidelity?.issues.length
-        ? ` Retry correction required: ${lastFidelity.issues.join("; ")}. Ensure the central product zone is completely unobstructed and slide text is spelled accurately.`
-        : "";
-
+  // One pass, no automatic rebuild: the product is composited by code and the text is drawn by code,
+  // so a new Muse Image scene can change neither check. A rebuild only added a paid image call (NFR-06).
+  {
     // Step 1: Generate the 1080x1350 scene with a reserved empty product area and NO text (`FR-CG-04`, A-09).
     lastScene = await generateSlideScene({
-      sceneBrief: `${input.sceneBrief.trim()}${retryNote}`,
+      sceneBrief: input.sceneBrief.trim(),
       slideText: "",
       slideRole: input.slideRole,
       visualStyle: input.visualStyle,
@@ -268,7 +258,7 @@ export async function renderAndVerifySlide(
       surfaceType: input.surfaceType,
       lightingStyle: input.lightingStyle,
       reservedBox: templateLayers?.product.box ?? input.reservedBox,
-      step: isRetry ? "regenerate_image" : "render_image",
+      step: "render_image",
       shopId: input.shopId,
       postId: input.postId,
     });
@@ -348,21 +338,6 @@ export async function renderAndVerifySlide(
       postId: input.postId,
     });
     allTelemetry.push(lastFidelity.telemetry);
-
-    if (lastFidelity.fidelityPassed) {
-      break;
-    }
-
-    // Fix 2 (PR #36 review): Pixel failure is deterministic under the same cutout and box,
-    // so regenerating the scene cannot fix it. Only retry when spelling or rule checks fail,
-    // protecting the < $0.10 per carousel budget.
-    if (
-      !lastFidelity.pixelPassed &&
-      lastFidelity.spellingPassed &&
-      lastFidelity.rulesPassed
-    ) {
-      break;
-    }
   }
 
   const totalCostUsd = Number(
@@ -382,10 +357,12 @@ export async function renderAndVerifySlide(
     placedBox: lastComposite.placedBox,
     fidelityPassed: lastFidelity.fidelityPassed,
     fidelityScore: lastFidelity.fidelityScore,
+    textPassed: lastFidelity.textPassed,
+    textIssues: lastFidelity.textPassed ? [] : lastFidelity.issues,
     realProductBadge: lastFidelity.realProductBadge,
     flagged: !lastFidelity.fidelityPassed,
     fidelity: lastFidelity,
-    attempts,
+    attempts: 1,
     telemetry: allTelemetry,
     totalCostUsd,
     totalLatencyMs,

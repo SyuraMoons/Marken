@@ -234,7 +234,7 @@ export async function callMockProvider(
         },
         tokensIn: 260,
         tokensOut: 70,
-        images: 1,
+        images: 0,
         provider: "mock",
       };
 

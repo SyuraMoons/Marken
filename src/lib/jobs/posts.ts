@@ -287,8 +287,8 @@ async function renderSlide(
   brand?: BrandStyle,
 ): Promise<Slide> {
   const admin = createAdminClient();
-  // The studio rebuilds a failed slide once (FR-FD-01), then flags it. Retrying here too
-  // would multiply paid image calls past the USD 0.10 per carousel target (NFR-06).
+  // No retry here: a new scene cannot change the product or text check, and each retry is a
+  // paid image call against the USD 0.10 per carousel target (NFR-06).
   const result = await renderAndVerifySlide({
     ...s,
     cutoutPath,
@@ -318,6 +318,8 @@ async function renderSlide(
     slide_path,
     fidelity_score: result.fidelityScore,
     fidelity_passed: result.fidelityPassed,
+    text_passed: result.textPassed,
+    text_issues: result.textIssues,
     layers: result.layers,
   };
 }

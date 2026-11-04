@@ -60,10 +60,15 @@ export type VerifySlideFidelityInput = ComputePixelFidelityInput & {
 };
 
 export type VerifySlideFidelityResult = PixelFidelityResult & {
-  /** Overall slide pass: `pixelPassed && spellingPassed && rulesPassed` */
+  /**
+   * Product check (`FR-FD-01`): equals `pixelPassed`. This is the only result that blocks Approve.
+   * Text is drawn by code from the plan (A-09), so a text issue is a note for the owner, not a product failure.
+   */
   fidelityPassed: boolean;
-  /** Combined `[0..1]` fidelity score stored in `posts.slides[].fidelity_score` */
+  /** Product pixel score `[0..1]` stored in `posts.slides[].fidelity_score` */
   fidelityScore: number;
+  /** `spellingPassed && rulesPassed` (`FR-FD-02`): shown as a warning on the slide */
+  textPassed: boolean;
   /** Whether the "Real product" badge may be shown (`FR-FD-03`: true only when `FR-FD-01` passes) */
   realProductBadge: boolean;
   /** Whether `Muse Spark` verified the slide text is spelled accurately (`FR-FD-02`) */
@@ -235,39 +240,31 @@ export async function computePixelFidelity(
 export async function verifySlideFidelity(
   input: VerifySlideFidelityInput,
 ): Promise<VerifySlideFidelityResult> {
-  const slideBuf = resolveBuffer(input.slide);
   const styleRules = (input.styleRules ?? []).slice(0, 10);
 
   // 1. Run deterministic pixel comparison (`FR-FD-01`)
   const pixelResult = await computePixelFidelity(input);
 
-  // 2. Downscale slide to JPEG data URL for fast multimodal inspection by `Muse Spark` (`FR-FD-02`)
-  const previewJpeg = await sharp(slideBuf)
-    .resize(720, 900, { fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality: 82 })
-    .toBuffer();
-  const slideDataUrl = `data:image/jpeg;base64,${previewJpeg.toString("base64")}`;
-
-  // 3. Deterministic local rule check on `slideText`
+  // 2. Deterministic local rule check on `slideText`
   const localRuleViolations = evaluateLocalSlideRuleViolations(
     input.slideText,
     styleRules,
   );
 
-  // 4. Call `Muse Spark` via Single Model Gateway (`step: "verify_slide"`)
+  // 3. `Muse Spark` checks the words themselves (`FR-FD-02`, `step: "verify_slide"`). Code draws the text
+  //    from this exact string (A-09), so reading it back from the image only adds false failures: the
+  //    decorative big word sits behind the product and layers are not in reading order.
   const systemPrompt = [
-    "You are MARKEN's Pillar 1 Fidelity Verifier (FR-FD-02).",
-    "Inspect the rendered carousel slide image and verify:",
-    "1. `spellingPassed`: The headline text rendered on the slide is legible and spelled accurately matching the expected `slideText`.",
-    "2. `rulesPassed`: Both the expected `slideText` and visible slide copy obey all provided `styleRules` and `shopTone`.",
+    "You are MARKEN's slide copy checker (FR-FD-02).",
+    "You get the words printed on one Instagram carousel slide. Several short text pieces may be joined into one string.",
+    "1. `spellingPassed`: false only for a real misspelling or a wrong word in the content language. Brand and product names, short fragments, and stylised words are fine.",
+    "2. `rulesPassed`: false only when the text clearly breaks one of the listed `styleRules`. Tone is a guide, not a rule: never fail on tone alone.",
+    "List each problem in `issues` as one short sentence the shop owner can act on. Empty when both pass.",
     'Respond strictly with JSON: { "spellingPassed": boolean, "rulesPassed": boolean, "issues": string[] }.',
   ].join("\n");
 
   const { data: modelVerdict, telemetry } = await callModelWithTelemetry<
-    {
-      imageUrl: string;
-      prompt: string;
-    },
+    string,
     z.infer<typeof SlideVerificationModelSchema>
   >({
     step: "verify_slide",
@@ -276,15 +273,12 @@ export async function verifySlideFidelity(
     postId: input.postId,
     systemPrompt,
     schema: SlideVerificationModelSchema,
-    input: {
-      imageUrl: slideDataUrl,
-      prompt: JSON.stringify({
-        expectedSlideText: input.slideText,
-        contentLanguage: input.contentLanguage ?? "en",
-        shopTone: input.shopTone ?? "warm and authentic",
-        styleRules,
-      }),
-    },
+    input: JSON.stringify({
+      slideText: input.slideText,
+      contentLanguage: input.contentLanguage ?? "en",
+      shopTone: input.shopTone ?? "warm and authentic",
+      styleRules,
+    }),
   });
 
   const issues: string[] = [...modelVerdict.issues];
@@ -299,22 +293,17 @@ export async function verifySlideFidelity(
     }
   }
 
-  const spellingPassed = modelVerdict.spellingPassed;
+  // A slide with no text has nothing to misspell or break.
+  const hasText = input.slideText.trim().length > 0;
+  const spellingPassed = !hasText || modelVerdict.spellingPassed;
   const rulesPassed =
-    modelVerdict.rulesPassed && localRuleViolations.length === 0;
-  const fidelityPassed =
-    pixelResult.pixelPassed && spellingPassed && rulesPassed;
-
-  // Compute overall fidelityScore stored on the slide record
-  const textPenalty = (!spellingPassed ? 0.15 : 0) + (!rulesPassed ? 0.25 : 0);
-  const fidelityScore = Number(
-    Math.max(0, pixelResult.pixelFidelityScore - textPenalty).toFixed(4),
-  );
+    (!hasText || modelVerdict.rulesPassed) && localRuleViolations.length === 0;
 
   return {
     ...pixelResult,
-    fidelityPassed,
-    fidelityScore,
+    fidelityPassed: pixelResult.pixelPassed,
+    fidelityScore: pixelResult.pixelFidelityScore,
+    textPassed: spellingPassed && rulesPassed,
     // FR-FD-03: Today shows "Real product" badge only when FR-FD-01 (pixel check) passes
     realProductBadge: pixelResult.pixelPassed,
     spellingPassed,

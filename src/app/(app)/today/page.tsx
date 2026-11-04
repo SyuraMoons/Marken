@@ -194,6 +194,21 @@ function TodayView({ q, data }: { q: Awaited<PageProps<"/today">["searchParams"]
               <Carousel slides={slides} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} eyebrow={photo?.name} />
             </div>
           </div>
+          {/* Spelling or style rule notes (FR-FD-02): a warning, never a block on Approve. */}
+          {slides
+            .filter((s) => s.text_passed === false)
+            .map((s) => (
+              <InfoCard key={s.order} vector="check" title={t("today.textNote.title", { n: s.order })}>
+                <p>{t("today.textNote.body")}</p>
+                {!!s.text_issues?.length && (
+                  <ul className="mt-2 list-disc pl-5">
+                    {s.text_issues.map((issue) => (
+                      <li key={issue}>{issue}</li>
+                    ))}
+                  </ul>
+                )}
+              </InfoCard>
+            ))}
           {allSlidesPassed(slides) && photo?.src && (
             <ButtonLink href={today({ view: "compare" })} variant="secondary">
               {t("today.compare")}

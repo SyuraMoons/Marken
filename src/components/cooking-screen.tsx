@@ -26,4 +26,3 @@ export function CookingContent({ detail, children }: { detail?: string; children
 export function CookingScreen(props: { detail?: string; children?: ReactNode }) {
   return <div className="bg-app cooking-screen"><CookingContent {...props} /></div>;
 }
-

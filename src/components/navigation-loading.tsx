@@ -7,4 +7,3 @@ export function NavigationLoading() {
   const { pending } = useLinkStatus();
   return <CookingOverlay active={pending} />;
 }
-

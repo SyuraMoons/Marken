@@ -112,4 +112,3 @@ export function SharePost({ downloads, caption }: { downloads: string[]; caption
     </details>
   );
 }
-

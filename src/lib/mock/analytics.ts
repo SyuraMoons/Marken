@@ -18,4 +18,3 @@ export function summarizeAnalytics(posts: DemoPost[]) {
   const likes = total("likes"), comments = total("comments"), saves = total("saves"), shares = total("shares");
   return { reach: total("reach"), impressions: total("impressions"), likes, comments, saves, shares, orders: total("orders"), interactions: likes + comments + saves + shares, dailyReach: ANALYTICS_DAYS.map((_, i) => posts.reduce((sum, post) => sum + post.dailyReach[i], 0)) };
 }
-

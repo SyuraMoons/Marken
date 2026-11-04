@@ -23,4 +23,3 @@ export function CookingOverlay({ active, detail }: { active: boolean; detail?: s
     document.body,
   );
 }
-

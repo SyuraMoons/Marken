@@ -264,7 +264,7 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
               const open = () => setView(p.cutout_confirmed ? { kind: "edit", id: p.id } : { kind: "check", id: p.id });
               return (
                 <li key={p.id} className="group flex flex-col rounded-[16px] bg-white p-2 shadow-[0_10px_28px_rgb(33_61_140/0.12)] ring-1 ring-border transition hover:-translate-y-1 hover:shadow-[0_16px_36px_rgb(33_61_140/0.18)]">
-                  <button type="button" onClick={open} aria-label={`${t(p.cutout_confirmed ? "products.edit" : "products.check")}: ${p.name}`} className="relative aspect-[4/5] overflow-hidden rounded-control bg-[radial-gradient(circle_at_30%_40%,#e5f0ff,#f9f9ff)]">
+                  <button type="button" data-tour="product-photo" onClick={open} aria-label={`${t(p.cutout_confirmed ? "products.edit" : "products.check")}: ${p.name}`} className="relative aspect-[4/5] overflow-hidden rounded-control bg-[radial-gradient(circle_at_30%_40%,#e5f0ff,#f9f9ff)]">
                     {p.cutout_url && <Image src={p.cutout_url} alt={p.name} fill sizes="(min-width: 1024px) 220px, (min-width: 640px) 30vw, 45vw" className="object-contain p-2 transition duration-300 group-hover:scale-[1.03]" />}
                     {!p.cutout_confirmed && (
                       <span className="absolute top-2 left-2 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-navy">{t("products.check")}</span>

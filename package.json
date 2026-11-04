@@ -9,9 +9,9 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test:integration": "node --test tests/integration.test.mjs",
-    "lab:cutout": "node --env-file=.env --import tsx scripts/lab/cutout.ts",
-    "lab:slide": "node --env-file=.env --import tsx scripts/lab/slide.ts",
-    "lab:fixtures": "node --env-file=.env --import tsx scripts/lab/make-fixtures.ts",
+    "lab:cutout": "node --env-file=.env.local --import tsx scripts/lab/cutout.ts",
+    "lab:slide": "node --env-file=.env.local --import tsx scripts/lab/slide.ts",
+    "lab:fixtures": "node --env-file=.env.local --import tsx scripts/lab/make-fixtures.ts",
     "test:unit": "node --import tsx --test tests/cutout.test.ts"
   },
   "dependencies": {

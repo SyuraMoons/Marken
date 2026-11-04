@@ -9,6 +9,7 @@ import { z } from "zod";
 import { callModelWithTelemetry, type ModelCallTelemetry } from "../gateway";
 import { checkStyleRules, type CheckStyleRulesResult } from "./rules";
 import { CarouselPlanModelSchema } from "./schemas";
+import type { TemplateId } from "../studio/layers";
 
 export type SlideRole = "hook" | "product" | "cta";
 
@@ -21,7 +22,7 @@ export type SlidePlan = {
   headline?: string;
   subline?: string;
   bigWord?: string;
-  templateId?: "product-highlight" | "product-poster" | "product-with-name" | "big-type-behind" | "color-block" | "pedestal-hero" | "tilted-hero";
+  templateId?: TemplateId;
 };
 
 export type CarouselCaptionOption = {
@@ -326,7 +327,8 @@ export async function planDailyCarousel(
     headline: s.headline?.trim() || s.text.trim(),
     subline: s.subline?.trim(),
     bigWord: s.big_word?.trim(),
-    templateId: s.template_id ?? (s.role === "hook" ? "product-poster" : s.role === "product" ? "product-highlight" : "product-with-name"),
+    // Product slides default to a layout that shows the slide text ("product-highlight" has none).
+    templateId: s.template_id ?? (s.role === "hook" ? "product-poster" : s.role === "product" ? "pedestal-hero" : "product-with-name"),
   }));
 
   const captions: CarouselCaptionOption[] = finalPlan.caption_options.map(

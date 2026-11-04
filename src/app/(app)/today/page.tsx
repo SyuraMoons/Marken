@@ -143,6 +143,20 @@ function TodayView({ q, data }: { q: Awaited<PageProps<"/today">["searchParams"]
     );
   }
 
+  // The job queue never picked this post up (lib/posts/stalled): say so instead of loading forever.
+  if (post.status === "generating" && data.stalled) {
+    return (
+      <StatusScreen title={t("status.stalled.title")} body={t("status.stalled.body")}>
+        <ActionButton url={`/api/shops/${shop.id}/posts/generate`} body={post.product_id ? { productId: post.product_id } : {}} openPost>
+          {t("status.stalled.action")}
+        </ActionButton>
+        <ButtonLink href="/posts" variant="text">
+          {t("history.back")}
+        </ButtonLink>
+      </StatusScreen>
+    );
+  }
+
   if (post.status === "generating") {
     return <Studio productName={productName} steps={steps} calls={calls} />;
   }

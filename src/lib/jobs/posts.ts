@@ -124,7 +124,9 @@ export const generatePost = inngest.createFunction(
     });
     if (!input) return { skipped: "not_generating" };
 
-    const trend = await step.run("pick-trend", () => pickTrend(input.shop, postId));
+    // Logged as a step so a started run shows within seconds, even while trend research runs on a
+    // cache miss; a post with no step rows after a while is treated as never started (lib/posts/stalled).
+    const trend = await step.run("pick-trend", () => withStep(ctx, "pick_trend", null, () => pickTrend(input.shop, postId)));
 
     const plan = await step.run("plan", () =>
       withStep(ctx, "plan_post", "muse-spark", () =>

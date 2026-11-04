@@ -6,6 +6,7 @@ import { getBrandKit } from "@/lib/data/brand-kit";
 import { getProducts, type ProductView } from "@/lib/data/products";
 import { signPath } from "@/lib/data/today";
 import { asSlides } from "@/lib/posts/slides";
+import { neverStarted } from "@/lib/posts/stalled";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { listShops } from "@/lib/supabase/active-shop";
 import { createClient } from "@/lib/supabase/server";
@@ -104,7 +105,7 @@ type Db = Awaited<ReturnType<typeof createClient>>;
 async function loadPreview(supabase: Db, shopId: string, products: ProductView[]): Promise<SetupPreview | null> {
   const { data: post } = await supabase
     .from("posts")
-    .select("status, product_id, slides")
+    .select("id, shop_id, status, product_id, slides, created_at")
     .eq("shop_id", shopId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -117,7 +118,11 @@ async function loadPreview(supabase: Db, shopId: string, products: ProductView[]
     ? await supabase.from("media_uploads").select("storage_path").eq("id", product.source_upload_id).maybeSingle()
     : { data: null };
   const slidePath = post && post.product_id === product.id ? (asSlides(post.slides)[0]?.slide_path ?? null) : null;
-  const [photo, slide] = await Promise.all([signPath(upload?.storage_path ?? null), signPath(slidePath)]);
+  const [photo, slide, stalled] = await Promise.all([
+    signPath(upload?.storage_path ?? null),
+    signPath(slidePath),
+    post ? neverStarted(supabase, post) : false,
+  ]);
 
   return {
     name: product.name,
@@ -125,5 +130,6 @@ async function loadPreview(supabase: Db, shopId: string, products: ProductView[]
     photo,
     slide,
     postStatus: post?.status ?? null,
+    stalled,
   };
 }

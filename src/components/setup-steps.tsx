@@ -32,7 +32,8 @@ export type SetupShop = {
 };
 
 // The owner's real product for steps 4 and 5: signed URLs only (NFR-13).
-export type SetupPreview = { name: string; cutout: string | null; photo: string | null; slide: string | null; postStatus: string | null };
+// `stalled`: the first post is generating but the job queue never started it (lib/posts/stalled).
+export type SetupPreview = { name: string; cutout: string | null; photo: string | null; slide: string | null; postStatus: string | null; stalled: boolean };
 
 // A photo uploaded earlier that has no product yet (signed URL only).
 export type PendingUpload = { id: string; url: string | null; createdAt: string };
@@ -725,7 +726,18 @@ function Step5({ ctx, preview }: { ctx: Ctx; preview: SetupPreview | null }) {
   const [failed, setFailed] = useState(false);
   const started = useRef(false);
   // The first slide is still being made: re-read the page until it lands (tour state is kept across refreshes).
-  const waiting = Boolean(preview) && !preview?.slide && (preview?.postStatus === "generating" || (preview?.postStatus == null && !ctx.shop.completed));
+  const stalled = Boolean(preview?.stalled);
+  const waiting = Boolean(preview) && !stalled && !preview?.slide && (preview?.postStatus === "generating" || (preview?.postStatus == null && !ctx.shop.completed));
+  const [retrying, startRetry] = useTransition();
+  const [retryFailed, setRetryFailed] = useState(false);
+  // The route fails the dead post and starts a new one; the refresh picks it up and polling resumes.
+  const retry = () =>
+    startRetry(async () => {
+      setRetryFailed(false);
+      const res = await fetch(`/api/shops/${ctx.shop.id}/posts/generate`, { method: "POST" }).catch(() => null);
+      if (!res?.ok) return setRetryFailed(true);
+      router.refresh();
+    });
 
   // Replay tour (Settings) must not start another post.
   useEffect(() => {
@@ -747,7 +759,23 @@ function Step5({ ctx, preview }: { ctx: Ctx; preview: SetupPreview | null }) {
   const after = preview?.slide ?? preview?.cutout ?? null;
   const afterCaption = preview?.slide ? t("ob5.afterCaption") : t("ob5.afterWorking");
   const realPost = preview ? (
-    <RealPhoto src={after} alt={preview.name} eyebrow={t("ob5.realEyebrow")} caption={preview.slide ? preview.name : t("ob5.realWorking", { product: preview.name })} working={!preview.slide} />
+    <div className="flex flex-col gap-4">
+      <RealPhoto
+        src={after}
+        alt={preview.name}
+        eyebrow={t("ob5.realEyebrow")}
+        caption={preview.slide ? preview.name : stalled ? t("ob5.stalled") : t("ob5.realWorking", { product: preview.name })}
+        working={!preview.slide && !stalled}
+      />
+      {stalled && (
+        <div className="flex flex-col gap-1 lg:max-w-75">
+          <Button variant="secondary" onClick={retry} disabled={retrying} aria-busy={retrying}>
+            {t("status.stalled.action")}
+          </Button>
+          <Err show={retryFailed} />
+        </div>
+      )}
+    </div>
   ) : (
     <Guide eyebrow={t("ob5.sampleEyebrow")} caption={t("ob5.sample")} />
   );

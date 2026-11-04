@@ -5,6 +5,7 @@ import { apiError, conflict } from "@/lib/http";
 import { enqueue } from "@/lib/jobs/client";
 import { DAILY_POST_LIMIT_CODE, MAX_POSTS_PER_DAY } from "@/lib/posts/limits";
 import { allSlidesPassed, asSlides } from "@/lib/posts/slides";
+import { neverStarted } from "@/lib/posts/stalled";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -49,7 +50,12 @@ export async function POST(req: Request, ctx: RouteContext<"/api/shops/[id]/post
     .eq("status", "generating");
   if (productId) running = running.eq("product_id", productId);
   const { data: inFlight } = await running.order("created_at", { ascending: false }).limit(1).maybeSingle();
-  if (inFlight) return Response.json({ post: inFlight, created: false });
+  if (inFlight) {
+    if (!(await neverStarted(admin, inFlight))) return Response.json({ post: inFlight, created: false });
+    // The queue never ran it, so fail it (freeing the day's slot) and start a fresh one below.
+    // If its job turns up later, the job's load step sees the post is no longer generating and stops.
+    await admin.from("posts").update({ status: "failed" }).eq("id", inFlight.id).eq("status", "generating");
+  }
 
   // A ready post whose product check failed can never be approved (FR-FD-03), so it gives up
   // its slot. The status guard keeps this from touching a post approved in the meantime.

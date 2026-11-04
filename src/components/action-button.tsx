@@ -12,6 +12,7 @@ export function ActionButton({
   variant,
   disabled,
   then,
+  openPost,
   children,
 }: {
   url: string;
@@ -19,6 +20,8 @@ export function ActionButton({
   variant?: "primary" | "secondary" | "text" | "danger";
   disabled?: boolean;
   then?: string;
+  /** Open the post the route answers with ({ post: { id } }) on Today, e.g. after starting a new one. */
+  openPost?: boolean;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -36,6 +39,10 @@ export function ActionButton({
       if (res?.status === 401) return router.push("/login");
       if (!res?.ok) return setError(true);
       if (then) return router.push(then);
+      if (openPost) {
+        const id = ((await res.json().catch(() => null)) as { post?: { id?: string } } | null)?.post?.id;
+        if (id) return router.push(`/today?post=${id}`);
+      }
       router.refresh();
     });
 

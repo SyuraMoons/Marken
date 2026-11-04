@@ -135,6 +135,8 @@ export async function saveSlideEdit(opts: {
     scene_path,
     fidelity_score: fidelity.fidelityScore,
     fidelity_passed: fidelity.fidelityPassed,
+    text_passed: fidelity.textPassed,
+    text_issues: fidelity.textPassed ? [] : fidelity.issues,
     layers: { ...layers, sceneBrief: layers.sceneBrief },
   };
   const slides = asSlides(fresh.slides).map((s) => (s.order === order ? updated : s));

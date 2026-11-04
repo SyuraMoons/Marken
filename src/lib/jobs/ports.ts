@@ -82,6 +82,9 @@ export type RenderedSlide = {
   slidePng: Buffer;
   fidelityScore: number;
   fidelityPassed: boolean;
+  /** Spelling and style rules (FR-FD-02); a note for the owner, never blocks Approve. */
+  textPassed?: boolean;
+  textIssues?: string[];
   /** Editable layers (SRD A-09); absent only when a test double omits them. */
   layers?: SlideLayers;
 };
@@ -315,6 +318,8 @@ export async function renderAndVerifySlide(input: RenderSlideInput): Promise<Ren
     slidePng: res.slideBuffer,
     fidelityScore: res.fidelityScore,
     fidelityPassed: res.fidelityPassed,
+    textPassed: res.textPassed,
+    textIssues: res.textIssues,
   };
 }
 

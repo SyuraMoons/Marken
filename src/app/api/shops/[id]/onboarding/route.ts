@@ -19,12 +19,12 @@ const Step1 = z.object({
 
 const Step4 = z.object({
   tone: z.string().trim().max(500).optional(),
-  rules: z.array(z.string().trim().min(1).max(200)).max(10).default([]),
+  rules: z.array(z.string().trim().min(1).max(200)).max(10).optional(),
 });
 
 const Body = z.object({
   step: z.number().int().min(1).max(5),
-  action: z.enum(["start", "finish", "skip"]),
+  action: z.enum(["start", "save", "finish", "skip"]),
   data: z.unknown().optional(),
   tour_completed: z.boolean().optional(),
 });
@@ -44,6 +44,7 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/shops/[id]/onb
     return conflict("step_locked", { current_step: shop.onboarding_step });
   }
   if (action === "skip" && step < 4) return apiError("step_required", 400);
+  if (action === "save" && step !== 4) return apiError("invalid_action", 400);
 
   const supabase = await createClient();
   const now = new Date().toISOString();
@@ -57,6 +58,23 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/shops/[id]/onb
   }
 
   const shopUpdate: ShopUpdate = {};
+
+  // Tone and rules; rules are only rewritten when sent, so a tone-only save keeps them.
+  const saveStep4 = async (raw: unknown): Promise<Response | null> => {
+    const v = Step4.safeParse(raw ?? {});
+    if (!v.success) return apiError("invalid_data", 400, { issues: v.error.issues });
+    if (v.data.tone !== undefined) shopUpdate.tone = v.data.tone;
+    if (v.data.rules === undefined) return null;
+    // Upsert by position first, then drop extras, so a mid-way failure never wipes rules.
+    const rows = v.data.rules.map((text, i) => ({ shop_id: shop.id, text, position: i + 1 }));
+    if (rows.length) {
+      const { error } = await supabase.from("style_rules").upsert(rows, { onConflict: "shop_id,position" });
+      if (error) return apiError("rules_failed", 500);
+    }
+    const { error: delErr } = await supabase.from("style_rules").delete().eq("shop_id", shop.id).gt("position", rows.length);
+    if (delErr) return apiError("rules_failed", 500);
+    return null;
+  };
 
   if (action === "finish") {
     if (step === 1) {
@@ -82,28 +100,20 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/shops/[id]/onb
       if (products.some((p) => !p.cutout_confirmed)) return conflict("unconfirmed_cutouts");
     }
     if (step === 4) {
-      const v = Step4.safeParse(data ?? {});
-      if (!v.success) return apiError("invalid_data", 400, { issues: v.error.issues });
-      if (v.data.tone !== undefined) shopUpdate.tone = v.data.tone;
-      // Upsert by position first, then drop extras, so a mid-way failure never wipes rules.
-      const rows = v.data.rules.map((text, i) => ({
-        shop_id: shop.id,
-        text,
-        position: i + 1,
-      }));
-      if (rows.length) {
-        const { error } = await supabase
-          .from("style_rules")
-          .upsert(rows, { onConflict: "shop_id,position" });
-        if (error) return apiError("rules_failed", 500);
-      }
-      const { error: delErr } = await supabase
-        .from("style_rules")
-        .delete()
-        .eq("shop_id", shop.id)
-        .gt("position", rows.length);
-      if (delErr) return apiError("rules_failed", 500);
+      const failure = await saveStep4(data);
+      if (failure) return failure;
     }
+  }
+
+  // Saves one answer at a time without moving the step on, so leaving for Instagram loses nothing.
+  if (action === "save") {
+    const failure = await saveStep4(data);
+    if (failure) return failure;
+    if (Object.keys(shopUpdate).length) {
+      const { error } = await supabase.from("shops").update(shopUpdate).eq("id", shop.id);
+      if (error) return apiError("save_failed", 500);
+    }
+    return Response.json({ ok: true });
   }
 
   if (step === 5) {

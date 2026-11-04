@@ -15,7 +15,7 @@ import { UploadError } from "./upload-error";
 import { deleteProduct, removeUpload, saveProduct, setCutoutConfirmed } from "@/lib/actions/products";
 import type { ProductView } from "@/lib/data/products";
 import { t, type MessageKey } from "@/lib/i18n";
-import { asTone, CATEGORIES, COUNTRIES, TIME_ZONES, TONES, type Tone } from "@/lib/options";
+import { CATEGORIES, COUNTRIES, LOOK_PHRASE, LOOKS, lookOf, NEVER_KEYS, NEVER_PRESETS, TIME_ZONES, TONES, type Look, type NeverKey, type Tone } from "@/lib/options";
 import { ACCEPT, patchOnboarding, uploadAndExtract, validPhoto } from "@/lib/upload";
 
 export type SetupShop = {
@@ -59,7 +59,7 @@ export function SetupSteps({ step, shop, products, rules, brandKit, preview, pen
       {step === 2 && <Step2 ctx={ctx} products={products} pending={pending} />}
       {/* Keyed by ids so a replaced photo (router.refresh) resets the list. */}
       {step === 3 && <Step3 key={products.map((p) => p.id).join()} ctx={ctx} initial={products} />}
-      {step === 4 && <Step4 ctx={ctx} initialRules={rules} initialKit={brandKit} />}
+      {step === 4 && <Step4 ctx={ctx} initialRules={rules} initialKit={brandKit} preview={preview} />}
       {step === 5 && <Step5 ctx={ctx} preview={preview} />}
     </>
   );
@@ -495,106 +495,230 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
   );
 }
 
-// Voice & Instagram (228:16936 / 228:17005), connected state (228:18124).
-function Step4({ ctx, initialRules, initialKit }: { ctx: Ctx; initialRules: string[]; initialKit: BrandKitValue }) {
+// Voice, look and Instagram as one question card at a time (Lovart-style). Each answer is saved when confirmed,
+// so leaving for Instagram or skipping a question never loses anything.
+const CARDS = ["tone", "never", "look", "ig", "summary"] as const;
+type CardId = (typeof CARDS)[number];
+const MAX_RULES = 10;
+
+const toneOf = (v: string | null): Tone | null => TONES.find((x) => x === v) ?? null;
+
+function Chip({ on, onClick, children, hint }: { on: boolean; onClick: () => void; children: ReactNode; hint?: string }) {
+  return (
+    <button type="button" aria-pressed={on} onClick={onClick} className={`glass flex min-h-11 flex-col items-start gap-0.5 rounded-card px-4 py-3 text-left text-base font-medium ${on ? "outline-2 outline-blue" : ""}`}>
+      {children}
+      {hint && <span className="text-[13px] font-normal text-muted">{hint}</span>}
+    </button>
+  );
+}
+
+function Step4({ ctx, initialRules, initialKit, preview }: { ctx: Ctx; initialRules: string[]; initialKit: BrandKitValue; preview: SetupPreview | null }) {
   const igResult = useSearchParams().get("ig");
-  const [tone, setTone] = useState<Tone>(asTone(ctx.shop.tone));
-  const [rules, setRules] = useState<string[]>(initialRules.length ? initialRules : [""]);
+  const [card, setCard] = useState<CardId>(igResult ? "ig" : "tone");
+  const [editing, setEditing] = useState(false);
+  const [tone, setTone] = useState<Tone | null>(toneOf(ctx.shop.tone));
+  // Saved rules that match a preset tick that chip; the rest are the owner's own.
+  const [never, setNever] = useState<NeverKey[]>(() => NEVER_KEYS.filter((k) => initialRules.includes(NEVER_PRESETS[k])));
+  const [own, setOwn] = useState<string[]>(() => initialRules.filter((r) => !NEVER_KEYS.some((k) => NEVER_PRESETS[k] === r)));
   const [kit, setKit] = useState(initialKit);
+  const [look, setLook] = useState<Look | null>(lookOf(initialKit.photo_style));
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
 
-  const finish = (action: "finish" | "skip") =>
+  const rules = [...never.map((k) => NEVER_PRESETS[k]), ...own.map((r) => r.trim()).filter(Boolean)].slice(0, MAX_RULES);
+  const index = CARDS.indexOf(card);
+  const move = (to: CardId) => {
+    setFailed(false);
+    setCard(to);
+  };
+  // After a confirm: back to the summary when editing from it, otherwise on to the next card.
+  const advance = () => {
+    setEditing(false);
+    move(editing ? "summary" : CARDS[index + 1]);
+  };
+  const run = (job: () => Promise<boolean>) =>
     start(async () => {
       setFailed(false);
-      const data = { tone, rules: rules.map((r) => r.trim()).filter(Boolean) };
-      // Skipping leaves the kit as it was; Continue saves what the owner chose (SRD A-09).
-      if (action === "finish" && !(await saveBrandKit(kit)).ok) return setFailed(true);
-      if (!(await ctx.save(action === "finish" ? { action, data } : { action }))) return setFailed(true);
+      if (await job()) advance();
+      else setFailed(true);
+    });
+
+  const confirm = () => {
+    if (card === "tone" && tone) run(() => ctx.save({ action: "save", data: { tone } }));
+    else if (card === "never") run(() => ctx.save({ action: "save", data: { rules } }));
+    else if (card === "look" && look) run(async () => (await saveBrandKit({ ...kit, photo_style: LOOK_PHRASE[look] })).ok);
+  };
+  const canConfirm = card === "tone" ? tone !== null : card === "look" ? look !== null : true;
+
+  const finish = () =>
+    start(async () => {
+      setFailed(false);
+      const data = tone ? { tone, rules } : { rules };
+      if (!(await ctx.save({ action: "finish", data }))) return setFailed(true);
       ctx.go(5);
     });
 
-  if (ctx.shop.igConnected && igResult === "connected") {
-    return (
-      <div className="flex flex-col gap-5 lg:max-w-136">
-        <Head title={t("ob4.connectedTitle")} body={t("ob4.connectedBody")} />
-        <InfoCard vector="social" title={t("ob4.connectedTitle")}>
-          {t("ob4.connectedCard")}
-        </InfoCard>
-        <Err show={failed} />
-        <Button onClick={() => finish("finish")} disabled={pending} aria-busy={pending}>
-          {t("ob4.connectedContinue")}
+  const toggleNever = (k: NeverKey) => setNever(never.includes(k) ? never.filter((x) => x !== k) : [...never, k]);
+  const edit = (to: CardId) => {
+    setEditing(true);
+    move(to);
+  };
+
+  const product = preview?.name ?? "your product";
+  const sample = tone
+    ? t(`ob4.sample${tone}` as MessageKey, { product, emoji: never.includes("emojis") ? "" : t("ob4.sampleEmoji") })
+    : t("ob4.samplePending");
+
+  const nav = (
+    <>
+      <Err show={failed} text="ob4.qSaveFailed" />
+      <div className="flex flex-col gap-2">
+        <Button onClick={confirm} disabled={pending || !canConfirm} aria-busy={pending}>
+          {t("ob4.qConfirm")}
         </Button>
+        {(card === "never" || card === "look") && (
+          <Button variant="text" onClick={advance} disabled={pending}>
+            {t("ob4.qSkipQuestion")}
+          </Button>
+        )}
+        {index > 0 && !editing && (
+          <Button variant="text" onClick={() => move(CARDS[index - 1])} disabled={pending}>
+            {t("ob4.qBack")}
+          </Button>
+        )}
       </div>
+    </>
+  );
+
+  const left =
+    card === "tone" ? (
+      <>
+        <h2 className="text-xl font-semibold">{t("ob4.qToneTitle")}</h2>
+        <div className="flex flex-col gap-2">
+          {TONES.map((x) => (
+            <Chip key={x} on={tone === x} onClick={() => setTone(x)}>
+              {t(`ob4.tone${x}` as MessageKey)}
+            </Chip>
+          ))}
+        </div>
+        {nav}
+      </>
+    ) : card === "never" ? (
+      <>
+        <h2 className="text-xl font-semibold">{t("ob4.qNeverTitle")}</h2>
+        <p className="text-sm text-muted">{t("ob4.qNeverHint")}</p>
+        <div className="flex flex-col gap-2">
+          {NEVER_KEYS.map((k) => (
+            <Chip key={k} on={never.includes(k)} onClick={() => toggleNever(k)}>
+              {t(`ob4.never${k}` as MessageKey)}
+            </Chip>
+          ))}
+        </div>
+        {own.map((r, i) => (
+          <span key={i} className="flex gap-2">
+            <input value={r} onChange={(e) => setOwn(own.map((x, j) => (j === i ? e.target.value : x)))} maxLength={200} placeholder={t("ob4.qOwnRulePlaceholder")} aria-label={t("ob4.qOwnRule")} className={glassInput} />
+            <button type="button" aria-label={t("ob4.removeRule", { n: i + 1 })} onClick={() => setOwn(own.filter((_, j) => j !== i))} className="flex size-11 shrink-0 items-center justify-center self-center text-xl text-danger">
+              ×
+            </button>
+          </span>
+        ))}
+        {never.length + own.length < MAX_RULES && (
+          <Button variant="secondary" onClick={() => setOwn([...own, ""])}>
+            {own.length ? t("ob4.qAddOwn") : t("ob4.qOwnRule")}
+          </Button>
+        )}
+        {nav}
+      </>
+    ) : card === "look" ? (
+      <>
+        <h2 className="text-xl font-semibold">{t("ob4.qLookTitle")}</h2>
+        <div className="flex flex-col gap-2">
+          {LOOKS.map((k) => (
+            <Chip key={k} on={look === k} onClick={() => setLook(k)} hint={t(`ob4.qLook${k === "clean" ? "Clean" : k === "lifestyle" ? "Lifestyle" : "Bold"}Hint` as MessageKey)}>
+              {t(`ob4.look${k}` as MessageKey)}
+            </Chip>
+          ))}
+        </div>
+        <details className="glass rounded-card p-4">
+          <summary className="min-h-11 cursor-pointer text-sm font-medium">{t("ob4.qColours")}</summary>
+          <div className="flex flex-col gap-4 pt-3">
+            <BrandKitEditor shopId={ctx.shop.id} value={kit} onChange={setKit} hasDescription={Boolean(ctx.shop.description?.trim())} />
+          </div>
+        </details>
+        {nav}
+      </>
+    ) : card === "ig" ? (
+      <>
+        <InfoCard vector="social" title={ctx.shop.igConnected ? t("ob4.connectedTitle") : t("ob4.igTitle")}>
+          {ctx.shop.igConnected ? t("ob4.connectedCard") : t("ob4.igBody")}
+        </InfoCard>
+        {!ctx.shop.igConnected && (
+          <>
+            {igResult === "error" && (
+              <p role="alert" className="text-sm text-danger">
+                {t("settings.igError")}
+              </p>
+            )}
+            <p className="text-[13px] text-muted">{t("settings.igHint")}</p>
+            <AnchorButton variant="secondary" href="/api/auth/instagram?next=onboarding">
+              {t("ob4.connect")}
+            </AnchorButton>
+          </>
+        )}
+        <Button variant={ctx.shop.igConnected ? "primary" : "text"} onClick={advance}>
+          {ctx.shop.igConnected ? t("ob4.qNext") : t("ob4.qSkipIg")}
+        </Button>
+        {!editing && (
+          <Button variant="text" onClick={() => move("look")}>
+            {t("ob4.qBack")}
+          </Button>
+        )}
+      </>
+    ) : (
+      <>
+        <h2 className="text-xl font-semibold">{t("ob4.summaryTitle")}</h2>
+        <p className="text-sm text-muted">{t("ob4.summaryBody")}</p>
+        <ul className="flex flex-col gap-2">
+          {(
+            [
+              ["tone", tone ? t("ob4.summaryTone", { tone: t(`ob4.tone${tone}` as MessageKey).toLowerCase() }) : t("ob4.summaryToneNone")],
+              ["never", rules.length ? t("ob4.summaryRules", { rules: rules.join("; ") }) : t("ob4.summaryRulesNone")],
+              ["look", look ? t("ob4.summaryLook", { look: t(`ob4.look${look}` as MessageKey).toLowerCase() }) : t("ob4.summaryLookNone")],
+              ["ig", t("ob4.summaryIg", { state: t(ctx.shop.igConnected ? "ob4.igStateOn" : "ob4.igStateOff") })],
+            ] as [CardId, string][]
+          ).map(([id, line]) => (
+            <li key={id} className="glass flex items-center justify-between gap-3 rounded-card p-3.5">
+              <span className="text-[15px]">{line}</span>
+              <Button variant="text" onClick={() => edit(id)} disabled={pending}>
+                {t("ob4.summaryEdit")}
+              </Button>
+            </li>
+          ))}
+        </ul>
+        <Err show={failed} />
+        <Button onClick={finish} disabled={pending} aria-busy={pending}>
+          {t("ob4.summaryFinish")}
+        </Button>
+      </>
     );
-  }
 
   return (
     <>
-      <Head title={t("ob4.title")} body={t("ob4.body")} />
+      <Head title={t("ob4.title")} body={card === "summary" ? t("ob4.summaryBody") : t("ob4.progress", { n: index + 1, total: CARDS.length })} />
       <Split
-        left={
-          <>
-            <BrandKitEditor shopId={ctx.shop.id} value={kit} onChange={setKit} hasDescription={Boolean(ctx.shop.description?.trim())} />
-            <Field n={5} cue="voice" label={t("ob4.tone")}>
-              <select value={tone} onChange={(e) => setTone(e.target.value as Tone)} className={glassInput}>
-                {TONES.map((x) => (
-                  <option key={x} value={x}>
-                    {t(`ob4.tone${x}` as MessageKey)}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            {rules.map((r, i) => (
-              <Field key={i} n={i + 6} cue="rules" label={t("ob4.rule", { n: i + 1 })}>
-                <span className="flex gap-2">
-                  <input value={r} onChange={(e) => setRules(rules.map((x, j) => (j === i ? e.target.value : x)))} maxLength={200} placeholder={t("ob4.rulePlaceholder")} className={glassInput} />
-                  {rules.length > 1 && (
-                    <button type="button" aria-label={t("ob4.removeRule", { n: i + 1 })} onClick={() => setRules(rules.filter((_, j) => j !== i))} className="flex size-11 shrink-0 items-center justify-center self-center text-xl text-danger">
-                      ×
-                    </button>
-                  )}
-                </span>
-              </Field>
-            ))}
-            <p className="text-xs text-muted">{t("ob4.ruleHint")}</p>
-            {rules.length < 10 && (
-              <Button variant="secondary" onClick={() => setRules([...rules, ""])}>
-                {t("ob4.addRule")}
-              </Button>
-            )}
-            <section className="glass flex flex-col gap-2 rounded-card p-5">
-              <h2 className="text-lg font-semibold">{t("ob4.sample")}</h2>
-              <p className="text-[15px] text-muted">{t("ob4.sampleText")}</p>
-            </section>
-          </>
-        }
+        left={left}
         right={
-          <>
-            <InfoCard vector="social" title={ctx.shop.igConnected ? t("ob4.connectedTitle") : t("ob4.igTitle")}>
-              {ctx.shop.igConnected ? t("ob4.connectedCard") : t("ob4.igBody")}
-            </InfoCard>
-            {!ctx.shop.igConnected && (
-              <>
-                {igResult === "error" && (
-                  <p role="alert" className="text-sm text-danger">
-                    {t("settings.igError")}
-                  </p>
-                )}
-                <p className="text-[13px] text-muted">{t("settings.igHint")}</p>
-                <AnchorButton variant="secondary" href="/api/auth/instagram?next=onboarding">
-                  {t("ob4.connect")}
-                </AnchorButton>
-              </>
-            )}
-            <Err show={failed} />
-            <Button onClick={() => finish("finish")} disabled={pending} aria-busy={pending}>
-              {t("ob4.continue")}
-            </Button>
-            <Button variant="text" onClick={() => finish("skip")} disabled={pending}>
-              {t("ob4.skip")}
-            </Button>
-          </>
+          <section className="glass flex flex-col gap-3 rounded-card p-5">
+            <h2 className="text-lg font-semibold">{t("ob4.sampleIntro")}</h2>
+            <div className="flex items-center gap-3">
+              {preview?.cutout && (
+                <span className="relative aspect-[4/5] w-16 shrink-0 overflow-hidden rounded-control bg-[radial-gradient(circle_at_30%_40%,#e5f0ff,#f9f9ff)]">
+                  <Image src={preview.cutout} alt={preview.name} fill sizes="64px" className="object-contain" />
+                </span>
+              )}
+              <p className="text-[15px] text-muted">{sample}</p>
+            </div>
+          </section>
         }
       />
     </>

@@ -24,8 +24,9 @@ async function uploadOne(file: File) {
 }
 
 // onUploaded fires between the upload and the cutout/extract phase (loading screens, FD-24).
-export async function uploadAndExtract(shopId: string, files: File[], onUploaded?: () => void): Promise<Extracted> {
-  const uploadIds: string[] = [];
+// `saved` are uploads that already exist (a run that died, or a trip back to step 2): they are extracted without uploading again.
+export async function uploadAndExtract(shopId: string, files: File[], onUploaded?: () => void, saved: string[] = []): Promise<Extracted> {
+  const uploadIds: string[] = [...saved];
   for (const file of files) uploadIds.push(await uploadOne(file));
   onUploaded?.();
   const res = await fetch(`/api/shops/${shopId}/extract`, {

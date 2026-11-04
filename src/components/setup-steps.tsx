@@ -9,10 +9,10 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { AnchorButton, Button } from "./button";
 import { Field, glassInput } from "./field";
 import { InfoCard } from "./info-card";
-import { Photo, ProductForm } from "./products-view";
+import { Photo, ProcessingPhoto, ProductForm } from "./products-view";
 import { Stage, Stages } from "./stages";
 import { UploadError } from "./upload-error";
-import { deleteProduct, saveProduct, setCutoutConfirmed } from "@/lib/actions/products";
+import { deleteProduct, removeUpload, saveProduct, setCutoutConfirmed } from "@/lib/actions/products";
 import type { ProductView } from "@/lib/data/products";
 import { t, type MessageKey } from "@/lib/i18n";
 import { asTone, CATEGORIES, COUNTRIES, TIME_ZONES, TONES, type Tone } from "@/lib/options";
@@ -31,10 +31,13 @@ export type SetupShop = {
   completed: boolean;
 };
 
+// A photo uploaded earlier that has no product yet (signed URL only).
+export type PendingUpload = { id: string; url: string | null; createdAt: string };
+
 type Ctx = { shop: SetupShop; go: (step: number) => void; save: (body: Record<string, unknown>) => Promise<boolean> };
 
 // All 5 onboarding steps (F-03, FR-OB, Figma page 05). Each step saves server-side before moving on (FR-OB-11).
-export function SetupSteps({ step, shop, products, rules, brandKit }: { step: number; shop: SetupShop; products: ProductView[]; rules: string[]; brandKit: BrandKitValue }) {
+export function SetupSteps({ step, shop, products, rules, brandKit, pending }: { step: number; shop: SetupShop; products: ProductView[]; rules: string[]; brandKit: BrandKitValue; pending: PendingUpload[] }) {
   const router = useRouter();
   const ctx: Ctx = {
     shop,
@@ -50,7 +53,7 @@ export function SetupSteps({ step, shop, products, rules, brandKit }: { step: nu
   return (
     <>
       {step === 1 && <Step1 ctx={ctx} />}
-      {step === 2 && <Step2 ctx={ctx} hasProducts={products.length > 0} />}
+      {step === 2 && <Step2 ctx={ctx} products={products} pending={pending} />}
       {/* Keyed by ids so a replaced photo (router.refresh) resets the list. */}
       {step === 3 && <Step3 key={products.map((p) => p.id).join()} ctx={ctx} initial={products} />}
       {step === 4 && <Step4 ctx={ctx} initialRules={rules} initialKit={brandKit} />}
@@ -191,22 +194,13 @@ const TIPS = [
   ["backdrop", "ob2.tipBackdrop"],
 ] as const;
 
-// Loading panel tied to the real upload/extract phases (270:1497, 270:1639; FD-24).
-function Loading({ phase }: { phase: "uploading" | "preparing" }) {
+// Loading panel tied to the real upload/extract phases (270:1497, 270:1639; FD-24): the owner's own photos
+// get the same scan-line animation and live step list as adding a product.
+function Loading({ phase, urls }: { phase: "uploading" | "preparing"; urls: string[] }) {
   return (
-    <div aria-busy="true" aria-live="polite" className="flex max-w-xl flex-col gap-5">
+    <div className="flex max-w-xl flex-col gap-5">
       <Head title={t(`ob2.${phase}Title`)} body={t(`ob2.${phase}Body`)} />
-      <section className="glass flex flex-col gap-3 rounded-card p-5">
-        <div className="flex flex-col gap-2.5" aria-hidden="true">
-          <span className="h-11 animate-pulse rounded-control bg-powder" />
-          <span className="h-3 animate-pulse rounded-full bg-powder" />
-          <span className="h-3 w-2/3 animate-pulse rounded-full bg-powder" />
-        </div>
-        {/* eslint-disable-next-line @next/next/no-img-element -- static design illustration */}
-        <img src={`/figma/vector-${phase === "uploading" ? "photo" : "build"}.svg`} width={78} height={50} alt="" />
-        <h2 className="text-lg font-semibold">{t(`ob2.${phase}Card`)}</h2>
-        <p className="text-[15px] text-muted">{t(`ob2.${phase}CardBody`)}</p>
-      </section>
+      <ProcessingPhoto src={urls[0]} more={urls.slice(1)} from={phase === "preparing" ? 1 : 0} />
       <InfoCard vector="check" title={t("ob2.waitTitle")}>
         {t("ob2.waitBody")}
       </InfoCard>
@@ -214,25 +208,52 @@ function Loading({ phase }: { phase: "uploading" | "preparing" }) {
   );
 }
 
-// Add one product (228:16642 / 228:16711). Onboarding needs at least 1 photo, up to 10 (route need_a_photo, SRD A-10).
-function Step2({ ctx, hasProducts }: { ctx: Ctx; hasProducts: boolean }) {
+const RESUME_MS = 3 * 60 * 1000;
+
+// Add products (228:16642 / 228:16711). Onboarding needs at least 1 photo, up to 10 (route need_a_photo, SRD A-10).
+// Everything already saved comes back here: prepared products, and photos whose preparation is still running or died.
+function Step2({ ctx, products, pending }: { ctx: Ctx; products: ProductView[]; pending: PendingUpload[] }) {
+  const router = useRouter();
   const pick = useRef<HTMLInputElement>(null);
   const next = useRef(1);
   const [photos, setPhotos] = useState<Picked[]>([]);
   const [error, setError] = useState<MessageKey | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
-  const ok = photos.length >= 1;
+  const [gaveUp, setGaveUp] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [now] = useState(() => Date.now());
+
+  // A recent upload without a product is most likely still being prepared by the request from before the refresh.
+  const running = gaveUp ? [] : pending.filter((u) => now - Date.parse(u.createdAt) < RESUME_MS);
+  const stuck = pending.filter((u) => !running.includes(u));
+  const resuming = phase === "idle" && running.length > 0 && photos.length === 0;
+  const saved = products.length + pending.length;
+  const total = saved + photos.length;
   const busy = phase !== "idle";
+  const canContinue = photos.length > 0 || saved > 0;
 
   // Free the preview blobs on leave.
   const urls = useRef<string[]>([]);
   useEffect(() => () => urls.current.forEach(URL.revokeObjectURL), []);
 
+  // Re-read the page until the running photos turn into products (capped, so a dead run never polls forever).
+  useEffect(() => {
+    if (!resuming) return;
+    let left = 45;
+    const id = setInterval(() => {
+      if (--left <= 0) {
+        clearInterval(id);
+        setGaveUp(true);
+      } else router.refresh();
+    }, 4000);
+    return () => clearInterval(id);
+  }, [resuming, router]);
+
   const add = (files: FileList | null) => {
     if (!files) return;
     const good = Array.from(files).filter(validPhoto);
     setError(good.length < files.length ? "ob2.badFile" : null);
-    const added = good.slice(0, 10 - photos.length).map((file) => {
+    const added = good.slice(0, 10 - total).map((file) => {
       const url = URL.createObjectURL(file);
       urls.current.push(url);
       return { id: next.current++, file, url };
@@ -241,16 +262,39 @@ function Step2({ ctx, hasProducts }: { ctx: Ctx; hasProducts: boolean }) {
     if (pick.current) pick.current.value = "";
   };
 
+  const drop = async (id: string, job: () => Promise<{ ok: boolean }>) => {
+    setBusyId(id);
+    const res = await job().catch(() => null);
+    setBusyId(null);
+    if (!res?.ok) return setError("common.error");
+    setError(null);
+    router.refresh();
+  };
+
   const submit = async () => {
     setError(null);
-    setPhase("uploading");
-    const res = await uploadAndExtract(ctx.shop.id, photos.map((p) => p.file), () => setPhase("preparing")).catch(() => null);
-    if (!res || res.products.length === 0) return (setPhase("idle"), setError("ob2.failed"));
+    // Only new photos are uploaded, and only photos without a product are prepared: the rest is already done.
+    if (photos.length > 0 || stuck.length > 0) {
+      setPhase("uploading");
+      const res = await uploadAndExtract(ctx.shop.id, photos.map((p) => p.file), () => setPhase("preparing"), stuck.map((u) => u.id)).catch(() => null);
+      if (!res || res.products.length === 0) return (setPhase("idle"), setError("ob2.failed"));
+    }
     if (!(await ctx.save({ action: "finish" }))) return (setPhase("idle"), setError("common.error"));
     ctx.go(3);
   };
 
-  if (busy) return <Loading phase={phase} />;
+  if (busy) return <Loading phase={phase} urls={photos.length ? photos.map((p) => p.url) : stuck.map((u) => u.url ?? "").filter(Boolean)} />;
+  if (resuming) return <Loading phase="preparing" urls={running.map((u) => u.url ?? "").filter(Boolean)} />;
+
+  const tile = "relative aspect-square overflow-hidden rounded-control bg-white";
+  const tag = "absolute bottom-1 left-1 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-medium text-ink";
+  const remove = (label: string, onClick: () => void, disabled = false) => (
+    <button type="button" onClick={onClick} disabled={disabled} aria-label={label} className="absolute top-0 right-0 flex size-11 items-center justify-center text-lg text-ink disabled:opacity-50">
+      <span aria-hidden="true" className="flex size-6 items-center justify-center rounded-full bg-white/90">
+        ×
+      </span>
+    </button>
+  );
 
   return (
     <>
@@ -276,24 +320,29 @@ function Step2({ ctx, hasProducts }: { ctx: Ctx; hasProducts: boolean }) {
         right={
           <section className="glass flex flex-col gap-3 rounded-card p-5">
             <h2 className="text-lg font-semibold">{t("ob2.cardTitle")}</h2>
-            <p className="text-[15px] text-muted">{photos.length ? t("ob2.count", { n: photos.length }) : t("ob2.cardBody")}</p>
-            {hasProducts && photos.length === 0 && <p className="text-sm">{t("ob2.have")}</p>}
-            {photos.length > 0 && (
+            <p className="text-[15px] text-muted">{total ? t("ob2.count", { n: total }) : t("ob2.cardBody")}</p>
+            {saved > 0 && photos.length === 0 && <p className="text-sm">{t("ob2.have")}</p>}
+            {total > 0 && (
               <ul className="grid grid-cols-3 gap-2">
+                {products.map((p, i) => (
+                  <li key={p.id} className={tile}>
+                    {p.cutout_url && <Image src={p.cutout_url} alt={p.name} fill sizes="120px" className="object-contain" />}
+                    <span className={tag}>{t("ob2.ready")}</span>
+                    {remove(t("ob2.removeSaved", { n: i + 1 }), () => void drop(p.id, () => deleteProduct(p.id)), busyId === p.id)}
+                  </li>
+                ))}
+                {pending.map((u, i) => (
+                  <li key={u.id} className={tile}>
+                    {u.url && <Image src={u.url} alt="" fill sizes="120px" className="object-cover" />}
+                    <span className={tag}>{t("ob2.preparing")}</span>
+                    {remove(t("ob2.removeSaved", { n: products.length + i + 1 }), () => void drop(u.id, () => removeUpload(u.id)), busyId === u.id)}
+                  </li>
+                ))}
                 {photos.map((p, i) => (
-                  <li key={p.id} className="relative aspect-square overflow-hidden rounded-control bg-white">
+                  <li key={p.id} className={tile}>
                     {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
                     <img src={p.url} alt={t("ob2.photo", { n: i + 1 })} className="size-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => setPhotos(photos.filter((x) => x.id !== p.id))}
-                      aria-label={t("ob2.remove", { n: i + 1 })}
-                      className="absolute top-0 right-0 flex size-11 items-center justify-center text-lg text-ink"
-                    >
-                      <span aria-hidden="true" className="flex size-6 items-center justify-center rounded-full bg-white/90">
-                        ×
-                      </span>
-                    </button>
+                    {remove(t("ob2.remove", { n: i + 1 }), () => setPhotos(photos.filter((x) => x.id !== p.id)))}
                   </li>
                 ))}
               </ul>
@@ -304,14 +353,14 @@ function Step2({ ctx, hasProducts }: { ctx: Ctx; hasProducts: boolean }) {
             ) : (
               <>
                 <Err show={Boolean(error)} text={error ?? undefined} />
-                {photos.length < 10 && (
+                {total < 10 && (
                   <Button variant="secondary" onClick={() => pick.current?.click()}>
-                    {t(photos.length ? "ob2.add" : "ob2.choose")}
+                    {t(total ? "ob2.add" : "ob2.choose")}
                   </Button>
                 )}
-                {!ok && photos.length > 0 && <p className="text-sm text-muted">{t("ob2.need")}</p>}
-                <Button onClick={ok ? submit : () => ctx.go(3)} disabled={!ok && !(hasProducts && photos.length === 0)}>
-                  {t("ob2.continue")}
+                {!canContinue && <p className="text-sm text-muted">{t("ob2.need")}</p>}
+                <Button onClick={submit} disabled={!canContinue}>
+                  {t(stuck.length > 0 && photos.length === 0 ? "ob2.retry" : "ob2.continue")}
                 </Button>
               </>
             )}

@@ -278,13 +278,16 @@ export async function renderAndVerifySlide(
     if (templateLayers && chosenTemplate) {
       const scene = lastScene.sceneBuffer;
       const brandColors = input.brand?.colors ?? [];
-      // Text on a template card or banner keeps the template colour. Text on the scene itself
-      // gets a colour that reads against it; the decorative big word stays the accent.
+      // Text on a template card, banner or CTA pill keeps the template colour. Text on the scene
+      // itself gets a colour that reads against it; the decorative big word stays the accent.
+      const onPill = templateLayers.background?.cta === true;
       const text = TEMPLATES_WITH_TEXT_ON_SHAPE.has(chosenTemplate)
         ? templateLayers.text
         : await Promise.all(
             templateLayers.text.map(async (t) =>
-              t.id === "big-type-behind" ? t : { ...t, color: await pickTextColor(scene, t.box, [...brandColors, t.color]) },
+              t.id === "big-type-behind" || (onPill && t.id === "cta")
+                ? t
+                : { ...t, color: await pickTextColor(scene, t.box, [...brandColors, t.color]) },
             ),
           );
       lastLayers = { ...templateLayers, product: { box: lastScene.reservedBox }, text };

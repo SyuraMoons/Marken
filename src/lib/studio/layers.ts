@@ -65,7 +65,8 @@ export const TEMPLATE_IDS = [
 export type TemplateId = (typeof TEMPLATE_IDS)[number];
 
 /** Template graphics (cards, banners) drawn between the scene and the text, so edits redraw them too. */
-export type SlideBackground = { template: TemplateId; dominant: string; accent: string };
+/** `cta: true` means the template draws its CTA pill (tech-hero, product-poster). */
+export type SlideBackground = { template: TemplateId; dominant: string; accent: string; cta?: boolean };
 
 /** Everything needed to rebuild a slide without a model call (except a new scene). */
 export type SlideLayers = {
@@ -102,7 +103,9 @@ export const SlideLayersSchema = z.object({
   sceneBrief: z.string().max(2000),
   product: z.object({ box: BoxSchema }),
   text: z.array(TextLayerSchema).max(6),
-  background: z.object({ template: z.enum(TEMPLATE_IDS), dominant: HexSchema, accent: HexSchema }).optional(),
+  background: z
+    .object({ template: z.enum(TEMPLATE_IDS), dominant: HexSchema, accent: HexSchema, cta: z.boolean().optional() })
+    .optional(),
 });
 
 /** Brand kit values the layers read (colours, fonts). All optional: a shop may have none. */
@@ -134,27 +137,6 @@ const EM_WIDTH: Record<FontId, number> = {
 };
 const LINE_HEIGHT = 1.12;
 export const textLineHeight = LINE_HEIGHT;
-
-/** Recommends cohesive font pairings tailored to product categories. */
-export function recommendFontsForCategory(category?: string | null): { heading: FontId; body: FontId } {
-  const cat = (category ?? "").toLowerCase();
-  if (cat.includes("tech") || cat.includes("gadget") || cat.includes("phone") || cat.includes("watch") || cat.includes("electronic") || cat.includes("audio")) {
-    return { heading: "space-grotesk-bold", body: "montserrat" };
-  }
-  if (cat.includes("luxury") || cat.includes("skincare") || cat.includes("beauty") || cat.includes("jewelry") || cat.includes("perfume") || cat.includes("cosmetic")) {
-    return { heading: "italiana", body: "forum" };
-  }
-  if (cat.includes("drink") || cat.includes("beverage") || cat.includes("soda") || cat.includes("coffee") || cat.includes("tumbler") || cat.includes("water") || cat.includes("street")) {
-    return { heading: "bebas", body: "montserrat-bold" };
-  }
-  if (cat.includes("food") || cat.includes("snack") || cat.includes("sweet") || cat.includes("dessert") || cat.includes("fun")) {
-    return { heading: "cherry-cream-soda", body: "poppins" };
-  }
-  if (cat.includes("fashion") || cat.includes("apparel") || cat.includes("clothing") || cat.includes("style")) {
-    return { heading: "amethysta", body: "montserrat" };
-  }
-  return { heading: "montserrat-bold", body: "poppins" };
-}
 
 /** Largest size (px) at which `text` is expected to fit `box` when wrapped by words. */
 export function fitFontSize(text: string, font: FontId, box: Box, max = 150): number {

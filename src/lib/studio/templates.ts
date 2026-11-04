@@ -37,10 +37,13 @@ export type TemplateInput = {
   fontBody?: FontId;
 };
 
+/** Templates that draw a CTA pill under the call to action text. */
+const TEMPLATES_WITH_CTA_PILL: ReadonlySet<TemplateId> = new Set(["tech-hero", "product-poster"]);
+
 /**
  * Creates SVG for background graphic shapes.
- * STRICT RULE: No rectangular card boxes behind the title text.
- * Only renders a subtle rounded CTA pill at the bottom if a call to action is present.
+ * New layouts put titles straight on the scene; only color-block and tilted-hero keep a shape
+ * behind the text, and tech-hero / product-poster draw a CTA pill when `hasCta` is set.
  */
 export function buildTemplateBackgroundShapes(
   templateId: TemplateId,
@@ -50,10 +53,22 @@ export function buildTemplateBackgroundShapes(
   if (templateId === "color-block") {
     const cardSvg = `
       <svg width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}" xmlns="http://www.w3.org/2000/svg">
-        <rect x="70" y="80" width="940" height="380" rx="36" fill="${palette.dominant}" />
+        <rect x="80" y="100" width="920" height="420" rx="40" fill="${palette.dominant}" />
       </svg>
     `;
     return Buffer.from(cardSvg);
+  }
+
+  if (templateId === "product-poster" && !hasCta) {
+    // Posts saved before the no-card redesign stored this background with white text on the card.
+    // New product-poster layouts only store a background when they draw the CTA pill.
+    const legacyCardSvg = `
+      <svg width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}" xmlns="http://www.w3.org/2000/svg">
+        <rect x="80" y="100" width="920" height="420" rx="40" fill="${palette.dominant}" />
+        <rect x="82" y="102" width="916" height="416" rx="38" fill="none" stroke="${palette.accent}" stroke-width="3" opacity="0.4"/>
+      </svg>
+    `;
+    return Buffer.from(legacyCardSvg);
   }
 
   if (templateId === "tilted-hero") {
@@ -67,7 +82,7 @@ export function buildTemplateBackgroundShapes(
     return Buffer.from(bannerSvg);
   }
 
-  if (hasCta && (templateId === "tech-hero" || templateId === "product-poster")) {
+  if (hasCta && TEMPLATES_WITH_CTA_PILL.has(templateId)) {
     // Elegant pill button at bottom strictly when a CTA is requested
     const pillSvg = `
       <svg width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}" xmlns="http://www.w3.org/2000/svg">
@@ -91,10 +106,15 @@ export function buildTemplateBackgroundShapes(
  * Applies a contemporary template to generate ready-to-render SlideLayers.
  */
 /** The colours a template's graphics need, stored on the layers so edits redraw them. */
-export function templateBackground(templateId: TemplateId, palette: ProductPalette): SlideBackground | undefined {
-  return buildTemplateBackgroundShapes(templateId, palette)
-    ? { template: templateId, dominant: palette.dominant, accent: palette.accent }
-    : undefined;
+export function templateBackground(
+  templateId: TemplateId,
+  palette: ProductPalette,
+  hasCta: boolean = false,
+): SlideBackground | undefined {
+  const base = { template: templateId, dominant: palette.dominant, accent: palette.accent };
+  if (templateId === "color-block" || templateId === "tilted-hero") return base;
+  if (hasCta && TEMPLATES_WITH_CTA_PILL.has(templateId)) return { ...base, cta: true };
+  return undefined;
 }
 
 export function applyTemplateLayout(input: TemplateInput): SlideLayers {
@@ -162,20 +182,22 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
     }
 
     case "tech-hero": {
-      // Inspired by Apple Watch Moskitao tech hero:
-      // Tag at top + Hero title + 1-sentence value prop + CTA pill button
-      const tagText = (categoryTag || "FEATURED").toUpperCase();
-      const tagBox: Box = { x: 100, y: 70, width: 880, height: 50 };
-      textLayers.push({
-        id: "tag",
-        role: "headline",
-        text: tagText,
-        box: tagBox,
-        font: "space-grotesk",
-        size: fitFontSize(tagText, "space-grotesk", tagBox, 32),
-        color: palette.accent || "#ff7a45",
-        align: "center",
-      });
+      // Tag at top + Hero title + 1-sentence value prop + CTA pill button.
+      // The tag comes from the planner in the shop's content language; no hard-coded fallback.
+      const tagText = categoryTag?.trim().toUpperCase();
+      if (tagText) {
+        const tagBox: Box = { x: 100, y: 70, width: 880, height: 50 };
+        textLayers.push({
+          id: "tag",
+          role: "headline",
+          text: tagText,
+          box: tagBox,
+          font: "space-grotesk",
+          size: fitFontSize(tagText, "space-grotesk", tagBox, 32),
+          color: palette.accent || "#ff7a45",
+          align: "center",
+        });
+      }
 
       const hBox: Box = { x: 90, y: 130, width: 900, height: 160 };
       textLayers.push({
@@ -279,8 +301,7 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
       break;
     }
 
-    case "product-poster":
-    case "color-block": {
+    case "product-poster": {
       // Clean modern campaign poster with NO BOX behind title
       const hBox: Box = { x: 80, y: 90, width: 920, height: 190 };
       textLayers.push({
@@ -523,7 +544,7 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
     productBox = { ...productBox, ...input.productBox };
   }
 
-  const background = templateBackground(templateId, palette);
+  const background = templateBackground(templateId, palette, textLayers.some((t) => t.id === "cta"));
   return {
     sceneBrief,
     product: { box: productBox },

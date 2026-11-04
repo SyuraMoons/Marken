@@ -32,18 +32,16 @@ export type FramingMode =
 export type DropShadowOptions = {
   /** Whether to render a soft grounding drop shadow behind the product (default: true) */
   enabled?: boolean;
-  /** Horizontal shadow offset in pixels (default: 0) */
+  /** Horizontal shadow offset in pixels (default: 6, or 18 for `offset-left`) */
   offsetX?: number;
-  /** Vertical shadow offset in pixels (default: 20) */
+  /** Vertical shadow offset in pixels (default: 22, or 42 for `floating-hero`) */
   offsetY?: number;
-  /** Gaussian blur sigma for the shadow silhouette (default: 14) */
+  /** Gaussian blur sigma for the shadow silhouette (default: 15, or 22 for `floating-hero`) */
   blurSigma?: number;
-  /** Shadow opacity multiplier `[0..1]` (default: 0.36) */
+  /** Shadow opacity multiplier `[0..1]` (default: 0.38, or 0.24 for `floating-hero`) */
   opacity?: number;
-  /** Whether to include a tight dark contact shadow under the product base (default: true) */
+  /** Whether to include a tight dark contact shadow under the product base (default: true, off for `floating-hero`) */
   contactShadow?: boolean;
-  /** Whether to blend a soft ground reflection under the product on shiny/wet surfaces (default: false) */
-  reflection?: boolean;
   /** Whether to cast a subtle ambient light wrap / rim glow matching the scene lighting (default: true) */
   ambientRim?: boolean;
 };
@@ -55,7 +53,10 @@ export type CompositeProductSlideInput = {
   cutout: Buffer | Uint8Array | string;
   /** Target empty area on the 1080x1350 canvas (defaults to `DEFAULT_RESERVED_BOX`) */
   reservedBox?: Partial<ReservedBox>;
-  /** Dynamic framing mode (macro-detail, offset-left, offset-right, full-center, floating-hero) */
+  /**
+   * Where the product sits inside `reservedBox`. Every mode stays inside the box, because that is
+   * the area Muse Image left empty and the template keeps free of text.
+   */
   framingMode?: FramingMode;
   /** Padding ratio inside `reservedBox` on each side (default: 0.06 = 6% breathing room) */
   paddingRatio?: number;
@@ -251,67 +252,6 @@ async function buildAmbientRimLayer(params: {
 }
 
 /**
- * Builds a subtle ground surface reflection under the base for glossy, wet, or polished surfaces.
- */
-async function buildGroundReflectionLayer(
-  scaledCutoutBuffer: Buffer,
-  placedBox: PlacedProductBox,
-): Promise<Buffer> {
-  const sliceH = Math.max(16, Math.min(180, Math.round(placedBox.height * 0.24)));
-  const bottomSlice = await sharp(scaledCutoutBuffer)
-    .extract({
-      left: 0,
-      top: placedBox.height - sliceH,
-      width: placedBox.width,
-      height: sliceH,
-    })
-    .flip()
-    .blur(2.5)
-    .ensureAlpha()
-    .raw()
-    .toBuffer();
-
-  // Apply vertical linear decay
-  for (let y = 0; y < sliceH; y++) {
-    const fade = Math.max(0, 1 - y / sliceH) * 0.24;
-    for (let x = 0; x < placedBox.width; x++) {
-      const idx = (y * placedBox.width + x) * 4;
-      bottomSlice[idx + 3] = Math.round(bottomSlice[idx + 3] * fade);
-    }
-  }
-
-  const reflImage = await sharp(bottomSlice, {
-    raw: { width: placedBox.width, height: sliceH, channels: 4 },
-  })
-    .png()
-    .toBuffer();
-
-  const canvasRefl = Buffer.alloc(SLIDE_WIDTH * SLIDE_HEIGHT * 4, 0);
-  const reflRaw = await sharp(reflImage).raw().toBuffer();
-
-  for (let y = 0; y < sliceH; y++) {
-    const destY = placedBox.top + placedBox.height + y;
-    if (destY >= SLIDE_HEIGHT) continue;
-    for (let x = 0; x < placedBox.width; x++) {
-      const destX = placedBox.left + x;
-      if (destX < 0 || destX >= SLIDE_WIDTH) continue;
-      const srcIdx = (y * placedBox.width + x) * 4;
-      const dstIdx = (destY * SLIDE_WIDTH + destX) * 4;
-      canvasRefl[dstIdx] = reflRaw[srcIdx];
-      canvasRefl[dstIdx + 1] = reflRaw[srcIdx + 1];
-      canvasRefl[dstIdx + 2] = reflRaw[srcIdx + 2];
-      canvasRefl[dstIdx + 3] = reflRaw[srcIdx + 3];
-    }
-  }
-
-  return sharp(canvasRefl, {
-    raw: { width: SLIDE_WIDTH, height: SLIDE_HEIGHT, channels: 4 },
-  })
-    .png()
-    .toBuffer();
-}
-
-/**
  * Deterministically composites the confirmed product cutout into the reserved area
  * of a 1080x1350 slide scene (`FR-CG-09`).
  */
@@ -337,20 +277,14 @@ export async function compositeProductSlide(
     .png()
     .toBuffer();
 
-  // 2. Compute sizing based on framing mode
-  let targetBoxW = reservedBox.width;
-  let targetBoxH = reservedBox.height;
-
-  if (framingMode === "macro-detail") {
-    // Zoom-in 1.45x for macro detail shot
-    targetBoxW = Math.min(SLIDE_WIDTH, Math.round(reservedBox.width * 1.45));
-    targetBoxH = Math.min(SLIDE_HEIGHT, Math.round(reservedBox.height * 1.45));
-  }
-
-  const padX = Math.round(targetBoxW * paddingRatio);
-  const padY = Math.round(targetBoxH * paddingRatio);
-  const maxProductWidth = Math.max(64, targetBoxW - padX * 2);
-  const maxProductHeight = Math.max(64, targetBoxH - padY * 2);
+  // 2. Size the product inside reservedBox. Macro detail fills the box edge to edge;
+  // floating hero shrinks a little so there is air under it for the cast shadow.
+  const effectivePadding = framingMode === "macro-detail" ? 0 : paddingRatio;
+  const sizeScale = framingMode === "floating-hero" ? 0.86 : 1;
+  const padX = Math.round(reservedBox.width * effectivePadding);
+  const padY = Math.round(reservedBox.height * effectivePadding);
+  const maxProductWidth = Math.max(64, Math.round((reservedBox.width - padX * 2) * sizeScale));
+  const maxProductHeight = Math.max(64, Math.round((reservedBox.height - padY * 2) * sizeScale));
 
   // 3. Scale cutout proportionally without distorting aspect ratio
   const scaledCutoutBuffer = await sharp(cutoutBytes)
@@ -366,27 +300,29 @@ export async function compositeProductSlide(
   const scaledWidth = Math.max(1, scaledMeta.width ?? maxProductWidth);
   const scaledHeight = Math.max(1, scaledMeta.height ?? maxProductHeight);
 
-  // 4. Compute dynamic placement coordinates according to framing mode
+  // 4. Place the product inside reservedBox according to the framing mode
+  const innerLeft = reservedBox.x + padX;
+  const innerRight = reservedBox.x + reservedBox.width - padX - scaledWidth;
+  const innerTop = reservedBox.y + padY;
+  const innerBottom = reservedBox.y + reservedBox.height - padY - scaledHeight;
   let left = Math.round(reservedBox.x + (reservedBox.width - scaledWidth) / 2);
   let top = Math.round(reservedBox.y + (reservedBox.height - scaledHeight) / 2);
 
   if (framingMode === "offset-left") {
-    // Dynamic left-side anchoring (Pepsi can style)
-    left = Math.max(40, Math.min(180, Math.round(SLIDE_WIDTH * 0.08)));
-    top = Math.max(80, Math.min(SLIDE_HEIGHT - scaledHeight - 40, Math.round(reservedBox.y + (reservedBox.height - scaledHeight) * 0.65)));
+    // Anchored to the left of the empty area, resting low on the surface
+    left = Math.round(innerLeft);
+    top = Math.round(innerBottom);
   } else if (framingMode === "offset-right") {
-    // Dynamic right-side anchoring
-    left = Math.max(40, SLIDE_WIDTH - scaledWidth - 60);
-    top = Math.max(80, Math.min(SLIDE_HEIGHT - scaledHeight - 40, Math.round(reservedBox.y + (reservedBox.height - scaledHeight) * 0.65)));
-  } else if (framingMode === "macro-detail") {
-    // Position detail zoom
-    left = Math.max(0, Math.min(SLIDE_WIDTH - scaledWidth, Math.round(reservedBox.x + (reservedBox.width - scaledWidth) / 2)));
-    top = Math.max(0, Math.min(SLIDE_HEIGHT - scaledHeight, Math.round(reservedBox.y + (reservedBox.height - scaledHeight) / 2)));
+    left = Math.round(innerRight);
+    top = Math.round(innerBottom);
   } else if (framingMode === "floating-hero") {
-    // Elevated product with air underneath (Bella Boom style)
-    top = Math.max(60, Math.round(reservedBox.y - 30));
+    // Lifted to the top of the empty area, leaving air underneath
+    top = Math.round(innerTop);
   }
 
+  // Never leave the reserved area (or the canvas)
+  left = Math.max(reservedBox.x, Math.min(reservedBox.x + reservedBox.width - scaledWidth, left));
+  top = Math.max(reservedBox.y, Math.min(reservedBox.y + reservedBox.height - scaledHeight, top));
   left = Math.max(0, Math.min(SLIDE_WIDTH - scaledWidth, left));
   top = Math.max(0, Math.min(SLIDE_HEIGHT - scaledHeight, top));
 
@@ -423,12 +359,6 @@ export async function compositeProductSlide(
     if (input.shadow?.contactShadow !== false && framingMode !== "floating-hero") {
       const contactBuffer = await buildContactShadowLayer(placedBox);
       layers.push({ input: contactBuffer, left: 0, top: 0 });
-    }
-
-    // 3. Optional ground reflection for glossy/wet/polished surfaces
-    if (input.shadow?.reflection) {
-      const reflBuffer = await buildGroundReflectionLayer(scaledCutoutBuffer, placedBox);
-      layers.push({ input: reflBuffer, left: 0, top: 0 });
     }
   }
 

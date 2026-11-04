@@ -229,6 +229,10 @@ export async function planDailyCarousel(input: PlanInput): Promise<CarouselPlan>
           headline: s.headline,
           subline: s.subline,
           bigWord: s.bigWord,
+          categoryTag: s.categoryTag,
+          framingMode: s.framingMode,
+          cameraAngle: s.cameraAngle,
+          surfaceType: s.surfaceType,
           templateId: s.templateId,
         })),
         captions: res.captions.map((c) => ({

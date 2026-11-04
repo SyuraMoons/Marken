@@ -125,7 +125,7 @@ function FeedCard({ post, shopName, day }: { post: FeedPost; shopName: string; d
   const status = STATUS[post.status] ?? STATUS.skipped;
   const making = post.status === "generating";
   return (
-    <article className="glass flex flex-col gap-3.5 rounded-card p-4 leading-[1.4] lg:p-5">
+    <article data-tour="feed-post" className="glass flex flex-col gap-3.5 rounded-card p-4 leading-[1.4] lg:p-5">
       <header className="flex items-center gap-2.5">
         <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue text-sm font-semibold text-white">
           {(shopName.trim()[0] ?? "M").toUpperCase()}
@@ -176,7 +176,7 @@ function PostCalendar({ today, posts, className = "" }: { today: string; posts: 
   const weekdays = t("feed.weekdays").split(",");
 
   return (
-    <section aria-label={t("feed.calendarEyebrow")} className={`glass flex flex-col gap-3 rounded-card p-4 leading-[1.4] lg:gap-4 lg:p-6 ${className}`}>
+    <section data-tour="calendar" aria-label={t("feed.calendarEyebrow")} className={`glass flex flex-col gap-3 rounded-card p-4 leading-[1.4] lg:gap-4 lg:p-6 ${className}`}>
       <div className="flex items-end justify-between gap-3">
         <div className="flex flex-col gap-0.5">
           <span className="text-[11px] font-semibold text-muted uppercase">{t("feed.calendarEyebrow")}</span>

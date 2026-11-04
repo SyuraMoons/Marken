@@ -1,31 +1,29 @@
-import { Suspense } from "react";
-import { AppShell } from "@/components/app-shell";
-import { getOwnerShop } from "@/lib/data/today";
-import { listShops } from "@/lib/supabase/active-shop";
-import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
+import { t } from "@/lib/i18n";
 
-// Auth guard lives in src/proxy.ts (FR-AU-04).
+const NAV = [
+  { href: "/today", label: t("nav.today") },
+  { href: "/products", label: t("nav.products") },
+  { href: "/results", label: t("nav.results") },
+  { href: "/settings", label: t("nav.settings") },
+];
+
+// Main app shell. Auth guard comes with Supabase Auth (FR-AU-04).
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
-    <Suspense fallback={<AppShell shopName="" shops={[]}>{children}</AppShell>}>
-      <Shell>{children}</Shell>
-    </Suspense>
-  );
-}
-
-async function Shell({ children }: { children: React.ReactNode }) {
-  const owner = await getOwnerShop();
-  // Every company the owner has; products and the rest are scoped to the active one (SRD v2.1 A-12).
-  const { shops } = owner ? await listShops(await createClient(), owner.user.id) : { shops: [] };
-  const switcher = shops.map((s) => ({
-    id: s.id,
-    name: s.name ?? "",
-    active: s.id === owner?.shop.id,
-    completed: Boolean(s.onboarding_completed_at),
-  }));
-  return (
-    <AppShell shopName={owner?.shop.name ?? ""} shops={switcher} account={{ email: owner?.user.email ?? null, provider: owner?.user.provider ?? null }}>
-      {children}
-    </AppShell>
+    <div className="flex min-h-dvh flex-col">
+      <div className="flex-1">{children}</div>
+      <nav className="sticky bottom-0 grid grid-cols-4 border-t border-foreground/10 bg-background">
+        {NAV.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="flex min-h-11 items-center justify-center text-sm"
+          >
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+    </div>
   );
 }

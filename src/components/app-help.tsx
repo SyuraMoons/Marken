@@ -9,6 +9,7 @@ import { t, type MessageKey } from "@/lib/i18n";
 
 type Step = { selector: string; body: MessageKey };
 const pages: Record<string, Step[]> = {
+  posts: [{ selector: 'main h1', body: 'tour.history' }, { selector: '[data-tour="feed-post"]', body: 'tour.feedPost' }, { selector: '[data-tour="calendar"]', body: 'tour.calendar' }],
   today: [{ selector: 'main h1', body: 'tour.today' }, { selector: '[data-tour="carousel"] button', body: 'tour.carousel' }, { selector: '[data-tour="caption"]', body: 'tour.caption' }, { selector: '[data-tour="approve"]', body: 'tour.approve' }],
   products: [{ selector: 'main h1', body: 'tour.products' }, { selector: '[data-tour="add-product"]', body: 'tour.addProduct' }, { selector: '[data-tour="product-photo"]', body: 'tour.productPhoto' }],
   results: [{ selector: 'main h1', body: 'tour.results' }, { selector: 'main section', body: 'tour.resultsData' }],
@@ -25,7 +26,7 @@ function visibleTarget(selector: string) {
 function RoutedHelp() {
   const path = usePathname();
   const view = useSearchParams().get("view");
-  const scope = path === "/today" && (view === "activity" || view === "details") ? "activity" : path.startsWith("/posts") ? "today" : path.split("/")[1];
+  const scope = path === "/today" && (view === "activity" || view === "details") ? "activity" : path === "/posts" ? "posts" : path.startsWith("/posts") ? "today" : path.split("/")[1];
   return <Help key={`${path}?${view}`} scope={scope} />;
 }
 

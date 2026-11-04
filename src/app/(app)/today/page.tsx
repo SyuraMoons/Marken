@@ -21,7 +21,8 @@ import { allSlidesPassed } from "@/lib/posts/slides";
 import { backTarget } from "@/lib/posts/back";
 import { FreshOnNavigate } from "@/components/fresh-on-navigate";
 
-// Today (F-10, FR-TD-01..04, FR-FD-03, F-24). One screen per post status; ?view= opens the post's sub-pages (Figma page 01).
+// Today (F-10, FR-TD-01..04, FR-FD-03, F-24): today's latest post (Figma page 01). ?post=<id> opens an earlier
+// post from History's feed or calendar, and ?view= its sub-pages.
 export default function TodayPage({ searchParams }: PageProps<"/today">) {
   return (
     <FreshOnNavigate>

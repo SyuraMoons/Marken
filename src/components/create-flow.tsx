@@ -1,4 +1,5 @@
 "use client";
+import { CookingOverlay } from "./cooking-overlay";
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -110,6 +111,7 @@ export function CreateFlow({ shopId, product, savedKit, hasDescription }: { shop
 
   return (
     <div className="flex flex-col gap-6 lg:gap-7">
+      <CookingOverlay active={pending} />
       <header className="bg-signature flex flex-col gap-4 rounded-[18px] border border-white/85 px-4 py-5 leading-[1.4] lg:rounded-card lg:px-6">
         <div className="flex items-center gap-4">
           {product.cutoutUrl && (

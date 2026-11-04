@@ -6,11 +6,12 @@ import { fromParam } from "@/lib/posts/back";
 import { ActionButton } from "./action-button";
 import { Button, ButtonLink } from "./button";
 import { InfoCard } from "./info-card";
+import { SharePost } from "./share-post";
 
 const REASONS = ["not_my_style", "wrong_product", "bad_timing", "other"] as const;
 
 // Caption choice + Edit + skip with reason chips (FR-TD-03, DX-05). `children` is the "why" section.
-export function ReviewPanel({ postId, captions, hashtags, canSkip = true, from = null, children }: { postId: string; scoped?: boolean; captions: string[]; hashtags: string[]; canSkip?: boolean; from?: string | null; children?: ReactNode }) {
+export function ReviewPanel({ postId, captions, hashtags, canSkip = true, from = null, downloads = [], children }: { postId: string; scoped?: boolean; captions: string[]; hashtags: string[]; canSkip?: boolean; from?: string | null; downloads?: string[]; children?: ReactNode }) {
   // Edit keeps ?from= so its Save/Cancel return to Today with the "Back to create post" link intact.
   const editHref = (i: number) => `/posts/${postId}/edit?c=${i}${fromParam(from)}`;
   const [index, setIndex] = useState(0);
@@ -97,6 +98,7 @@ export function ReviewPanel({ postId, captions, hashtags, canSkip = true, from =
         )}
         <p className="text-[13px] leading-[1.4] text-blue">{hashtags.join(" ")}</p>
       </section>
+      {downloads.length > 0 && downloads.every(Boolean) && <SharePost key={JSON.stringify([caption, downloads])} downloads={downloads} caption={[caption, hashtags.join(" ")].filter(Boolean).join("\n\n")} />}
       {children}
 
       {/* No Approve: publishing to Instagram is not built yet. The owner downloads the slides instead. */}

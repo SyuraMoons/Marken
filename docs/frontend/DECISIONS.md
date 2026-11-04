@@ -160,7 +160,7 @@ Each confirmed product card on /products has a one-tap "Generate image post" but
 ## FD-46 · Generate image post opens a create flow; nothing generates before the brief and brand kit (amends FD-45)
 
 **Decision:** "Generate image post" (Products card and the post-confirm screen) links to `/create?product=<id>` instead of starting the job. The flow has three steps:
-1. **Brief:** Marken drafts it on arrival. `POST /api/shops/:id/brand-kit/brief` (Muse Spark via the gateway, step `draft_brief`) reads the shop and product data and returns a goal plus three short fields: who it is for, look and feel, and what to show. The owner edits any field, changes the goal chip, or presses **Write it again**. If drafting fails, the fields stay empty and editable. The fields are joined into one brief, max 600 characters. Most owners have never written a brief, so they start from a draft instead of an empty box.
+1. **Brief:** three question cards (who it is for, look and feel, what to show), each with preset answers A, B, C or "Write your own" (FD-50). The answers are joined into one brief, max 600 characters.
 2. **Brand kit:** `POST /api/shops/:id/brand-kit/directions` (Muse Spark via the gateway, step `brand_directions`) drafts three brand directions (name, colours, heading/body font, design guidance, photo style) from the brief. The owner picks one, keeps their saved kit, or sets it up by hand with `BrandKitEditor`.
 3. **Review:** product, brief, kit and what they will get. **Generate image post** saves the chosen kit to `brand_kits` if it changed, then calls `POST /api/shops/:id/posts/generate` with `{ productId, brief }` and opens the studio on Today (FD-45).
 
@@ -198,3 +198,9 @@ User requested faster autoplay, no pause button, and continuous hero motion inde
 
 
 **Landing access — 4 Nov 2026.** Signed-in visitors may open `/`. The primary Create your first post CTA targets `/today`; logged-out requests are redirected to login, and unfinished setup still resumes onboarding. OAuth callback query parameters on the root are handled before landing-page access. This supersedes the earlier signed-in landing redirect.
+
+## FD-50 · Brief as question cards; no AI-drafted brief (amends FD-46)
+
+**Decision:** The brief step on `/create` asks three questions, one card each: **Who is it for?**, **Look and feel**, **What to show or mention**. Each offers three preset answers (A, B, C) and **Write your own**, which opens a text box. The goal chips stay. "Generate brief" / "Write it again" and `POST /api/shops/:id/brand-kit/brief` are removed, so the brief step makes no model calls.
+
+**Why:** Picking an answer is faster than reading and correcting a drafted paragraph, and it matches the onboarding question cards. Owners who want something specific still write it themselves.

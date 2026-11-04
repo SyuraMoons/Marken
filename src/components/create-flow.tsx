@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { saveBrandKit } from "@/lib/actions/brand-kit";
-import { BRIEF_GOALS, hasBrandKit, type BrandDirection, type BrandKitValue, type BriefGoal, type DraftedBrief } from "@/lib/brand-kit";
+import { BRIEF_GOALS, hasBrandKit, type BrandDirection, type BrandKitValue, type BriefGoal } from "@/lib/brand-kit";
 import { t, type MessageKey } from "@/lib/i18n";
 import { FONTS, isFontId, type FontId } from "@/lib/studio/layers";
 import { BrandKitEditor } from "./brand-kit-editor";
@@ -15,27 +15,21 @@ type Product = { id: string; name: string; cutoutUrl: string | null };
 type Step = "brief" | "kit" | "review";
 type Choice = { kind: "direction"; index: number } | { kind: "saved" } | { kind: "manual" };
 
-type BriefFields = Pick<DraftedBrief, "audience" | "mood" | "highlight">;
-
+// Each brief question offers three preset answers (a, b, c) or the owner's own words.
 const STEPS: Step[] = ["brief", "kit", "review"];
 const FIELDS = [
   { key: "audience", max: 160, rows: 2 },
-  { key: "mood", max: 100, rows: 1 },
+  { key: "mood", max: 100, rows: 2 },
   { key: "highlight", max: 200, rows: 3 },
 ] as const;
-const EMPTY_BRIEF: BriefFields = { audience: "", mood: "", highlight: "" };
+const OPTIONS = ["a", "b", "c"] as const;
+type FieldKey = (typeof FIELDS)[number]["key"];
+type BriefPick = (typeof OPTIONS)[number] | "own" | null;
+type Answer = { pick: BriefPick; own: string };
+const EMPTY_BRIEF: Record<FieldKey, Answer> = { audience: { pick: null, own: "" }, mood: { pick: null, own: "" }, highlight: { pick: null, own: "" } };
 
+const answerText = (key: FieldKey, a: Answer) => (a.pick === "own" ? a.own : a.pick ? t(`create.brief.${key}.${a.pick}` as MessageKey) : "");
 const sentence = (label: string, s: string) => (s.trim() ? `${label}: ${s.trim().replace(/[.\s]+$/, "")}.` : "");
-
-async function requestBrief(shopId: string, productId: string, goal?: BriefGoal, signal?: AbortSignal) {
-  const res = await fetch(`/api/shops/${shopId}/brand-kit/brief`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ productId, goal }),
-    signal,
-  }).catch(() => null);
-  return res?.ok ? ((await res.json().catch(() => null)) as DraftedBrief | null) : null;
-}
 
 const fontLabel = (f: FontId | null) => (f ? FONTS[f].label : t("bk.fontDefault"));
 const asKit = (d: BrandDirection): BrandKitValue => ({
@@ -47,16 +41,12 @@ const asKit = (d: BrandDirection): BrandKitValue => ({
 });
 const same = (a: BrandKitValue, b: BrandKitValue) => JSON.stringify(a) === JSON.stringify(b);
 
-// Create flow (FD-46): nothing generates until the owner has written a brief, chosen a brand kit and pressed Generate.
+// Create flow (FD-46, FD-50): nothing generates until the owner has answered the brief, chosen a brand kit and pressed Generate.
 export function CreateFlow({ shopId, product, savedKit, hasDescription }: { shopId: string; product: Product; savedKit: BrandKitValue; hasDescription: boolean }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("brief");
   const [goal, setGoal] = useState<BriefGoal | null>(null);
-  const [brief, setBrief] = useState<BriefFields>(EMPTY_BRIEF);
-  // The brief is drafted only when the owner presses Generate brief; nothing calls the model on arrival.
-  const [writing, setWriting] = useState(false);
-  const [written, setWritten] = useState(false);
-  const [writeFailed, setWriteFailed] = useState(false);
+  const [brief, setBrief] = useState(EMPTY_BRIEF);
   const [directions, setDirections] = useState<BrandDirection[] | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [draftFailed, setDraftFailed] = useState(false);
@@ -68,26 +58,14 @@ export function CreateFlow({ shopId, product, savedKit, hasDescription }: { shop
 
   const fullBrief = [
     goal ? t(`create.goal.${goal}.brief` as MessageKey) : "",
-    ...FIELDS.map((f) => sentence(t(`create.brief.${f.key}.short` as MessageKey), brief[f.key])),
+    ...FIELDS.map((f) => sentence(t(`create.brief.${f.key}.short` as MessageKey), answerText(f.key, brief[f.key]))),
   ]
     .filter(Boolean)
     .join(" ");
   const kit: BrandKitValue =
     choice.kind === "direction" && directions?.[choice.index] ? asKit(directions[choice.index]) : choice.kind === "saved" ? savedKit : manual;
 
-  const applyBrief = (d: DraftedBrief | null) => {
-    setWriting(false);
-    if (!d) return setWriteFailed(true);
-    setWritten(true);
-    setGoal(d.goal);
-    setBrief({ audience: d.audience, mood: d.mood, highlight: d.highlight });
-  };
-
-  const writeBrief = async () => {
-    setWriting(true);
-    setWriteFailed(false);
-    applyBrief(await requestBrief(shopId, product.id, goal ?? undefined));
-  };
+  const answer = (key: FieldKey, next: Partial<Answer>) => setBrief((b) => ({ ...b, [key]: { ...b[key], ...next } }));
 
   const draft = async () => {
     setStep("kit");
@@ -117,7 +95,13 @@ export function CreateFlow({ shopId, product, savedKit, hasDescription }: { shop
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ productId: product.id, brief: fullBrief || undefined }),
       }).catch(() => null);
-      if (res?.ok) return router.push("/today");
+      if (res?.ok) {
+        // Open this exact post and remember where the owner started, so Compare and other sub-views can lead back here.
+        const body = (await res.json().catch(() => null)) as { post?: { id?: string } } | null;
+        const params = new URLSearchParams({ from: `/create?product=${product.id}` });
+        if (body?.post?.id) params.set("post", body.post.id);
+        return router.push(`/today?${params}`);
+      }
       const code = res ? ((await res.json().catch(() => null)) as { error?: string } | null)?.error : null;
       setError(code === "daily_post_limit" ? "products.err.limit" : code === "queue_unavailable" ? "products.err.queue" : "common.error");
     });
@@ -164,41 +148,48 @@ export function CreateFlow({ shopId, product, savedKit, hasDescription }: { shop
               ))}
             </div>
           </fieldset>
-          <div className="glass flex flex-col gap-4 rounded-card p-5" aria-busy={writing}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-blue" role="status">
-                {writing
-                  ? t("create.brief.writing")
-                  : writeFailed
-                    ? t("create.brief.writeError")
-                    : written
-                      ? t("create.brief.written")
-                      : t("create.brief.idle")}
-              </p>
-              <Button variant="secondary" className="w-auto! px-4" onClick={writeBrief} disabled={writing}>
-                {t(writeFailed ? "create.brief.writeRetry" : written ? "create.brief.rewrite" : "create.brief.generate")}
-              </Button>
-            </div>
-            {FIELDS.map((f) => (
-              <label key={f.key} className="flex flex-col gap-1.5 text-sm font-medium">
-                {t(`create.brief.${f.key}` as MessageKey)}
-                {writing ? (
-                  <span className="h-12 animate-pulse rounded-control bg-powder" />
-                ) : (
+          {FIELDS.map((f, qi) => {
+            const a = brief[f.key];
+            const chip = (on: boolean) =>
+              `glass flex min-h-11 cursor-pointer items-start gap-3 rounded-card px-4 py-3 text-left text-[15px] has-focus-visible:outline-2 has-focus-visible:outline-blue ${on ? "outline-2 outline-blue" : ""}`;
+            const letter = (on: boolean) =>
+              `flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold uppercase ${on ? "bg-blue text-white" : "bg-powder text-blue"}`;
+            return (
+              <fieldset key={f.key} className="flex flex-col gap-2">
+                <legend className="mb-2 text-base font-semibold">
+                  <span className="text-blue">{qi + 1}.</span> {t(`create.brief.${f.key}` as MessageKey)}
+                </legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {OPTIONS.map((o) => (
+                    <label key={o} className={chip(a.pick === o)}>
+                      <input type="radio" name={f.key} value={o} checked={a.pick === o} onChange={() => answer(f.key, { pick: o })} className="sr-only" />
+                      <span className={letter(a.pick === o)}>{o}</span>
+                      <span>{t(`create.brief.${f.key}.${o}` as MessageKey)}</span>
+                    </label>
+                  ))}
+                  <label className={chip(a.pick === "own")}>
+                    <input type="radio" name={f.key} value="own" checked={a.pick === "own"} onChange={() => answer(f.key, { pick: "own" })} className="sr-only" />
+                    <span className={letter(a.pick === "own")}>✎</span>
+                    <span>{t("create.brief.own")}</span>
+                  </label>
+                </div>
+                {a.pick === "own" && (
                   <textarea
-                    value={brief[f.key]}
-                    onChange={(e) => setBrief((b) => ({ ...b, [f.key]: e.target.value }))}
+                    autoFocus
+                    value={a.own}
+                    onChange={(e) => answer(f.key, { own: e.target.value })}
                     rows={f.rows}
                     maxLength={f.max}
+                    aria-label={t(`create.brief.${f.key}` as MessageKey)}
                     placeholder={t(`create.brief.${f.key}.placeholder` as MessageKey)}
                     className={`${glassInput} font-normal`}
                   />
                 )}
-              </label>
-            ))}
-          </div>
+              </fieldset>
+            );
+          })}
           <p className="text-sm text-muted">{t("create.brief.hint")}</p>
-          <Button onClick={draft} disabled={writing || !fullBrief}>
+          <Button onClick={draft} disabled={!fullBrief}>
             {t("create.brief.next")}
           </Button>
           <ButtonLink href="/products" variant="text">
@@ -245,7 +236,9 @@ export function CreateFlow({ shopId, product, savedKit, hasDescription }: { shop
               role="radio"
               aria-checked={choice.kind === "manual"}
               onClick={() => setChoice({ kind: "manual" })}
-              className={`flex min-h-40 flex-col items-start justify-center gap-2 rounded-card border-2 border-dashed p-5 text-left focus-visible:outline-2 focus-visible:outline-blue ${choice.kind === "manual" ? "border-blue bg-powder/50" : "border-border bg-white/60"}`}
+              className={`flex min-h-40 flex-col items-start justify-center gap-2 rounded-card border-2 border-dashed p-5 text-left transition duration-150 ease-out focus-visible:outline-2 focus-visible:outline-blue active:scale-[0.97] ${
+                choice.kind === "manual" ? "-translate-y-1 border-solid border-blue bg-powder/60 shadow-xl" : "border-border bg-white/60 hover:-translate-y-0.5 hover:shadow-md"
+              }`}
             >
               <span className="text-lg font-semibold">{t("create.kit.manual")}</span>
               <span className="text-[15px] text-muted">{t("create.kit.manualBody")}</span>
@@ -365,10 +358,22 @@ function KitCard({ title, summary, kit, badge, selected, onSelect }: { title: st
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className={`glass flex flex-col gap-3 overflow-hidden rounded-card p-0 text-left transition focus-visible:outline-2 focus-visible:outline-blue ${selected ? "ring-2 ring-blue" : "hover:ring-1 hover:ring-border"}`}
+      className={`glass relative flex flex-col gap-3 overflow-hidden rounded-card p-0 text-left transition duration-150 ease-out focus-visible:outline-2 focus-visible:outline-blue active:scale-[0.97] ${
+        selected ? "-translate-y-1 bg-powder/60 shadow-xl ring-[3px] ring-blue" : "hover:-translate-y-0.5 hover:shadow-md hover:ring-1 hover:ring-border"
+      }`}
     >
-      <span className="flex h-20 items-end p-4" style={{ background: `linear-gradient(135deg, ${main}, ${kit.colors[1] ?? main})` }}>
-        <span className="rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-ink">{selected ? `✓ ${t("create.kit.selected")}` : badge ?? title}</span>
+      <span className="relative flex h-20 items-end p-4" style={{ background: `linear-gradient(135deg, ${main}, ${kit.colors[1] ?? main})` }}>
+        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${selected ? "bg-blue text-white" : "bg-white/90 text-ink"}`}>
+          {selected ? t("create.kit.selected") : badge ?? title}
+        </span>
+        <span
+          aria-hidden
+          className={`absolute top-3 right-3 flex size-8 items-center justify-center rounded-full border-2 border-white text-sm font-bold shadow transition ${
+            selected ? "scale-100 bg-blue text-white" : "scale-90 bg-white/70 text-transparent"
+          }`}
+        >
+          ✓
+        </span>
       </span>
       <span className="flex flex-col gap-3 px-5 pb-5">
         <span className="flex flex-col gap-1">

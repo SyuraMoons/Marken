@@ -64,6 +64,26 @@ Markers: **NEW** added in v2.0 · **CHG** changed from v1.1 · **KEPT** from v1.
 
 **Cut in v2.0:** Offerings pipeline (F-21 and its FRs), LinkedIn and X export pack (F-23), peer watch (F-25), video Reel (F-20), website fetch.
 
+### v2.1 amendments (2 Nov 2026, team decision on the 2 Nov design handoff)
+
+Where this table disagrees with the rest of the SRD, this table wins. Items marked **to decide** are agreed in direction only; build nothing that depends on them until they are filled in.
+
+| ID | Area | v2.0 | v2.1 |
+| :--- | :--- | :--- | :--- |
+| A-01 | Landing (FR-LP-01) | Headline "Your real product, never redrawn" | Headline "Turn product photos into social posts." Copy may mention products **or services**. The "real product, never redrawn" promise stays in the product (badge, compare, Pillar 1) |
+| A-02 | Target user | Physical product sellers only; services out of scope | Landing speaks to products or services. The workflow (photos, cutout, fidelity, Real product badge) stays product-photo based. **To decide:** any service-specific workflow |
+| A-03 | Auth (FR-AU-01) | Google OAuth or email magic link | Google OAuth, **Meta (Facebook) OAuth**, or email magic link; all create the same user |
+| A-04 | Publishing (F-12) | Instagram carousel only; Facebook out of scope | Instagram carousel **and** Facebook Page post as separate destinations the owner picks per post. Approve still gates both. Download + copy fallback per destination. **To decide:** Facebook post format (Figma shows "Photo post") |
+| A-05 | Product scope (F-10, F-04) | One shop; the daily loop picks one product | The app is scoped to a **selected product** (product switcher in the header). Today, Products, Results and Settings show that product. A shop can hold a sample product with no photos yet. Up to **5 live posts per shop per day** (`posts_daily_cap`); the morning cron makes one of them. **To decide:** post cadence per product |
+| A-06 | Company details (onboarding step 1, Settings) | name, category, country, content language, time zone | Adds a free-text **company description** ("what you sell and who it's for"), injected into prompts like tone and rules. Needs a `shops` column |
+| A-07 | Loading states (NFR-17) | Not specified | Uploading, preparing cutouts, regenerating scene, preparing captions and refreshing results each have a screen state; they advance on real completion only |
+| A-10 | Upload minimum (onboarding step 2, FR-OB-03) | 3 to 10 photos | **1 to 10** photos. One clear photo is enough to start; each photo becomes its own product until A-08 (several photos per product) ships |
+| A-11 | Make a post with a chosen product (F-08) | Run now only rotates products | Products screen offers **Make post** after a cutout is confirmed and on each confirmed product. `POST .../posts/generate` takes optional `productId`; it replaces today's post only while that post is `ready`, never after approval |
+| A-12 | Several companies per owner (F-02, out of scope list) | One shop per owner | An owner can have up to **3 companies** and switches between them from the bottom of the sidebar (header on mobile). Each company has its own products, brand kit, posts and Instagram connection; nothing is shared between them. One company is **active** (`users.active_shop_id`); RLS and Storage scope by it through `private.current_shop_id()`, and owner API routes reject a non-active shop with `not_active_shop`. An owner has at most one unfinished (onboarding) company at a time. Supersedes the A-05 product switcher and the "multiple shops per owner" out-of-scope line |
+| A-09 | Editable slides and brand kit (FR-CG-04, F-09, F-11, onboarding step 4, Settings) | Muse Image draws the slide text inside the scene; Edit changes the caption only | A slide is a stack of **layers** combined by code: scene (Muse Image, **no text, no product**) → text layers (bundled fonts, drawn by code) → product (cutout pixels). Owners edit text, font, colour and size, move or resize the product, ask Muse Spark to reword a slide, or ask for a new background; every edit re-renders and re-runs the fidelity check, so the badge and Approve follow what will be published. Text sits under the product, so product pixels are never touched (FR-CG-09). A per-shop **brand kit** (colours, headline and call-to-action font, design guidance, photo style) is set in onboarding step 4 and Settings, can be drafted by Muse Spark from the company description, and feeds the text layers and scene briefs. New tables/routes: `brand_kits`; `POST /api/posts/:id/slides/:order` (+ `/rewrite`, `/background`); `POST /api/shops/:id/brand-kit/suggest`. AI edits are limited to 10 per post per day. **Later:** logo layer, brand book upload, drag on canvas, resize to 1:1 / 9:16, saved "styles" |
+
+Out of scope changes: service businesses and Facebook publishing are no longer out of scope (A-02, A-04).
+
 ---
 
 ## 2. Introduction
@@ -76,7 +96,7 @@ Markers: **NEW** added in v2.0 · **CHG** changed from v1.1 · **KEPT** from v1.
 
 **In scope:** a mobile first, installable web app (PWA): landing page, login, 5 step onboarding, and the main app (Today, Products, Results, Settings). Behind it runs the daily agent loop.
 
-**Out of scope:** SaaS and service businesses · video and Reels · LinkedIn, X, TikTok, Shopee or Facebook publishing · chat app interfaces · payments · paid ads · multiple shops per owner · peer watch · training our own models.
+**Out of scope:** SaaS businesses · video and Reels · LinkedIn, X, TikTok or Shopee publishing · chat app interfaces · payments · paid ads · multiple shops per owner · peer watch · training our own models.
 
 | Term | Meaning |
 | :--- | :--- |
@@ -123,7 +143,7 @@ Marken is an agent, not a chat window. It runs this loop every day for each shop
 
 | Step | What happens | Model |
 | :--- | :--- | :--- |
-| 1. Learn the shop | Owner uploads 3 to 10 product photos; products, prices and attributes are extracted | Muse Spark |
+| 1. Learn the shop | Owner uploads 1 to 10 product photos; products, prices and attributes are extracted | Muse Spark |
 | 2a. Research trends **CHG** | An agent browses TikTok Creative Center and Google Trends and collects candidates | Muse Wonder (fallback: Muse Spark web search) |
 | 2b. Score trends **CHG** | Each candidate scored 0 to 100 for fit and momentum | Muse Spark Open |
 | 2c. Analyse trends **CHG** | Top trends analysed once (video and audio where they exist); cached 7 days for all shops | Muse Spark |
@@ -176,7 +196,7 @@ If time runs short before the gate, cut in this order: F-13 email, F-15 settings
 A new owner goes Landing → Login → 5 step onboarding → Today. A returning owner goes straight to Today; an unfinished setup resumes at its saved step.
 
 1. **Shop basics (required):** shop name, category, country, content language, time zone.
-2. **Upload products (required):** 3 to 10 photos. SAM 3.1 cuts out each product; Muse Spark extracts name, price and attributes.
+2. **Upload products (required):** 1 to 10 photos. SAM 3.1 cuts out each product; Muse Spark extracts name, price and attributes.
 3. **Review (required):** edit, delete or add products. Owner confirms each cutout looks right.
 4. **Voice and Instagram (optional):** tone, rules, live sample caption; connect Instagram or skip.
 5. **First post + tour (optional tour):** the first real carousel is generated; coach marks walk through Today, the "Real product" badge and the activity panel.
@@ -378,3 +398,8 @@ Also: README with model routing and pilot results (`DM-03`); a seeded demo accou
 | Pilot sellers drop out | Recruit 4 to keep 3; the dogfood shop always runs |
 | Judges see "another caption tool" | Lead the video with the seller and the before and after shot |
 | Meta Model API limits from Indonesia | Confirm on 29 Oct; Muse Spark Open fallback for text |
+
+
+## Guided help and practice amendment — 3 Nov 2026
+
+User-requested addition: page-specific guided tours from a bottom-right `?` control, plus a fixed-input practice sandbox. Add public route `/sandbox`; it uses only fixed sample assets and preset choices, with no real uploads, model calls, publishing or owner-data access. Core app/API authentication is unchanged. Tour steps explain visible controls without activating actions. The sandbox must prominently identify simulated outcomes, support reset and an error/retry exercise, and never claim a real publication or real fidelity result. Both features must support keyboard navigation, mobile layouts and reduced motion.

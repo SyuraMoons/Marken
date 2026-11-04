@@ -1,0 +1,88 @@
+// MARKEN AI Agent exports (SRD v2.0 §4 & §7).
+
+export {
+  extractProductFromPhoto,
+  extractProductsAndCutouts,
+  type ExtractProductFromPhotoInput,
+  type ExtractProductFromPhotoResult,
+  type ExtractProductsAndCutoutsInput,
+  type ExtractProductsAndCutoutsResult,
+  type ExtractedProductWithCutout,
+  type PhotoExtractionFailure,
+  type PhotoInputItem,
+} from "./extract";
+export {
+  ExtractedProductSchema,
+  RawProductExtractionModelSchema,
+  RawTrendCandidateSchema,
+  StyleRuleCheckModelSchema,
+  CarouselPlanModelSchema,
+  CarouselSlidePlanSchema,
+  RegenerateCaptionModelSchema,
+  TrendAnalysisModelSchema,
+  TrendResearchModelSchema,
+  TrendScoreModelSchema,
+  type ExtractedProduct,
+} from "./schemas";
+export {
+  checkStyleRules,
+  evaluateLocalRuleViolations,
+  type CheckStyleRulesInput,
+  type CheckStyleRulesResult,
+} from "./rules";
+export {
+  MAX_REVISIONS_PER_DAY,
+  regenerateCaptionFromFeedback,
+  RevisionLimitExceededError,
+  type RegenerateCaptionInput,
+  type RegenerateCaptionResult,
+  type RegeneratedCaptionOption,
+} from "./caption";
+export {
+  planDailyCarousel,
+  selectEligibleProductsAndTrends,
+  type CarouselCaptionOption,
+  type DailyCarouselPlanResult,
+  type PlanDailyCarouselInput,
+  type PostHistoryItem,
+  type ProductCandidate,
+  type SelectEligibleInput,
+  type SelectEligibleResult,
+  type SlidePlan,
+  type SlideRole,
+  type TrendCandidateForPlan,
+} from "./planner";
+export {
+  analyseTrend,
+  DEFAULT_TREND_SCORE_THRESHOLD,
+  researchAndScoreTrends,
+  researchTrends,
+  scoreTrendCandidate,
+  scoreTrendCandidates,
+  TREND_CACHE_TTL_DAYS,
+  type AnalyseTrendInput,
+  type AnalyseTrendResult,
+  type ResearchAndScoreTrendsInput,
+  type ResearchAndScoreTrendsResult,
+  type ResearchTrendsInput,
+  type ResearchTrendsResult,
+  type ScoredTrendCandidate,
+  type ScoreTrendsOptions,
+  type ScoreTrendsResult,
+  type TrendAnalysis,
+  type TrendCandidate,
+  type TrendSource,
+  type TrendType,
+} from "./trends";
+export {
+  compositeProductSlide,
+  computePixelFidelity,
+  cutoutProduct,
+  generateSlideScene,
+  renderAndVerifySlide,
+  verifySlideFidelity,
+  type RenderAndVerifySlideInput,
+  type RenderAndVerifySlideResult,
+  type VerifySlideFidelityInput,
+  type VerifySlideFidelityResult,
+} from "../studio";

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { deleteProduct, saveProduct, setCutoutConfirmed } from "@/lib/actions/products";
@@ -229,48 +230,87 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
           </Button>
         </section>
       )}
-      <Button data-tour="add-product" className="max-lg:hidden lg:w-50!" onClick={() => setView({ kind: "add" })}>
-        {t("products.add")}
-      </Button>
+      {/* Library window, styled after the landing "01 / Products" card: toolbar, then a grid of numbered photo tiles. */}
+      <section className="overflow-hidden rounded-card border border-border bg-white shadow-[0_24px_48px_rgb(33_61_140/0.10)]">
+        <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 lg:px-6 lg:py-4">
+          <span className="text-sm text-muted">
+            {String(products.length).padStart(2, "0")} / {t("nav.products")}
+          </span>
+          <button
+            type="button"
+            data-tour="add-product"
+            onClick={() => setView({ kind: "add" })}
+            className="flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-white px-4 text-sm font-semibold text-navy shadow-[0_8px_20px_rgb(33_61_140/0.10)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgb(33_61_140/0.14)]"
+          >
+            <span aria-hidden="true" className="text-base">＋</span>
+            {t("products.add")}
+          </button>
+        </header>
 
-      {products.length === 0 && <p className="glass rounded-card p-5 text-muted">{t("products.empty")}</p>}
-      <ol className="flex flex-col gap-6 lg:gap-7">
-        {products.map((p, i) => (
-          <li key={p.id} className="flex flex-col gap-6 lg:glass lg:flex-row lg:items-start lg:gap-7 lg:rounded-2xl lg:p-6">
-            <Photo
-              src={p.cutout_url}
-              alt={p.name}
-              eyebrow={p.category ?? t("products.eyebrow")}
-              caption={t(p.cutout_confirmed ? "products.confirmedCutout" : "products.uncheckedCutout")}
-              className="lg:w-40 lg:shrink-0"
-            />
-            <section className="glass flex flex-1 flex-col gap-3 rounded-card p-5 leading-[1.4] lg:py-6 lg:pl-[22px]">
-              <h2 className="text-lg font-semibold">{p.name}</h2>
-              <p className="text-[15px] text-muted">
-                {t(p.cutout_confirmed ? "products.lineChecked" : "products.lineUnchecked", { category: p.category ?? "" })}
-                <br />
-                {p.price != null ? money(p) : t("products.priceNone")}
-              </p>
-              {p.cutout_confirmed && (
-                <ButtonLink href={`/create?product=${p.id}`}>{t("products.makePost")}</ButtonLink>
-              )}
-              <Button variant="secondary" onClick={() => setView(p.cutout_confirmed ? { kind: "edit", id: p.id } : { kind: "check", id: p.id })}>
-                {t(p.cutout_confirmed ? "products.edit" : "products.check")}
-              </Button>
-            </section>
-            <span aria-hidden="true" className="hidden w-10 text-sm text-muted lg:block">{String(i + 1).padStart(2, "0")}</span>
-          </li>
-        ))}
-      </ol>
-      <Button data-tour="add-product" className="lg:hidden" onClick={() => setView({ kind: "add" })}>
-        {t("products.add")}
-      </Button>
-
-      <div className="lg:max-w-[544px]">
-        <InfoCard vector="photo" title={t("products.howTitle")}>
-          {t("products.howBody")}
-        </InfoCard>
-      </div>
+        {products.length === 0 ? (
+          <div className="p-4 lg:p-6">
+            <button
+              type="button"
+              onClick={() => setView({ kind: "add" })}
+              className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed border-powder text-muted transition hover:border-blue hover:text-blue sm:aspect-[3/1]"
+            >
+              <span aria-hidden="true" className="text-2xl">＋</span>
+              <span className="text-sm">{t("products.empty")}</span>
+            </button>
+          </div>
+        ) : (
+          <ol className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] sm:gap-4 sm:p-4 lg:gap-5 lg:p-6">
+            {products.map((p, i) => {
+              const open = () => setView(p.cutout_confirmed ? { kind: "edit", id: p.id } : { kind: "check", id: p.id });
+              return (
+                <li key={p.id} className="group flex flex-col rounded-[16px] bg-white p-2 shadow-[0_10px_28px_rgb(33_61_140/0.12)] ring-1 ring-border transition hover:-translate-y-1 hover:shadow-[0_16px_36px_rgb(33_61_140/0.18)]">
+                  <button type="button" data-tour="product-photo" onClick={open} aria-label={`${t(p.cutout_confirmed ? "products.edit" : "products.check")}: ${p.name}`} className="relative aspect-[4/5] overflow-hidden rounded-control bg-[radial-gradient(circle_at_30%_40%,#e5f0ff,#f9f9ff)]">
+                    {p.cutout_url && <Image src={p.cutout_url} alt={p.name} fill sizes="(min-width: 1024px) 220px, (min-width: 640px) 30vw, 45vw" className="object-contain p-2 transition duration-300 group-hover:scale-[1.03]" />}
+                    {!p.cutout_confirmed && (
+                      <span className="absolute top-2 left-2 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-navy">{t("products.check")}</span>
+                    )}
+                  </button>
+                  <div className="flex flex-1 flex-col gap-1 px-1.5 pt-2.5 pb-1">
+                    <div className="flex items-baseline gap-2">
+                      <span aria-hidden="true" className="text-xs text-muted tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+                      <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink" title={p.name}>{p.name}</h2>
+                    </div>
+                    <p className="truncate text-sm text-muted">
+                      {[p.category, p.price != null ? money(p) : null].filter(Boolean).join(" · ") || t("products.priceNone")}
+                    </p>
+                    <div className="mt-auto flex flex-col gap-2 pt-3">
+                      {p.cutout_confirmed ? (
+                        <>
+                          <Link href={`/create?product=${p.id}`} className="flex min-h-10 items-center justify-center rounded-full bg-blue px-3 text-sm font-semibold whitespace-nowrap text-white transition hover:bg-navy">
+                            {t("products.makePost")}
+                          </Link>
+                          <button type="button" onClick={open} className="flex min-h-10 items-center justify-center rounded-full border border-border px-3 text-sm font-semibold whitespace-nowrap text-navy transition hover:bg-surface">
+                            {t("products.edit")}
+                          </button>
+                        </>
+                      ) : (
+                        <button type="button" onClick={open} className="flex min-h-10 items-center justify-center rounded-full border border-border px-3 text-sm font-semibold whitespace-nowrap text-navy transition hover:bg-surface">
+                          {t("products.check")}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+            <li>
+              <button
+                type="button"
+                onClick={() => setView({ kind: "add" })}
+                className="flex size-full min-h-48 flex-col items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-powder text-sm font-semibold text-muted transition hover:border-blue hover:text-blue"
+              >
+                <span aria-hidden="true" className="text-2xl">＋</span>
+                {t("products.add")}
+              </button>
+            </li>
+          </ol>
+        )}
+      </section>
     </div>
   );
 }

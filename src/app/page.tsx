@@ -52,9 +52,9 @@ function Feature({ n, layout = "text-first", bg, dark }: { n: number; layout?: "
 export default function LandingPage() {
   return (
     <div className="bg-app min-h-dvh">
-      <header className="mx-auto flex h-25 max-w-360 items-center justify-between gap-4 px-5 lg:px-18">
-        <Logo className="text-2xl font-semibold! lg:text-[28px]" />
-        <ButtonLink href="/login" className="w-[110px]! shadow-[0_6px_8px_rgb(36_86_219/13%)] lg:w-50!">
+      <header className="mx-auto flex h-16 max-w-360 items-center justify-between gap-4 px-5 lg:px-18">
+        <Logo className="text-xl font-semibold! lg:text-[22px]" />
+        <ButtonLink href="/login" className="h-10! w-25! text-sm! shadow-sm lg:w-35!">
           <span className="lg:hidden">{t("landing.signIn")}</span>
           <span className="max-lg:hidden">{t("landing.getStarted")}</span>
         </ButtonLink>
@@ -65,11 +65,11 @@ export default function LandingPage() {
           {/* eslint-disable-next-line @next/next/no-img-element -- static design decoration */}
           <img src="/figma/landing-pink-light.svg" alt="" width={300} height={300} className="pointer-events-none absolute top-[510px] right-[-60px] size-75 lg:top-[497px] lg:right-[-100px] lg:h-[530px] lg:w-[680px]" />
           <div className="relative mx-auto flex max-w-360 flex-col items-center gap-6 px-5 py-12 text-center text-white lg:gap-7 lg:px-12 lg:pt-20 lg:pb-16">
-            <h1 className="max-w-[350px] text-[30px] leading-9 font-semibold whitespace-pre-line lg:max-w-240 lg:text-5xl lg:leading-14">{t("landing.title")}</h1>
+            <h1 className="landing-headline max-w-[1100px] text-[46px] leading-[1.04] font-bold tracking-[-0.045em] whitespace-pre-line sm:text-[64px] lg:text-[94px] lg:leading-[1.02]">{t("landing.title")}</h1>
             <p className="max-w-[350px] leading-6 lg:max-w-190 lg:text-[17px] lg:leading-normal">
               <R k="landing.body" />
             </p>
-            <ButtonLink href="/login" className="max-w-[350px] shadow-[0_6px_8px_rgb(36_86_219/13%)] lg:w-65">
+            <ButtonLink href="/today" className="landing-hero-cta max-w-[350px] border-white/80! bg-white! text-navy! font-bold! lg:w-75">
               {t("landing.cta")}
             </ButtonLink>
             <LandingHero />

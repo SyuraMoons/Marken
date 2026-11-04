@@ -1,7 +1,9 @@
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
+  // Fixed-fixture practice must work before a Supabase project is configured.
+  if (request.nextUrl.pathname === "/sandbox") return NextResponse.next();
   return updateSession(request);
 }
 

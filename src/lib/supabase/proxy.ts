@@ -56,8 +56,8 @@ export async function updateSession(request: NextRequest) {
     return redirectTo(`/auth/callback${search}`);
   }
 
-  // The practice route holds only fixed fixtures and never reads owner data; keep the refreshed session, skip every redirect.
-  if (pathname === "/sandbox") return response;
+  // Public landing and practice remain reachable after sign-in; OAuth returns are handled above.
+  if (pathname === "/sandbox" || pathname === "/") return response;
 
   const isPublic = pathname === "/" || pathname === "/login" || pathname === "/example";
   const isAuthRoute = pathname.startsWith("/auth/");
@@ -67,7 +67,7 @@ export async function updateSession(request: NextRequest) {
     return redirectTo("/login");
   }
 
-  if (pathname === "/" || pathname === "/login") {
+  if (pathname === "/login") {
     const { shop, error } = await findActiveShop(supabase, userId);
     // On a query failure stay put rather than send an existing owner back to step 1.
     if (error) return response;

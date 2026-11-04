@@ -27,7 +27,7 @@ It is built for small business owners who sell physical products, by four studen
 | **App (PWA)** | [marken-olive.vercel.app](https://marken-olive.vercel.app) |
 | **Sandbox, no sign-in** | [marken-olive.vercel.app/sandbox](https://marken-olive.vercel.app/sandbox) |
 | **Public before/after example** | [marken-olive.vercel.app/example](https://marken-olive.vercel.app/example) |
-| **Three-minute demo video** |[youtube.com/ElXCMlSDtyY](https://youtu.be/ElXCMlSDtyY) |
+| **Three-minute demo video** |[youtube.com/YjrocdaNMdg]((https://youtu.be/YjrocdaNMdg)) |
 | **Architecture diagrams** | [AI pipeline](docs/images/ai-pipeline-flow.png) · [Single model gateway](docs/images/ai-gateway-flow.png) |
 
 ## Built during the hackathon

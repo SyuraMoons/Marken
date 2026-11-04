@@ -371,8 +371,6 @@ function Step2({ ctx, products, pending }: { ctx: Ctx; products: ProductView[]; 
   );
 }
 
-const price = (p: ProductView) => (p.price != null ? `${p.currency ?? ""} ${Number(p.price).toLocaleString()}`.trim() : t("ob3.noPrice"));
-
 // Review this product, one photo at a time (228:16787, 228:17683, 228:17796), plus details (228:17913).
 function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
   const router = useRouter();
@@ -382,7 +380,6 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
-  const done = items.length > 0 && items.every((p) => p.cutout_confirmed);
   const current = items[Math.min(index, items.length - 1)];
 
   const act = (job: () => Promise<{ ok: boolean } | null>, after: () => void) =>
@@ -393,16 +390,19 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
       after();
     });
 
+  // One confirm per product; the last one saves the step and moves straight to step 4.
   const confirm = () =>
-    act(
-      () => setCutoutConfirmed(current.id, true),
-      () => {
-        const next = items.map((x) => (x.id === current.id ? { ...x, cutout_confirmed: true } : x));
-        setItems(next);
-        const todo = next.findIndex((x) => !x.cutout_confirmed);
-        if (todo >= 0) setIndex(todo);
-      },
-    );
+    start(async () => {
+      setFailed(false);
+      const res = await setCutoutConfirmed(current.id, true).catch(() => null);
+      if (!res?.ok) return setFailed(true);
+      const next = items.map((x) => (x.id === current.id ? { ...x, cutout_confirmed: true } : x));
+      setItems(next);
+      const todo = next.findIndex((x) => !x.cutout_confirmed);
+      if (todo >= 0) return setIndex(todo);
+      if (!(await ctx.save({ action: "finish" }))) return setFailed(true);
+      ctx.go(4);
+    });
 
   // Replace = upload the new photo as a product, then drop the old one.
   const replace = (file: File | undefined) => {
@@ -415,13 +415,6 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
       () => router.refresh(),
     );
   };
-
-  const finish = () =>
-    start(async () => {
-      setFailed(false);
-      if (!(await ctx.save({ action: "finish" }))) return setFailed(true);
-      ctx.go(4);
-    });
 
   if (editing && current) {
     return (
@@ -450,21 +443,6 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
     );
   }
 
-  if (done) {
-    return (
-      <>
-        <Head title={t("ob3.title")} body={t("ob3.body")} />
-        <div className="flex flex-col gap-4 lg:max-w-136">
-          <InfoCard vector="check" title={t("ob3.allDone")} />
-          <Err show={failed} />
-          <Button onClick={finish} disabled={pending} aria-busy={pending}>
-            {t("ob3.continue")}
-          </Button>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <Head title={t("ob3.title")} body={t("ob3.body")} />
@@ -475,12 +453,6 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
             <InfoCard vector="check" title={t("ob3.visibleTitle")}>
               {t("ob3.visibleBody")}
             </InfoCard>
-            <Field n={1} cue="product" label={t("ob3.name")}>
-              <input value={current.name} readOnly className={glassInput} />
-            </Field>
-            <Field n={2} cue="tag" label={t("ob3.price")}>
-              <input value={price(current)} readOnly className={glassInput} />
-            </Field>
             <input ref={pick} type="file" accept={ACCEPT} className="sr-only" aria-label={t("ob3.replace")} onChange={(e) => replace(e.target.files?.[0])} />
             <Err show={failed} />
             <Button onClick={confirm} disabled={pending} aria-busy={pending}>

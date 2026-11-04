@@ -142,6 +142,8 @@ export type HistoryItem = {
   createdAt: string;
   productName: string | null;
   caption: string;
+  hashtags: string[];
+  slideCount: number;
   thumb: string | null;
   /** Signed attachment URLs, only when every slide passed the product check (FR-FD-01). */
   downloads: string[];
@@ -156,7 +158,7 @@ export async function getPostHistory(limit = 60): Promise<HistoryItem[] | null> 
   const supabase = await createClient();
   const { data } = await supabase
     .from("posts")
-    .select("id, status, post_date, created_at, approved_at, slides, chosen_caption, caption_options, products(name)")
+    .select("id, status, post_date, created_at, approved_at, slides, chosen_caption, caption_options, hashtags, products(name)")
     .eq("shop_id", owner.shop.id)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -175,6 +177,8 @@ export async function getPostHistory(limit = 60): Promise<HistoryItem[] | null> 
       createdAt: r.created_at,
       productName: r.products?.name ?? null,
       caption: r.chosen_caption ?? asCaptions(r.caption_options)[0] ?? "",
+      hashtags: r.hashtags ?? [],
+      slideCount: asSlides(r.slides).length,
       thumb: signed.get(first[i]) ?? null,
       downloads: savable[i].map((p) => files.get(p) ?? ""),
       canDelete: canDeletePost(r, Boolean(owner.shop.ig_account_id)),

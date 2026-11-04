@@ -14,12 +14,15 @@ import { canDeletePost } from "@/lib/posts/deletable";
 import { ReviewPanel } from "@/components/review-panel";
 import { StatusScreen } from "@/components/status-screen";
 import { t, type MessageKey } from "@/lib/i18n";
-import { getTodayData } from "@/lib/data/today";
+import { getOwnerShop, getPostHistory, getTodayData } from "@/lib/data/today";
+import { shopToday } from "@/lib/api/owner";
+import { TodayFeed } from "@/components/today-feed";
 
 type TodayData = Extract<NonNullable<Awaited<ReturnType<typeof getTodayData>>>, { missing: false }>;
 import { allSlidesPassed } from "@/lib/posts/slides";
 
-// Today (F-10, FR-TD-01..04, FR-FD-03, F-24). One screen per post status; ?view= opens the post's sub-pages (Figma page 01).
+// Today (F-10, FR-TD-01..04, FR-FD-03, F-24). Plain /today is the feed of every morning's post plus a calendar
+// (Figma 01 Today › today-feed); ?post=<id> opens one post's detail, and ?view= its sub-pages (Figma page 01).
 export default function TodayPage({ searchParams }: PageProps<"/today">) {
   return (
     <Suspense fallback={<div className="aspect-[4/5] max-w-120 animate-pulse rounded-card bg-white" />}>
@@ -30,6 +33,7 @@ export default function TodayPage({ searchParams }: PageProps<"/today">) {
 
 async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">) {
   const q = await searchParams;
+  if (typeof q.post !== "string" && typeof q.view !== "string") return <Feed tab={q.tab === "calendar" ? "calendar" : "posts"} />;
   // ?post= opens one earlier post from History; every link below carries it so sub-views stay on that post.
   const data = await getTodayData(typeof q.post === "string" ? q.post : undefined);
   if (!data) redirect("/login");
@@ -38,7 +42,7 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
     <>
       {data.post && typeof q.post === "string" && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-control bg-powder px-4 py-3 text-sm">
-          <ButtonLink href="/posts" variant="text" className="w-auto! font-semibold!">
+          <ButtonLink href="/today" variant="text" className="w-auto! font-semibold!">
             {t("history.back")}
           </ButtonLink>
           <span className="text-muted">{t("history.from", { date: formatDay(data.post.post_date) })}</span>
@@ -47,6 +51,13 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
       <TodayView q={q} data={data} />
     </>
   );
+}
+
+async function Feed({ tab }: { tab: "posts" | "calendar" }) {
+  const [owner, posts] = await Promise.all([getOwnerShop(), getPostHistory()]);
+  if (!owner || !posts) redirect("/login");
+  const { shop } = owner;
+  return <TodayFeed shopName={shop.name ?? ""} today={shopToday(shop.time_zone)} posts={posts} tab={tab} generateUrl={`/api/shops/${shop.id}/posts/generate`} />;
 }
 
 function formatDay(date: string) {

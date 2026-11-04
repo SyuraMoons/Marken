@@ -12,7 +12,7 @@ function load(relative, dependencies = {}) {
   }).outputText;
   const exports = {};
   vm.runInNewContext(source, {
-    exports, Buffer, console,
+    exports, Buffer, console, process, URL,
     require(name) {
       if (name === 'server-only') return {};
       if (name in dependencies) return dependencies[name];
@@ -71,4 +71,27 @@ test('verification result and original product bytes survive the adapter', async
   assert.equal(result.fidelityPassed, false);
   assert.equal(result.fidelityScore, 0.3);
   assert.equal(result.slidePng, image);
+});
+
+
+test('landing remains public while dashboard, setup and OAuth routing stay protected', async () => {
+  async function visit(route, signedIn, completed = true) {
+    const cookies = { getAll: () => [], set: () => {} };
+    const response = (kind, url) => ({ kind, url: url?.toString(), cookies, headers: new Map() });
+    const { updateSession } = load('src/lib/supabase/proxy.ts', {
+      '@supabase/ssr': { createServerClient: () => ({ auth: { getClaims: async () => ({ data: { claims: signedIn ? { sub: 'owner' } : null } }) } }) },
+      'next/server': { NextResponse: { next: () => response('next'), redirect: (url) => response('redirect', url) } },
+      './active-shop': { findActiveShop: async () => ({ shop: { onboarding_step: 2, onboarding_completed_at: completed ? '2026-11-04' : null }, error: null }) },
+    });
+    const url = new URL(route, 'http://localhost:3000');
+    return updateSession({ url: url.href, nextUrl: url, cookies });
+  }
+  assert.equal((await visit('/', true)).kind, 'next');
+  assert.equal((await visit('/', false)).kind, 'next');
+  assert.equal((await visit('/', true, false)).kind, 'next');
+  assert.equal((await visit('/today', true)).kind, 'next');
+  assert.equal((await visit('/today', false)).url, 'http://localhost:3000/login');
+  assert.equal((await visit('/today', true, false)).url, 'http://localhost:3000/onboarding/2');
+  assert.equal((await visit('/login', true)).url, 'http://localhost:3000/today');
+  assert.equal((await visit('/?code=oauth-return', true)).url, 'http://localhost:3000/auth/callback?code=oauth-return');
 });

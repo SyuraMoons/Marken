@@ -35,8 +35,10 @@ export default function TodayPage({ searchParams }: PageProps<"/today">) {
 
 async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">) {
   const q = await searchParams;
-  // ?post= opens one earlier post from History; every link below carries it so sub-views stay on that post.
-  const data = await getTodayData(typeof q.post === "string" ? q.post : undefined);
+  // The Today tab is gone: this route only shows one post opened from History (?post=), so a bare /today goes there.
+  if (typeof q.post !== "string") redirect("/posts");
+  // Every link below carries ?post= so sub-views stay on that post.
+  const data = await getTodayData(q.post);
   if (!data) redirect("/login");
   if (data.missing) notFound();
   const from = backTarget(q.from);

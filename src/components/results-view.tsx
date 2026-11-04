@@ -156,7 +156,7 @@ export function ResultsView() {
           <Button variant="secondary" onClick={() => setView("learning")}>
             {t("results.weekly")}
           </Button>
-          <ButtonLink href="/today" variant="text">
+          <ButtonLink href="/posts" variant="text">
             {t("results.backToday")}
           </ButtonLink>
         </div>

@@ -8,7 +8,7 @@ import type { Database } from "./database.types";
 function destinationFor(
   shop: { onboarding_step: number; onboarding_completed_at: string | null } | null,
 ) {
-  if (shop?.onboarding_completed_at) return "/today";
+  if (shop?.onboarding_completed_at) return "/posts";
   return `/onboarding/${shop?.onboarding_step ?? 1}`;
 }
 

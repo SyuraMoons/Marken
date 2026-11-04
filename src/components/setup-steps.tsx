@@ -44,7 +44,7 @@ export function SetupSteps({ step, shop, products, rules, brandKit, preview, pen
   const router = useRouter();
   const ctx: Ctx = {
     shop,
-    go: (n) => router.push(n > 5 ? "/today" : `/onboarding/${n}`),
+    go: (n) => router.push(n > 5 ? "/posts" : `/onboarding/${n}`),
     save: (body) => patchOnboarding(shop.id, { step, ...body }),
   };
 

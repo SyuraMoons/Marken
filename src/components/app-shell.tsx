@@ -7,9 +7,8 @@ import { ProfileMenu, type Account } from "./profile-menu";
 import { ShopSwitcher, type SwitcherShop } from "./shop-switcher";
 
 const NAV: NavItem[] = [
-  { href: "/today", label: t("nav.today"), icon: "today" },
-  { href: "/posts", label: t("nav.history"), icon: "activity" },
   { href: "/products", label: t("nav.products"), icon: "products" },
+  { href: "/posts", label: t("nav.history"), icon: "activity" },
   { href: "/results", label: t("nav.results"), icon: "results" },
   { href: "/settings", label: t("nav.settings"), icon: "settings" },
 ];
@@ -29,7 +28,7 @@ export function AppShell({ shopName, shops, account, children }: { shopName: str
     <div className="bg-app flex min-h-dvh">
       <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col justify-between bg-navy px-6 pt-8 pb-6 lg:flex">
         <div className="flex flex-col gap-[30px]">
-          <Logo href="/today" tone="white" />
+          <Logo href="/posts" tone="white" />
           <Nav variant="side" />
         </div>
         <ShopSwitcher shops={shops} variant="side" />
@@ -38,7 +37,7 @@ export function AppShell({ shopName, shops, account, children }: { shopName: str
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="relative z-20 flex h-15 items-center justify-between gap-2 px-5 lg:glass lg:h-auto lg:border-x-0 lg:border-t-0 lg:px-10 lg:py-[22px]">
           <span className="lg:hidden">
-            <Logo href="/today" />
+            <Logo href="/posts" />
           </span>
           <span className="lg:hidden">
             <ShopSwitcher shops={shops} variant="pill" />

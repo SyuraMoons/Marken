@@ -7,15 +7,17 @@ Guidance for AI coding agents (Claude Code, Codex, Cursor, Antigravity, etc.) wo
 **MARKEN** is the AI marketer that posts for you every morning, using your real product, your brand rules, and today's trends. You approve with one tap. Built for the **Meta Global AI Developer Hackathon** (submission due **4 Nov 2026, 9:00 PM ET / 5 Nov, 09:00 WIB**).
 
 - **Product name:** **MARKEN**. ("TrenToko" in `docs/images/*.png` is the old name — never use it in code or UI.)
-- **Target user:** Small business owners in any country who sell **physical products** on Instagram. Do not use "UMKM" or frame the product as Indonesia-only. Content language is set per shop (English and Bahasa Indonesia at the demo). UI strings are English and externalised in `src/lib/i18n/index.ts`.
-- **Headline promise:** *"Your real product, never redrawn."*
+- **Target user:** Small business owners in any country who sell **physical products** on Instagram (SRD v2.1 A-02: landing copy may also speak to services; the workflow stays product-photo based). Do not use "UMKM" or frame the product as Indonesia-only. Content language is set per shop (English and Bahasa Indonesia at the demo). UI strings are English and externalised in `src/lib/i18n/index.ts`.
+- **Headline promise:** *"Your real product, never redrawn."* (product promise; the landing headline is "Turn product photos into social posts." per SRD v2.1 A-01)
 - **North Star:** **Trusted posts per shop per week** (a post counts only when approved by the owner, published, and every slide passed the product fidelity check).
-- **Source of truth:** `docs/SRD.md` (**SRD v2.0 Final**). If anything from v1.0/v1.1 disagrees with v2.0, **v2.0 wins**.
+- **Source of truth:** `docs/SRD.md` (**SRD v2.0 Final + v2.1 amendments A-01 to A-07 in §1**). If anything from v1.0/v1.1 disagrees with v2.0, **v2.0 wins**; the v2.1 amendments win over the v2.0 body.
 - **Team & Workstreams:** See `docs/TEAM.md` for workstream boundaries between **Altaf** (AI Engine, Gateway, Studio/Fidelity), **Harfi** (Supabase, Inngest Jobs, IG API, API Routes), and **Nalen & Akhnaf** (UI/UX, Frontend Flows, Pilot & Video).
+
+- **Frontend rules:** Anyone touching UI reads `docs/frontend/` first (`Marken-Frontend-README.md`, `RULES.md`, `DESIGN.md`, `DESIGN_FIXES.md`, `DECISIONS.md`, `API_CONTRACT.md`, `CHECKLIST.md`).
 
 ## Status and commands
 
-Scaffold state: routes exist and render placeholders, API routes return 501, and `src/lib/*` modules are stubs ready for implementation.
+Scaffold state: pages render placeholders; the issue #11 API routes are live (Instagram callback still returns 501, jobs are queued as Inngest events that #12/#13 consume); and `src/lib/*` modules are being implemented by workstream (`src/lib/gateway/*`, `src/lib/studio/cutout.ts`, and `src/lib/agents/extract.ts` are live against `https://api.meta.ai/v1`).
 
 ```bash
 pnpm dev          # local dev server
@@ -28,7 +30,7 @@ Copy `.env.example` to `.env.local` for secrets.
 
 Next.js 16 notes: middleware is now `src/proxy.ts`; `cacheComponents` is on, so dynamic `params` need `generateStaticParams` or a Suspense boundary.
 
-Stack (SRD v2.0 §9): Next.js App Router + TypeScript + Tailwind (PWA) on Vercel, Supabase (Auth with Google + magic link, Postgres with RLS, Storage with signed URLs), Inngest for cron and durable jobs, Meta Model API (`Muse Spark`, `Muse Wonder`, `Muse Image`, `SAM 3.1`), `Muse Spark Open` on Baseten/Modal, `sharp` for deterministic server-side compositing & fidelity verification, Instagram Graph API (carousel), Resend for email reminders.
+Stack (SRD v2.0 §9): Next.js App Router + TypeScript + Tailwind (PWA) on Vercel, Supabase (Auth with Google + magic link, Postgres with RLS, Storage with signed URLs), Inngest for cron and durable jobs, Meta Model API (`Muse Spark` / `muse-spark-1.3`, `Muse Wonder` / `muse-wonder-1.0`, `Muse Image` / `muse-image-1.0`, `SAM 3.1` / `sam-3.1` with `@meta-sam/parser`), `Muse Spark Open` (`muse-spark-1.3-contributor` on Meta API or Baseten/Modal override), `sharp` for deterministic server-side compositing & fidelity verification, Instagram Graph API (carousel), Resend for email reminders.
 
 ## Three Pillars & Architecture Invariants
 
@@ -53,20 +55,20 @@ Breaking any of these fails SRD v2.0 acceptance criteria:
    - Prices are `null` when not visible in product photos (never invent prices or claims).
    - Shop tone, style rules (up to 10), and content language are injected into every prompt, and captions/slide text pass a rule check (regenerate once on fail, then flag).
 7. **Security & Mobile-First PWA (`NFR-01..14`):**
-   - Secrets and Instagram tokens stay server-side; IG tokens encrypted at rest. RLS scopes all data to the owner's single shop (`one shop per owner`). Media served only via signed URLs.
+   - Secrets and Instagram tokens stay server-side; IG tokens encrypted at rest. RLS scopes all data to the owner's active shop (an owner may have up to 3 companies, SRD v2.1 A-12; `private.current_shop_id()` resolves the active one). Media served only via signed URLs.
    - Works from 360 px wide; Today loads in `< 2 s`.
 
 ## Routes and User Flow (SRD v2.0 §6 & §9)
 
-- **Flow:** Landing `/` → `/login` → `/onboarding/[step]` (**5 steps**, saved server-side per step) → `/today`. Logged-in users hitting `/` are redirected server-side (`FR-LP-03`).
+- **Flow:** Landing `/` → `/login` → `/onboarding/[step]` (**5 steps**, saved server-side per step) → `/today`. Logged-in users may browse `/`; its "Get started" link hits `/login` and its "Create your first post" CTA hits `/today`, and both send them server-side to their saved onboarding step or `/today` without signing in again (`FR-LP-03`, applied in `src/lib/supabase/proxy.ts`). `/today` shows today's latest post; `/posts` (History) is the feed of every post plus a post calendar, and a card or day opens it on `/today?post=<id>`.
 - **5 Onboarding Steps:**
   1. Shop basics (required): name, category, country, content language, time zone.
-  2. Upload products (required): 3–10 photos (`SAM 3.1` cutout + `Muse Spark` extraction).
+  2. Upload products (required): 1–10 photos (`SAM 3.1` cutout + `Muse Spark` extraction).
   3. Review (required): edit/delete/add products; owner confirms each cutout.
   4. Voice & Instagram (optional): tone, rules, live sample caption; connect IG or skip.
   5. First post + tour (optional tour): coach marks run on a sample post while the real 3-slide carousel generates, swapping to the real post when ready.
-- **Routes:** `/` · `/login` · `/onboarding/[step]` · `/today` · `/posts/[id]/edit` · `/products` · `/results` (P1) · `/settings`
-- **API:** `POST /api/uploads` · `POST /api/shops/:id/extract` · `PATCH /api/shops/:id/onboarding` · `POST /api/shops/:id/posts/generate` · `POST /api/posts/:id/approve` · `POST /api/posts/:id/skip` · `POST /api/posts/:id/regenerate` · `GET /api/posts/:id/activity` · `GET /api/auth/instagram/callback` · cron `trends.daily` · cron `posts.daily`
+- **Routes:** `/` · `/login` · `/onboarding/[step]` · `/today` (`?post=<id>` opens an earlier post) · `/posts` (History: post feed + calendar) · `/posts/[id]/edit` · `/products` · `/results` (P1) · `/settings`
+- **API:** `POST /api/shops` · `DELETE /api/shops/:id` · `POST /api/uploads` (returns a signed upload URL; the browser uploads straight to Storage) · `POST /api/shops/:id/extract` · `PATCH /api/shops/:id/onboarding` · `POST /api/shops/:id/posts/generate` · `POST /api/posts/:id/approve` · `POST /api/posts/:id/skip` · `POST /api/posts/:id/regenerate` · `GET /api/posts/:id/activity` · `GET /api/auth/instagram/callback` · cron `trends.daily` · cron `posts.daily`
 
 <!-- BEGIN:nextjs-agent-rules -->
 

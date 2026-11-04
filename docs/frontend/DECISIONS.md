@@ -194,5 +194,7 @@ The brief travels on the `post/generate.requested` event to the planner, which f
 **Landing hero revision — 4 Nov 2026.**
 User requested faster autoplay, no pause button, and continuous hero motion independent of reduced-motion preferences. Three persistent photo panels change positions every 2 seconds using 900 ms transform transitions. Manual category/swipe/arrow controls remain. Headline increases to 94 px desktop / 46 px mobile; the main CTA uses a white treatment, pop-in entrance and subtle scale/glow emphasis. This exception applies to the landing hero; other app motion preferences remain intact.
 
+**Amendment (merge review, 4 Nov 2026):** The hero no longer overrides motion preferences. Autoplay and the CTA animation stop when the OS or the Settings Motion switch asks for reduced motion, and autoplay holds while the pointer or keyboard focus is inside the slider (WCAG 2.2.2), so no visible pause button is needed.
+
 
 **Landing access — 4 Nov 2026.** Signed-in visitors may open `/`. The primary Create your first post CTA targets `/today`; logged-out requests are redirected to login, and unfinished setup still resumes onboarding. OAuth callback query parameters on the root are handled before landing-page access. This supersedes the earlier signed-in landing redirect.

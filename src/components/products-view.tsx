@@ -269,7 +269,6 @@ export function ProductsView({ shopId, products }: { shopId: string; products: P
   );
 }
 
-const MAX_PHOTOS = 3;
 
 const TIPS = [
   ["whole", "products.tipWhole"],
@@ -277,7 +276,7 @@ const TIPS = [
   ["backdrop", "products.tipBackdrop"],
 ] as const;
 
-// Add one product (228:13807): up to 3 photos per Figma; only photo 1 is uploaded until the backend groups photos (FD-33).
+// Add one product (228:13807): one photo per product. Figma shows up to 3, but only one is used until the backend groups photos (FD-33, A-08).
 function AddProduct({ shopId, replace, onDone, onCancel }: { shopId: string; replace?: string; onDone: (id: string | null) => void; onCancel: () => void }) {
   const pick = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
@@ -292,11 +291,11 @@ function AddProduct({ shopId, replace, onDone, onCancel }: { shopId: string; rep
     if (!list) return;
     const good = Array.from(list).filter(validPhoto);
     setError(good.length < list.length ? "type" : null);
-    setFiles((cur) => [...cur, ...good].slice(0, MAX_PHOTOS));
+    // Picking again swaps the photo rather than stacking a second one.
+    if (good[0]) setFiles([good[0]]);
     if (pick.current) pick.current.value = "";
   };
 
-  // shortcut: sends photo 1 only, because each upload becomes its own product; send all once A-08 lands.
   const submit = () =>
     files[0] &&
     start(async () => {
@@ -337,7 +336,7 @@ function AddProduct({ shopId, replace, onDone, onCancel }: { shopId: string; rep
       </section>
       <section className="glass flex flex-col gap-3 rounded-card p-5 leading-[1.4]">
         <h2 className="text-lg font-semibold">{t("products.uploadTitle")}</h2>
-        <p className="text-[15px] text-muted">{files.length ? t("products.chosen", { n: files.length, total: MAX_PHOTOS }) : t("products.uploadBody")}</p>
+        <p className="text-[15px] text-muted">{files.length ? t("products.chosen") : t("products.uploadBody")}</p>
         {files.length > 0 && (
           <ul className="grid grid-cols-3 gap-3">
             {previews.map((src, i) => (
@@ -356,8 +355,7 @@ function AddProduct({ shopId, replace, onDone, onCancel }: { shopId: string; rep
             ))}
           </ul>
         )}
-        {files.length > 1 && <p className="text-sm text-muted">{t("products.firstOnly")}</p>}
-        <input ref={pick} type="file" accept={ACCEPT} multiple className="sr-only" aria-label={t("products.choose")} onChange={(e) => choose(e.target.files)} />
+        <input ref={pick} type="file" accept={ACCEPT} className="sr-only" aria-label={t("products.choose")} onChange={(e) => choose(e.target.files)} />
         {error === "type" && (
           <p role="alert" className="text-sm text-danger">
             {t("ob2.badFile")}
@@ -367,8 +365,8 @@ function AddProduct({ shopId, replace, onDone, onCancel }: { shopId: string; rep
           <UploadError onRetry={submit} onChoose={() => { setError(null); pick.current?.click(); }} />
         ) : (
           <>
-            <Button variant="secondary" onClick={() => pick.current?.click()} disabled={files.length >= MAX_PHOTOS}>
-              {t("products.choose")}
+            <Button variant="secondary" onClick={() => pick.current?.click()}>
+              {t(files.length ? "products.chooseAgain" : "products.choose")}
             </Button>
             <Button onClick={submit} disabled={!files.length}>
               {t("products.review")}

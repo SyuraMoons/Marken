@@ -60,7 +60,7 @@ Breaking any of these fails SRD v2.0 acceptance criteria:
 
 ## Routes and User Flow (SRD v2.0 §6 & §9)
 
-- **Flow:** Landing `/` → `/login` → `/onboarding/[step]` (**5 steps**, saved server-side per step) → `/today`. Logged-in users may browse `/`; its "Get started" links hit `/login`, which redirects them server-side to their saved onboarding step or `/today` without signing in again (`FR-LP-03`, applied at `/login`).
+- **Flow:** Landing `/` → `/login` → `/onboarding/[step]` (**5 steps**, saved server-side per step) → `/today`. Logged-in users hitting `/` are redirected server-side (`FR-LP-03`).
 - **5 Onboarding Steps:**
   1. Shop basics (required): name, category, country, content language, time zone.
   2. Upload products (required): 1–10 photos (`SAM 3.1` cutout + `Muse Spark` extraction).

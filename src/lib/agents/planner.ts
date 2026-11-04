@@ -18,6 +18,10 @@ export type SlidePlan = {
   text: string;
   alt: string;
   sceneBrief: string;
+  headline?: string;
+  subline?: string;
+  bigWord?: string;
+  templateId?: "big-type-behind" | "color-block" | "pedestal-hero" | "tilted-hero";
 };
 
 export type CarouselCaptionOption = {
@@ -222,13 +226,22 @@ export async function planDailyCarousel(
     input.brief?.trim()
       ? `Owner's brief for this post (follow it for angle, audience and mood, but never invent prices, discounts or claims it does not state): ${input.brief.trim()}`
       : "",
-    "Carousel Structure (3 slides):",
-    "1. `order: 1`, `role: 'hook'`: Attention-grabbing sensory/problem-solution headline that hooks the audience into swiping.",
-    "2. `order: 2`, `role: 'product'`: Product spotlight highlighting texture, craftsmanship, or key benefit.",
-    "3. `order: 3`, `role: 'cta'`: Clear, polite call to action (e.g. tap link in bio / DM to order).",
-    "Every slide must include an accessibility `alt` description (NFR-10) and a `scene_brief` describing a background that leaves the center empty for the real product cutout (FR-CG-04).",
+    "Carousel Structure & Contemporary Creative Direction (3 slides, inspired by high-impact visual campaigns):",
+    "1. `order: 1`, `role: 'hook'`: Eye-catching problem/curiosity hook. Recommended `template_id: 'big-type-behind'` with a bold 1-word 3D `big_word` behind the product (e.g. 'COLD', 'FRESH', 'PURE') and punchy `headline` (<= 6 words).",
+    "2. `order: 2`, `role: 'product'`: Product benefit/craftsmanship spotlight. Recommended `template_id: 'color-block'` or 'pedestal-hero', with clear `headline` and `subline` (<= 12 words).",
+    "3. `order: 3`, `role: 'cta'`: Action-driving slide. Recommended `template_id: 'pedestal-hero'` or 'tilted-hero', inviting swipe, tap bio, or DM.",
+    "",
+    "CRITICAL SCENE BRIEF DIRECTIVE (PRODUCT RELEVANCE):",
+    "The `scene_brief` MUST strictly match the PHYSICAL PRODUCT'S REAL-WORLD UTILITY, CATEGORY, AND SENSORY ESSENCE, not random generic trend props.",
+    "- For drinkware/tumblers: Cold mist, crisp ice cubes, condensation droplets on a clean icy pedestal, or outdoor morning trail.",
+    "- For food/coffee/jars: Warm wooden table, golden sunbeam, morning breakfast setting, rustic ceramic tile.",
+    "- For footwear/apparel: Minimalist concrete studio, sleek dynamic floor, soft directional rim lighting.",
+    "- For skincare/beauty: Smooth marble surface, clean water ripple, luxury soft-glow studio.",
+    "NEVER use generic office unboxing props (like scissors or brown cardboard) unless the product is stationery or packaging.",
+    "Camera perspective must be an eye-level or slight low-angle commercial product shot with a clear pedestal or table surface where the product can rest with grounding shadows.",
+    "",
     "Provide exactly 2 distinct caption options (Option A & Option B) and 5 to 15 relevant hashtags.",
-    'Respond strictly with valid JSON matching: { "product_id": string, "trend_id": string, "fit_reason": string, "slides": [{ "order": 1|2|3, "role": "hook"|"product"|"cta", "text": string, "alt": string, "scene_brief": string }], "caption_options": [string, string], "hashtags": string[] }.',
+    'Respond strictly with valid JSON matching: { "product_id": string, "trend_id": string, "fit_reason": string, "slides": [{ "order": 1|2|3, "role": "hook"|"product"|"cta", "headline": string, "subline": string, "big_word": string, "template_id": "big-type-behind"|"color-block"|"pedestal-hero"|"tilted-hero", "text": string, "alt": string, "scene_brief": string }], "caption_options": [string, string], "hashtags": string[] }.',
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -310,6 +323,10 @@ export async function planDailyCarousel(
     text: s.text.trim(),
     alt: s.alt.trim(),
     sceneBrief: s.scene_brief.trim(),
+    headline: s.headline?.trim() || s.text.trim(),
+    subline: s.subline?.trim(),
+    bigWord: s.big_word?.trim(),
+    templateId: s.template_id ?? (s.role === "hook" ? "big-type-behind" : s.role === "product" ? "color-block" : "pedestal-hero"),
   }));
 
   const captions: CarouselCaptionOption[] = finalPlan.caption_options.map(

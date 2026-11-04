@@ -89,6 +89,8 @@ export type RenderLayeredInput = {
   cutout: Buffer;
   layers: SlideLayers;
   shadow?: DropShadowOptions;
+  /** Optional background graphic shapes (cards, banners) rendered under text and product */
+  backgroundShapes?: Buffer | null;
 };
 
 export type RenderLayeredResult = {
@@ -100,7 +102,14 @@ export type RenderLayeredResult = {
 /** scene -> text -> shadow + product. Text goes under the product so fidelity (FR-FD-01) stays exact. */
 export async function renderLayeredSlide(input: RenderLayeredInput): Promise<RenderLayeredResult> {
   const layers = normalizeLayers(input.layers);
-  const base = await sharp(input.scene).resize(CANVAS_W, CANVAS_H, { fit: "cover" }).ensureAlpha().png().toBuffer();
+  let base = await sharp(input.scene).resize(CANVAS_W, CANVAS_H, { fit: "cover" }).ensureAlpha().png().toBuffer();
+
+  if (input.backgroundShapes) {
+    base = await sharp(base)
+      .composite([{ input: input.backgroundShapes, left: 0, top: 0 }])
+      .png()
+      .toBuffer();
+  }
 
   const texts = (await Promise.all(layers.text.map(renderText))).filter((t) => t !== null);
   const withText = texts.length ? await sharp(base).composite(texts).png().toBuffer() : base;

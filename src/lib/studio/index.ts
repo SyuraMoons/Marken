@@ -34,6 +34,8 @@ import {
 } from "./fidelity";
 import { defaultTextBox, defaultTextLayer, type BrandStyle, type SlideLayers } from "./layers";
 import { pickTextColor, renderLayeredSlide } from "./render";
+import { extractProductPalette } from "./palette";
+import { applyTemplateLayout, buildTemplateBackgroundShapes, type TemplateId } from "./templates";
 import {
   buildScenePrompt,
   clampReservedBox,
@@ -88,6 +90,10 @@ export type RenderAndVerifySlideInput = {
   slideRole?: "hook" | "product" | "cta";
   /** Optional visual style guidance */
   visualStyle?: string;
+  headline?: string;
+  subline?: string;
+  bigWord?: string;
+  templateId?: TemplateId;
   /** Confirmed transparent RGBA product cutout buffer, Uint8Array, or data URL */
   cutout: Buffer | Uint8Array | string;
   /** Optional custom reserved box on the 1080x1350 canvas */
@@ -218,29 +224,60 @@ export async function renderAndVerifySlide(
     });
     allTelemetry.push(lastScene.telemetry);
 
-    // Step 2: Layers. Text is drawn by code in a readable brand colour; the product goes last (`FR-CG-09`).
-    const textBox = defaultTextBox(input.slideRole);
-    const textColor = await pickTextColor(lastScene.sceneBuffer, textBox, input.brand?.colors);
-    const inset = Math.round(lastScene.reservedBox.width * 0.06);
-    const insetY = Math.round(lastScene.reservedBox.height * 0.06);
-    lastLayers = {
-      sceneBrief: input.sceneBrief.trim(),
-      product: {
-        box: {
-          x: lastScene.reservedBox.x + inset,
-          y: lastScene.reservedBox.y + insetY,
-          width: lastScene.reservedBox.width - inset * 2,
-          height: lastScene.reservedBox.height - insetY * 2,
+    // Step 2: Layers. Apply contemporary layout templates (BLU style) when templateId or roles are specified.
+    const cutoutBuf = Buffer.isBuffer(input.cutout)
+      ? input.cutout
+      : typeof input.cutout === "string"
+      ? Buffer.from(input.cutout.replace(/^data:image\/[a-z+]+;base64,/, ""), "base64")
+      : Buffer.from(input.cutout);
+
+    const chosenTemplate: TemplateId | undefined = input.templateId ?? (
+      input.slideRole === "hook" ? "big-type-behind" :
+      input.slideRole === "product" ? "color-block" :
+      input.slideRole === "cta" ? "pedestal-hero" : undefined
+    );
+
+    let backgroundShapes: Buffer | null = null;
+
+    if (chosenTemplate) {
+      const palette = await extractProductPalette(cutoutBuf);
+      lastLayers = applyTemplateLayout({
+        templateId: chosenTemplate,
+        sceneBrief: input.sceneBrief.trim(),
+        headline: input.headline?.trim() || input.slideText?.trim() || "",
+        subline: input.subline?.trim(),
+        bigWord: input.bigWord?.trim(),
+        palette,
+        fontHeading: input.brand?.headingFont ?? undefined,
+        fontBody: input.brand?.bodyFont ?? undefined,
+      });
+      backgroundShapes = buildTemplateBackgroundShapes(chosenTemplate, palette);
+    } else {
+      const textBox = defaultTextBox(input.slideRole);
+      const textColor = await pickTextColor(lastScene.sceneBuffer, textBox, input.brand?.colors);
+      const inset = Math.round(lastScene.reservedBox.width * 0.06);
+      const insetY = Math.round(lastScene.reservedBox.height * 0.06);
+      lastLayers = {
+        sceneBrief: input.sceneBrief.trim(),
+        product: {
+          box: {
+            x: lastScene.reservedBox.x + inset,
+            y: lastScene.reservedBox.y + insetY,
+            width: lastScene.reservedBox.width - inset * 2,
+            height: lastScene.reservedBox.height - insetY * 2,
+          },
         },
-      },
-      text: input.slideText?.trim()
-        ? [defaultTextLayer({ role: input.slideRole, text: input.slideText.trim(), color: textColor, brand: input.brand })]
-        : [],
-    };
+        text: input.slideText?.trim()
+          ? [defaultTextLayer({ role: input.slideRole, text: input.slideText.trim(), color: textColor, brand: input.brand })]
+          : [],
+      };
+    }
+
     const rendered = await renderLayeredSlide({
       scene: lastScene.sceneBuffer,
-      cutout: Buffer.isBuffer(input.cutout) ? input.cutout : typeof input.cutout === "string" ? Buffer.from(input.cutout.replace(/^data:image\/[a-z+]+;base64,/, ""), "base64") : Buffer.from(input.cutout),
+      cutout: cutoutBuf,
       layers: lastLayers,
+      backgroundShapes,
       shadow: input.shadow,
     });
     // Store the tight placed box so later edits re-render the same size.

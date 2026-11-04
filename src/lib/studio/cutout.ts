@@ -6,6 +6,17 @@
 import { decodeMaskToRaster, type SegmentationMask } from "@meta-sam/parser";
 import sharp from "sharp";
 import { callModelWithTelemetry, type ModelCallTelemetry } from "../gateway";
+import {
+  assessCutout,
+  CUTOUT_REASON_HINTS,
+  type CutoutAssessment,
+  type CutoutReasonCode,
+} from "./cutout-quality";
+import {
+  decontaminateEdges,
+  rasterToSoftAlpha,
+  refineMaskRaster,
+} from "./mask-refine";
 import { normalizePhoto, photoToModelDataUrl, type PhotoInput } from "./photo";
 
 // Larger than the extraction image: the mask is upscaled onto full-resolution pixels,
@@ -58,7 +69,12 @@ export type CutoutProductResult = {
    */
   confidence: number | null;
   /**
-   * Gateway telemetry record (`step: "cutout"`, `model: "sam-3.1"`).
+   * Quality gate result for the cutout mask (`null` on the pre-rendered mock path).
+   */
+  quality: CutoutAssessment | null;
+  /**
+   * Gateway telemetry record (`step: "cutout"`, `model: "sam-3.1"`). Cost, latency and
+   * image count are summed when the cutout was retried.
    */
   telemetry: ModelCallTelemetry;
 };
@@ -87,110 +103,52 @@ type SamGatewayOutput = {
  */
 export class CutoutFailedError extends Error {
   readonly telemetry: ModelCallTelemetry;
+  /** Quality gate failures, when the mask was found but rejected. Empty otherwise. */
+  readonly reasons: CutoutReasonCode[];
 
-  constructor(reason: string, telemetry: ModelCallTelemetry) {
+  constructor(
+    reason: string,
+    telemetry: ModelCallTelemetry,
+    reasons: CutoutReasonCode[] = [],
+  ) {
     super(`Product cutout failed: ${reason}`);
     this.name = "CutoutFailedError";
     this.telemetry = telemetry;
+    this.reasons = reasons;
+  }
+
+  /** Owner-facing tips for the quality failures, to show next to the re-upload prompt. */
+  get hints(): string[] {
+    return this.reasons.map((code) => CUTOUT_REASON_HINTS[code]);
   }
 }
 
-/**
- * Cleans up small specular-highlight holes and 1-2px gaps inside a binary `0 | 1` mask
- * via morphological dilation -> border flood-fill (hole filling).
- */
-function fillMaskHolesAndSpeckles(
-  raster01: Uint8Array,
-  width: number,
-  height: number,
-): Buffer {
-  const total = width * height;
-  const closed = new Uint8Array(raster01);
+/** Prompts tried in order. The first is the caller's hint, the rest are generic fallbacks. */
+const FALLBACK_HINTS = ["product", "main object"];
+/** One retry: the SAM call is cheap and a second prompt often recovers a clean mask. */
+const MAX_ATTEMPTS = 2;
 
-  const radius = 2;
-  const dilated = new Uint8Array(total);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (closed[y * width + x]) {
-        const yMin = Math.max(0, y - radius);
-        const yMax = Math.min(height - 1, y + radius);
-        const xMin = Math.max(0, x - radius);
-        const xMax = Math.min(width - 1, x + radius);
-        for (let ny = yMin; ny <= yMax; ny++) {
-          const rowOff = ny * width;
-          for (let nx = xMin; nx <= xMax; nx++) {
-            dilated[rowOff + nx] = 1;
-          }
-        }
-      }
-    }
-  }
-
-  const exterior = new Uint8Array(total);
-  const queue = new Int32Array(total);
-  let head = 0;
-  let tail = 0;
-
-  const enqueueIfZero = (idx: number) => {
-    if (!dilated[idx] && !exterior[idx]) {
-      exterior[idx] = 1;
-      queue[tail++] = idx;
-    }
+function mergeTelemetry(list: ModelCallTelemetry[]): ModelCallTelemetry {
+  const last = list[list.length - 1];
+  if (list.length === 1) return last;
+  return {
+    ...last,
+    images: list.reduce((n, t) => n + t.images, 0),
+    tokensIn: list.reduce((n, t) => n + t.tokensIn, 0),
+    tokensOut: list.reduce((n, t) => n + t.tokensOut, 0),
+    latencyMs: list.reduce((n, t) => n + t.latencyMs, 0),
+    costUsd: Number(list.reduce((n, t) => n + t.costUsd, 0).toFixed(6)),
+    retries: list.length - 1,
   };
-
-  const cornerSpanX = Math.max(4, Math.round(width * 0.18));
-  for (let x = 0; x < width; x++) {
-    if (x < cornerSpanX || x >= width - cornerSpanX) {
-      enqueueIfZero(x);
-      enqueueIfZero((height - 1) * width + x);
-    }
-  }
-  for (let y = 0; y < height; y++) {
-    enqueueIfZero(y * width);
-    enqueueIfZero(y * width + (width - 1));
-  }
-
-  while (head < tail) {
-    const idx = queue[head++];
-    const x = idx % width;
-    const y = (idx - x) / width;
-
-    if (x > 0) enqueueIfZero(idx - 1);
-    if (x + 1 < width) enqueueIfZero(idx + 1);
-    if (y > 0) enqueueIfZero(idx - width);
-    if (y + 1 < height) enqueueIfZero(idx + width);
-  }
-
-  // Fix 1 (PR #36 review): Keep the original edge without 2px background halo.
-  // The dilated mask is used only to identify exterior background via border flood-fill.
-  // Any pixel not reached from the exterior is an enclosed interior hole.
-  // An output pixel is foreground (255) if it was in the original mask OR is an enclosed hole.
-  const alpha = Buffer.allocUnsafe(total);
-  for (let i = 0; i < total; i++) {
-    alpha[i] = closed[i] || !exterior[i] ? 255 : 0;
-  }
-  return alpha;
-}
-
-/**
- * Decodes a `sam-3.1` mask into a `0 | 255` alpha `Buffer`. Returns `null` for an empty mask.
- */
-function maskToAlpha(mask: SegmentationMask): Buffer | null {
-  const raster01 = decodeMaskToRaster(mask);
-  let foreground = false;
-  for (let i = 0; i < raster01.length; i++) {
-    if (raster01[i] !== 0) {
-      foreground = true;
-      break;
-    }
-  }
-  if (!foreground) return null;
-  return fillMaskHolesAndSpeckles(raster01, mask.width, mask.height);
 }
 
 /**
  * Cuts out the main product from an uploaded photo using `SAM 3.1` via the Single Model Gateway
  * and returns a transparent RGBA PNG buffer (`FR-SP-09`).
+ *
+ * The mask is cleaned (speckles, small holes), turned into a soft anti-aliased alpha, and
+ * the edge colours are decontaminated. A quality gate rejects unusable masks; one retry runs
+ * with a generic prompt before the step fails visibly with the gate's reasons.
  */
 export async function cutoutProduct(
   input: CutoutProductInput,
@@ -199,113 +157,157 @@ export async function cutoutProduct(
   const dataUrl = await photoToModelDataUrl(photo, SAM_INPUT_MAX_SIDE);
   const { uprightPng, width: origWidth, height: origHeight } = photo;
 
-  const { data: samOut, telemetry } = await callModelWithTelemetry<
-    { imageUrl: string; labelHint: string },
-    SamGatewayOutput
-  >({
-    step: "cutout",
-    model: "sam-3.1",
-    shopId: input.shopId,
-    postId: input.postId,
-    input: {
-      imageUrl: dataUrl,
-      labelHint: input.labelHint?.trim() || "main product",
-    },
-  });
+  const first = input.labelHint?.trim() || "main product";
+  const hints = [first, ...FALLBACK_HINTS.filter((h) => h !== first)].slice(
+    0,
+    MAX_ATTEMPTS,
+  );
 
-  // Fast path: if mock provider returned a pre-rendered PNG base64
-  if (samOut.cutoutBase64 && samOut.bbox) {
-    const rawBuf = Buffer.from(samOut.cutoutBase64, "base64");
-    const cutoutBuffer = await sharp(rawBuf).ensureAlpha().png().toBuffer();
-    const cutMeta = await sharp(cutoutBuffer).metadata();
+  const telemetries: ModelCallTelemetry[] = [];
+  let lastFailure: { reason: string; codes: CutoutReasonCode[] } = {
+    reason: "sam-3.1 returned no segmentation",
+    codes: [],
+  };
+
+  for (const labelHint of hints) {
+    const { data: samOut, telemetry } = await callModelWithTelemetry<
+      { imageUrl: string; labelHint: string },
+      SamGatewayOutput
+    >({
+      step: "cutout",
+      model: "sam-3.1",
+      shopId: input.shopId,
+      postId: input.postId,
+      input: { imageUrl: dataUrl, labelHint },
+    });
+    telemetries.push(telemetry);
+
+    // Fast path: if mock provider returned a pre-rendered PNG base64
+    if (samOut.cutoutBase64 && samOut.bbox) {
+      const rawBuf = Buffer.from(samOut.cutoutBase64, "base64");
+      const cutoutBuffer = await sharp(rawBuf).ensureAlpha().png().toBuffer();
+      const cutMeta = await sharp(cutoutBuffer).metadata();
+      return {
+        cutoutBuffer,
+        cutoutDataUrl: `data:image/png;base64,${cutoutBuffer.toString("base64")}`,
+        bbox: samOut.bbox,
+        width: cutMeta.width ?? origWidth,
+        height: cutMeta.height ?? origHeight,
+        confidence: samOut.confidence ?? null,
+        quality: null,
+        telemetry: mergeTelemetry(telemetries),
+      };
+    }
+
+    const { mask, pixelBox, bbox } = samOut;
+    if (!mask || !pixelBox || !bbox) {
+      lastFailure = {
+        reason: samOut.issue ?? "sam-3.1 returned no segmentation",
+        codes: [],
+      };
+      continue;
+    }
+
+    const raster = decodeMaskToRaster(mask);
+    const refined = refineMaskRaster(raster, mask.width, mask.height);
+    if (refined.stats.foreground === 0) {
+      lastFailure = { reason: "sam-3.1 returned an empty mask", codes: [] };
+      continue;
+    }
+
+    const quality = assessCutout({
+      mask: refined.mask,
+      width: mask.width,
+      height: mask.height,
+      stats: refined.stats,
+      pixelBox,
+    });
+    if (!quality.ok) {
+      lastFailure = {
+        reason: `mask rejected (${quality.reasons.join(", ")})`,
+        codes: quality.reasons,
+      };
+      continue;
+    }
+
+    // Scale SAM 3.1 `<|box;x1=...;y1=...;x2=...;y2=...;w=...;h=...|>` onto the full-size photo
+    const scaleX = origWidth / Math.max(1, pixelBox.w);
+    const scaleY = origHeight / Math.max(1, pixelBox.h);
+    const cropLeft = Math.max(0, Math.round(pixelBox.x1 * scaleX));
+    const cropTop = Math.max(0, Math.round(pixelBox.y1 * scaleY));
+    const right = Math.min(origWidth, Math.round((pixelBox.x2 + 1) * scaleX));
+    const bottom = Math.min(origHeight, Math.round((pixelBox.y2 + 1) * scaleY));
+    const cropWidth = Math.max(1, right - cropLeft);
+    const cropHeight = Math.max(1, bottom - cropTop);
+
+    // Extract RGB pixels of the bounding box crop (3 channels)
+    const croppedRgbBuffer = await sharp(uprightPng)
+      .extract({
+        left: cropLeft,
+        top: cropTop,
+        width: cropWidth,
+        height: cropHeight,
+      })
+      .removeAlpha()
+      .raw()
+      .toBuffer();
+
+    // The mask covers the box exactly, at its own resolution
+    const alphaChannel = await rasterToSoftAlpha(
+      refined.mask,
+      mask.width,
+      mask.height,
+      cropWidth,
+      cropHeight,
+    );
+    const rgb = await decontaminateEdges(
+      croppedRgbBuffer,
+      alphaChannel,
+      cropWidth,
+      cropHeight,
+    );
+
+    // Combine 3-channel RGB crop + 1-channel Alpha mask into transparent RGBA PNG.
+    // Capped at CUTOUT_MAX_SIDE to stay well within Supabase bucket limits.
+    const rawRgba = await sharp(rgb, {
+      raw: { width: cropWidth, height: cropHeight, channels: 3 },
+    })
+      .joinChannel(alphaChannel, {
+        raw: { width: cropWidth, height: cropHeight, channels: 1 },
+      })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const cutoutBuffer = await sharp(rawRgba.data, {
+      raw: { width: rawRgba.info.width, height: rawRgba.info.height, channels: 4 },
+    })
+      .resize({
+        width: CUTOUT_MAX_SIDE,
+        height: CUTOUT_MAX_SIDE,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .png({ compressionLevel: 9, adaptiveFiltering: true })
+      .toBuffer();
+
+    const outMeta = await sharp(cutoutBuffer).metadata();
+
     return {
       cutoutBuffer,
       cutoutDataUrl: `data:image/png;base64,${cutoutBuffer.toString("base64")}`,
-      bbox: samOut.bbox,
-      width: cutMeta.width ?? origWidth,
-      height: cutMeta.height ?? origHeight,
+      bbox,
+      width: outMeta.width ?? cropWidth,
+      height: outMeta.height ?? cropHeight,
       confidence: samOut.confidence ?? null,
-      telemetry,
+      quality,
+      telemetry: mergeTelemetry(telemetries),
     };
   }
 
-  const { mask, pixelBox, bbox } = samOut;
-  if (!mask || !pixelBox || !bbox) {
-    throw new CutoutFailedError(
-      samOut.issue ?? "sam-3.1 returned no segmentation",
-      telemetry,
-    );
-  }
-
-  const decodedAlpha = maskToAlpha(mask);
-  if (!decodedAlpha) {
-    throw new CutoutFailedError("sam-3.1 returned an empty mask", telemetry);
-  }
-
-  // Scale SAM 3.1 `<|box;x1=...;y1=...;x2=...;y2=...;w=...;h=...|>` onto the full-size photo
-  const scaleX = origWidth / Math.max(1, pixelBox.w);
-  const scaleY = origHeight / Math.max(1, pixelBox.h);
-  const cropLeft = Math.max(0, Math.round(pixelBox.x1 * scaleX));
-  const cropTop = Math.max(0, Math.round(pixelBox.y1 * scaleY));
-  const right = Math.min(origWidth, Math.round((pixelBox.x2 + 1) * scaleX));
-  const bottom = Math.min(origHeight, Math.round((pixelBox.y2 + 1) * scaleY));
-  const cropWidth = Math.max(1, right - cropLeft);
-  const cropHeight = Math.max(1, bottom - cropTop);
-
-  // Extract RGB pixels of the bounding box crop (3 channels)
-  const croppedRgbBuffer = await sharp(uprightPng)
-    .extract({
-      left: cropLeft,
-      top: cropTop,
-      width: cropWidth,
-      height: cropHeight,
-    })
-    .removeAlpha()
-    .raw()
-    .toBuffer();
-
-  // The mask covers the box exactly, at its own resolution
-  const alphaChannel =
-    mask.width === cropWidth && mask.height === cropHeight
-      ? decodedAlpha
-      : await sharp(decodedAlpha, {
-          raw: { width: mask.width, height: mask.height, channels: 1 },
-        })
-          .resize(cropWidth, cropHeight, { fit: "fill" })
-          .raw()
-          .toBuffer();
-
-  // Combine 3-channel RGB crop + 1-channel Alpha mask into transparent RGBA PNG.
-  // A full-resolution phone crop can pass the 10 MB bucket limit as PNG, and a slide never
-  // shows the product above ~1350 px, so the stored cutout is capped (aspect kept).
-  const rgba = await sharp(croppedRgbBuffer, {
-    raw: { width: cropWidth, height: cropHeight, channels: 3 },
-  })
-    .joinChannel(alphaChannel, {
-      raw: { width: cropWidth, height: cropHeight, channels: 1 },
-    })
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  const cutoutBuffer = await sharp(rgba.data, {
-    raw: { width: rgba.info.width, height: rgba.info.height, channels: 4 },
-  })
-    .resize({
-      width: CUTOUT_MAX_SIDE,
-      height: CUTOUT_MAX_SIDE,
-      fit: "inside",
-      withoutEnlargement: true,
-    })
-    .png({ compressionLevel: 9, adaptiveFiltering: true })
-    .toBuffer();
-  const outMeta = await sharp(cutoutBuffer).metadata();
-
-  return {
-    cutoutBuffer,
-    cutoutDataUrl: `data:image/png;base64,${cutoutBuffer.toString("base64")}`,
-    bbox,
-    width: outMeta.width ?? cropWidth,
-    height: outMeta.height ?? cropHeight,
-    confidence: samOut.confidence ?? null,
-    telemetry,
-  };
+  throw new CutoutFailedError(
+    lastFailure.reason,
+    mergeTelemetry(telemetries),
+    lastFailure.codes,
+  );
+}
 }

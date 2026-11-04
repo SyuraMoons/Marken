@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Local visual-review captures
 /design-review/
+
+# Local AI Lab scratchpad & test outputs
+scratch/

@@ -94,6 +94,10 @@ export const CarouselSlidePlanSchema = z.object({
   text: z.string().min(1),
   alt: z.string().min(1),
   scene_brief: z.string().min(1),
+  headline: z.string().optional(),
+  subline: z.string().optional(),
+  big_word: z.string().optional(),
+  template_id: z.enum(["big-type-behind", "color-block", "pedestal-hero", "tilted-hero"]).optional(),
 });
 
 /**

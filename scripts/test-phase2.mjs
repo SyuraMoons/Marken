@@ -14,7 +14,17 @@ console.log("=== PHASE 2: END-TO-END AI PIPELINE VERIFICATION ===");
 console.log(`Connecting to Meta Model API at: ${META_BASE_URL}\n`);
 
 async function runTest() {
-  const photoPath = path.resolve("src/img_test/test1.jpeg");
+  // Usage: node --env-file=.env.local scripts/test-phase2.mjs <path-to-product-photo>
+  const photoArg = process.argv[2] || process.env.PHASE2_PHOTO;
+  if (!photoArg) {
+    console.error("Pass a product photo: node --env-file=.env.local scripts/test-phase2.mjs ./photo.jpg");
+    process.exit(1);
+  }
+  const photoPath = path.resolve(photoArg);
+  if (!fs.existsSync(photoPath)) {
+    console.error(`Photo not found: ${photoPath}`);
+    process.exit(1);
+  }
   const rawBytes = fs.readFileSync(photoPath);
   console.log(`[1] Loaded test photo: ${photoPath} (${rawBytes.length} bytes)`);
 
@@ -199,14 +209,15 @@ async function runTest() {
     console.warn(`Muse Image returned HTTP ${imageRes.status}: ${await imageRes.text()}`);
     console.log("  (Mocking scene backdrop with Sharp to verify compositing & fidelity pipeline)");
   } else {
-    const imageJson = await imageRes.json();
+    await imageRes.json();
     const imageLatency = Date.now() - sceneStart;
     console.log(`✓ Muse Image 1.0 generated 1080x1350 scene in ${imageLatency}ms!`);
   }
 
-  // Step F: Deterministic Sharp Compositing & Fidelity Verification
-  console.log("\n--- STEP F: Deterministic Sharp Compositing & Fidelity Verification ---");
-  // Create a 1080x1350 test canvas and composite product
+  // Step F: Sharp compositing smoke test
+  // Smoke test only: pastes the resized photo onto a blank canvas to confirm sharp works.
+  // The real cutout compositing and fidelity check live in src/lib/studio (composite.ts, fidelity.ts).
+  console.log("\n--- STEP F: Sharp compositing smoke test ---");
   const canvas = await sharp({
     create: {
       width: 1080,
@@ -229,10 +240,10 @@ async function runTest() {
     .toBuffer();
 
   console.log(`✓ Composited slide created: ${compositeSlide.length} bytes (1080x1350).`);
-  console.log("✓ Fidelity check: product pixels placed deterministically into reserved area without redrawing.");
+  console.log("  (Fidelity check not run here; it is covered by src/lib/studio/fidelity.ts in the app pipeline.)");
 
   console.log("\n=======================================================");
-  console.log("🎉 PHASE 2 VERIFICATION COMPLETE: ALL AI MODULES LIVE!");
+  console.log("PHASE 2 SMOKE TEST COMPLETE: live model endpoints responded");
   console.log("=======================================================");
 }
 

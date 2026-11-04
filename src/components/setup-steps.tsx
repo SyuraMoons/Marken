@@ -734,11 +734,12 @@ function Step5({ ctx, preview }: { ctx: Ctx; preview: SetupPreview | null }) {
     void fetch(`/api/shops/${ctx.shop.id}/posts/generate`, { method: "POST" }).catch(() => null);
   }, [ctx.shop.id, ctx.shop.completed]);
 
-  // Capped at ~3 minutes so a failed start never polls forever.
+  // A run takes 3-5 minutes (plus queue time), so poll for up to 10 like Today's AutoRefresh;
+  // the old ~3 minute cap stopped seconds before the slide landed and left "Building slide 1" up.
   useEffect(() => {
     if (!waiting) return;
-    let left = 45;
-    const id = setInterval(() => (--left <= 0 ? clearInterval(id) : router.refresh()), 4000);
+    const until = Date.now() + 10 * 60_000;
+    const id = setInterval(() => (Date.now() > until ? clearInterval(id) : router.refresh()), 4000);
     return () => clearInterval(id);
   }, [waiting, router]);
 

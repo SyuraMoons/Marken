@@ -111,7 +111,7 @@ export function CaptionEditor({ postId, slides, captions, initial = 0, product }
         {t("edit.rewrite")}
       </Button>
       {text.trim() ? (
-        <ButtonLink href={`/today?view=share&post=${postId}&caption=${encodeURIComponent(text.trim())}`} variant="secondary">
+        <ButtonLink href={`/today?post=${postId}&caption=${encodeURIComponent(text.trim())}`} variant="secondary">
           {t("edit.save")}
         </ButtonLink>
       ) : (

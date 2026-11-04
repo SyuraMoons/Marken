@@ -19,7 +19,7 @@ function Feature({ n, layout = "text-first", bg, dark }: { n: number; layout?: "
   const k = `landing.f${n}`;
   const center = layout === "center";
   const cta = (cls: string) => (
-    <ButtonLink href={n === 2 ? "/example" : "/login"} variant="secondary" className={`${dark ? "bg-white! text-blue!" : ""} ${cls}`}>
+    <ButtonLink showLoading href={n === 2 ? "/example" : "/login"} variant="secondary" className={`${dark ? "bg-white! text-blue!" : ""} ${cls}`}>
       {t(`${k}Cta` as MessageKey)}
     </ButtonLink>
   );
@@ -54,7 +54,7 @@ export default function LandingPage() {
     <div className="bg-app min-h-dvh">
       <header className="mx-auto flex h-16 max-w-360 items-center justify-between gap-4 px-5 lg:px-18">
         <Logo className="text-xl font-semibold! lg:text-[22px]" />
-        <ButtonLink href="/login" className="h-10! w-25! text-sm! shadow-sm lg:w-35!">
+        <ButtonLink showLoading href="/login" className="h-10! w-25! text-sm! shadow-sm lg:w-35!">
           <span className="lg:hidden">{t("landing.signIn")}</span>
           <span className="max-lg:hidden">{t("landing.getStarted")}</span>
         </ButtonLink>
@@ -69,7 +69,7 @@ export default function LandingPage() {
             <p className="max-w-[350px] leading-6 lg:max-w-190 lg:text-[17px] lg:leading-normal">
               <R k="landing.body" />
             </p>
-            <ButtonLink href="/today" className="landing-hero-cta max-w-[350px] border-white/80! bg-white! text-navy! font-bold! lg:w-75">
+            <ButtonLink showLoading href="/today" className="landing-hero-cta max-w-[350px] border-white/80! bg-white! text-navy! font-bold! lg:w-75">
               {t("landing.cta")}
             </ButtonLink>
             <LandingHero />
@@ -91,7 +91,7 @@ export default function LandingPage() {
           <div className="mx-auto flex max-w-324 flex-col gap-5 px-5 py-10 leading-[1.4] lg:px-18 lg:py-16">
             <h2 className="text-[28px] font-semibold lg:text-[38px]">{t("landing.promoteTitle")}</h2>
             <p className="text-[17px] text-muted">{t("landing.promoteBody")}</p>
-            <ButtonLink href="/login" className="shadow-[0_6px_8px_rgb(36_86_219/13%)] lg:w-70">
+            <ButtonLink showLoading href="/login" className="shadow-[0_6px_8px_rgb(36_86_219/13%)] lg:w-70">
               {t("landing.promoteCta")}
             </ButtonLink>
             <p className="text-xs text-muted">{t("landing.footer")}</p>

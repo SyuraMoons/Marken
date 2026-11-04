@@ -10,7 +10,7 @@ const NAV: NavItem[] = [
   { href: "/today", label: t("nav.today"), icon: "today" },
   { href: "/posts", label: t("nav.history"), icon: "activity" },
   { href: "/products", label: t("nav.products"), icon: "products" },
-  { href: "/results", label: t("nav.results"), icon: "results" },
+  { href: "/analytics", label: t("nav.results"), icon: "results" },
   { href: "/settings", label: t("nav.settings"), icon: "settings" },
 ];
 // Agent activity is shown inline on Today and in the studio, so it no longer has its own tab (FD-45).

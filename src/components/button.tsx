@@ -1,3 +1,4 @@
+import { NavigationLoading } from "./navigation-loading";
 import Link from "next/link";
 import type { ComponentProps } from "react";
 
@@ -18,8 +19,8 @@ export function Button({ variant = "primary", className = "", ...props }: Compon
   return <button className={`${base} ${VARIANTS[variant]} ${className}`} {...props} />;
 }
 
-export function ButtonLink({ variant = "primary", className = "", ...props }: ComponentProps<typeof Link> & { variant?: Variant }) {
-  return <Link className={`${base} ${VARIANTS[variant]} ${className}`} {...props} />;
+export function ButtonLink({ variant = "primary", className = "", children, showLoading = false, ...props }: ComponentProps<typeof Link> & { variant?: Variant; showLoading?: boolean }) {
+  return <Link className={`${base} ${VARIANTS[variant]} ${className}`} {...props}>{children}{showLoading && <NavigationLoading />}</Link>;
 }
 
 // Plain anchor for server redirects (e.g. Instagram OAuth): Link would prefetch and client-navigate them.

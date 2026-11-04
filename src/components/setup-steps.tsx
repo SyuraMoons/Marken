@@ -197,18 +197,9 @@ const TIPS = [
   ["backdrop", "ob2.tipBackdrop"],
 ] as const;
 
-// Loading panel tied to the real upload/extract phases (270:1497, 270:1639; FD-24): the owner's own photos
-// get the same scan-line animation and live step list as adding a product.
+// Keep upload and extraction loading tied to their real phases.
 function Loading({ phase, urls }: { phase: "uploading" | "preparing"; urls: string[] }) {
-  return (
-    <div className="flex max-w-xl flex-col gap-5">
-      <Head title={t(`ob2.${phase}Title`)} body={t(`ob2.${phase}Body`)} />
-      <ProcessingPhoto src={urls[0]} more={urls.slice(1)} from={phase === "preparing" ? 1 : 0} />
-      <InfoCard vector="check" title={t("ob2.waitTitle")}>
-        {t("ob2.waitBody")}
-      </InfoCard>
-    </div>
-  );
+  return <div className="flex max-w-xl flex-col gap-5"><Head title={t(`ob2.${phase}Title`)} body={t(`ob2.${phase}Body`)} /><ProcessingPhoto src={urls[0]} more={urls.slice(1)} from={phase === "preparing" ? 1 : 0} /><InfoCard vector="check" title={t("ob2.waitTitle")}>{t("ob2.waitBody")}</InfoCard></div>;
 }
 
 // The owner's product on the soft stage; `working` adds the scan-line while the real slide is still being made.
@@ -766,6 +757,7 @@ function Step5({ ctx, preview }: { ctx: Ctx; preview: SetupPreview | null }) {
       if (!(await ctx.save(action === "finish" ? { action, tour_completed: true } : { action }))) return setFailed(true);
       ctx.go(6);
     });
+
 
   if (tour === 3) {
     return (

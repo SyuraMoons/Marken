@@ -31,13 +31,16 @@ export type SetupShop = {
   completed: boolean;
 };
 
+// The owner's real product for steps 4 and 5: signed URLs only (NFR-13).
+export type SetupPreview = { name: string; cutout: string | null; photo: string | null; slide: string | null; postStatus: string | null };
+
 // A photo uploaded earlier that has no product yet (signed URL only).
 export type PendingUpload = { id: string; url: string | null; createdAt: string };
 
 type Ctx = { shop: SetupShop; go: (step: number) => void; save: (body: Record<string, unknown>) => Promise<boolean> };
 
 // All 5 onboarding steps (F-03, FR-OB, Figma page 05). Each step saves server-side before moving on (FR-OB-11).
-export function SetupSteps({ step, shop, products, rules, brandKit, pending }: { step: number; shop: SetupShop; products: ProductView[]; rules: string[]; brandKit: BrandKitValue; pending: PendingUpload[] }) {
+export function SetupSteps({ step, shop, products, rules, brandKit, preview, pending }: { step: number; shop: SetupShop; products: ProductView[]; rules: string[]; brandKit: BrandKitValue; preview: SetupPreview | null; pending: PendingUpload[] }) {
   const router = useRouter();
   const ctx: Ctx = {
     shop,
@@ -57,7 +60,7 @@ export function SetupSteps({ step, shop, products, rules, brandKit, pending }: {
       {/* Keyed by ids so a replaced photo (router.refresh) resets the list. */}
       {step === 3 && <Step3 key={products.map((p) => p.id).join()} ctx={ctx} initial={products} />}
       {step === 4 && <Step4 ctx={ctx} initialRules={rules} initialKit={brandKit} />}
-      {step === 5 && <Step5 ctx={ctx} />}
+      {step === 5 && <Step5 ctx={ctx} preview={preview} />}
     </>
   );
 }
@@ -205,6 +208,27 @@ function Loading({ phase, urls }: { phase: "uploading" | "preparing"; urls: stri
         {t("ob2.waitBody")}
       </InfoCard>
     </div>
+  );
+}
+
+// The owner's product on the soft stage; `working` adds the scan-line while the real slide is still being made.
+function RealPhoto({ src, alt, eyebrow, caption, working = false }: { src: string | null; alt: string; eyebrow: string; caption: string; working?: boolean }) {
+  return (
+    <figure className="flex w-full flex-col gap-2 leading-[1.35] font-semibold lg:max-w-75">
+      <div className={`relative aspect-[4/5] overflow-hidden rounded-card bg-[radial-gradient(circle_at_30%_40%,#e5f0ff,#f9f9ff)] ${working ? "photo-processing" : ""}`}>
+        {src && <Image src={src} alt={alt} fill sizes="(min-width: 1024px) 300px, 90vw" className="object-contain" />}
+        {working && (
+          <>
+            <div aria-hidden="true" className="photo-shimmer absolute inset-0" />
+            <div aria-hidden="true" className="photo-scan-line" />
+          </>
+        )}
+      </div>
+      <figcaption className="flex flex-col gap-2">
+        <span className="text-[10px] uppercase">{eyebrow}</span>
+        <span>{caption}</span>
+      </figcaption>
+    </figure>
   );
 }
 
@@ -578,12 +602,15 @@ function Step4({ ctx, initialRules, initialKit }: { ctx: Ctx; initialRules: stri
 }
 
 // First post + tour (228:17081, 228:17182, 228:17301): runs on a labelled sample while the real post generates (FR-OB-09).
-function Step5({ ctx }: { ctx: Ctx }) {
+function Step5({ ctx, preview }: { ctx: Ctx; preview: SetupPreview | null }) {
+  const router = useRouter();
   const [tour, setTour] = useState<1 | 2 | 3>(1);
   const [showFailed, setShowFailed] = useState(false);
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
   const started = useRef(false);
+  // The first slide is still being made: re-read the page until it lands (tour state is kept across refreshes).
+  const waiting = Boolean(preview) && !preview?.slide && (preview?.postStatus === "generating" || (preview?.postStatus == null && !ctx.shop.completed));
 
   // Replay tour (Settings) must not start another post.
   useEffect(() => {
@@ -591,6 +618,23 @@ function Step5({ ctx }: { ctx: Ctx }) {
     started.current = true;
     void fetch(`/api/shops/${ctx.shop.id}/posts/generate`, { method: "POST" }).catch(() => null);
   }, [ctx.shop.id, ctx.shop.completed]);
+
+  // Capped at ~3 minutes so a failed start never polls forever.
+  useEffect(() => {
+    if (!waiting) return;
+    let left = 45;
+    const id = setInterval(() => (--left <= 0 ? clearInterval(id) : router.refresh()), 4000);
+    return () => clearInterval(id);
+  }, [waiting, router]);
+
+  // The owner's product: the real first slide once built, otherwise the confirmed cutout being worked on.
+  const after = preview?.slide ?? preview?.cutout ?? null;
+  const afterCaption = preview?.slide ? t("ob5.afterCaption") : t("ob5.afterWorking");
+  const realPost = preview ? (
+    <RealPhoto src={after} alt={preview.name} eyebrow={t("ob5.realEyebrow")} caption={preview.slide ? preview.name : t("ob5.realWorking", { product: preview.name })} working={!preview.slide} />
+  ) : (
+    <Guide eyebrow={t("ob5.sampleEyebrow")} caption={t("ob5.sample")} />
+  );
 
   const finish = (action: "finish" | "skip") =>
     start(async () => {
@@ -624,8 +668,17 @@ function Step5({ ctx }: { ctx: Ctx }) {
         <Split
           left={
             <div className="flex flex-col gap-6 lg:flex-row">
-              <Guide eyebrow={t("ob5.before")} caption={t("ob5.beforeCaption")} />
-              <Guide eyebrow={t("ob5.after")} caption={t("ob5.afterCaption")} />
+              {preview ? (
+                <>
+                  <RealPhoto src={preview.photo ?? preview.cutout} alt={preview.name} eyebrow={t("ob5.beforeReal")} caption={t("ob5.beforeCaption")} />
+                  <RealPhoto src={after} alt={preview.name} eyebrow={t("ob5.afterReal")} caption={afterCaption} working={!preview.slide} />
+                </>
+              ) : (
+                <>
+                  <Guide eyebrow={t("ob5.before")} caption={t("ob5.beforeCaption")} />
+                  <Guide eyebrow={t("ob5.after")} caption={t("ob5.afterCaption")} />
+                </>
+              )}
             </div>
           }
           right={
@@ -651,9 +704,9 @@ function Step5({ ctx }: { ctx: Ctx }) {
 
   return (
     <>
-      <Head title={t("ob5.title")} body={t("ob5.body")} />
+      <Head title={t("ob5.title")} body={preview ? t("ob5.bodyReal") : t("ob5.body")} />
       <Split
-        left={<Guide eyebrow={t("ob5.sampleEyebrow")} caption={t("ob5.sample")} />}
+        left={realPost}
         right={
           <>
             <section className="glass flex flex-col gap-2 rounded-card p-5">

@@ -59,7 +59,7 @@ async function Step({ params }: Pick<PageProps<"/onboarding/[step]">, "params">)
   const preview = step >= 4 ? await loadPreview(supabase, shop.id, products) : null;
 
   return (
-    <SetupShell step={step} shopId={shop.id} shopName={shop.name ?? ""} others={others}>
+    <SetupShell step={step} savedStep={shop.onboarding_step} shopId={shop.id} shopName={shop.name ?? ""} others={others}>
       <SetupSteps
         step={step}
         shop={{

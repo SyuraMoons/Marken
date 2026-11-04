@@ -7,6 +7,7 @@
 
 import { z } from "zod";
 import { callModelWithTelemetry, type ModelCallTelemetry } from "../gateway";
+import type { FramingMode } from "../studio/composite";
 import { checkStyleRules, type CheckStyleRulesResult } from "./rules";
 import { CarouselPlanModelSchema } from "./schemas";
 import type { TemplateId } from "../studio/layers";
@@ -22,6 +23,10 @@ export type SlidePlan = {
   headline?: string;
   subline?: string;
   bigWord?: string;
+  categoryTag?: string;
+  framingMode?: FramingMode;
+  cameraAngle?: string;
+  surfaceType?: string;
   templateId?: TemplateId;
 };
 
@@ -227,22 +232,29 @@ export async function planDailyCarousel(
     input.brief?.trim()
       ? `Owner's brief for this post (follow it for angle, audience and mood, but never invent prices, discounts or claims it does not state): ${input.brief.trim()}`
       : "",
-    "Carousel Structure & Contemporary Creative Direction (3 slides, inspired by high-impact visual campaigns):",
-    "1. `order: 1`, `role: 'hook'`: Eye-catching problem/curiosity hook. Recommended `template_id: 'big-type-behind'` with a bold 1-word 3D `big_word` behind the product (e.g. 'COLD', 'FRESH', 'PURE') and punchy `headline` (<= 6 words).",
-    "2. `order: 2`, `role: 'product'`: Product benefit/craftsmanship spotlight. Recommended `template_id: 'color-block'` or 'pedestal-hero', with clear `headline` and `subline` (<= 12 words).",
-    "3. `order: 3`, `role: 'cta'`: Action-driving slide. Recommended `template_id: 'pedestal-hero'` or 'tilted-hero', inviting swipe, tap bio, or DM.",
+    "Carousel Structure & Contemporary Creative Direction (3 slides, inspired by modern commercial poster aesthetics like Pepsi, Apple Watch Ultra, and high-end lifestyle campaigns):",
+    "1. `order: 1`, `role: 'hook'`: Clean, punchy problem or curiosity hook. Minimalist copy (headline <= 4 words, e.g. 'THE BLUE CAN' or 'MEET THE FUTURE'). Choose dynamic `framing_mode: 'offset-left'` or 'macro-detail' and `template_id: 'offset-editorial'` or 'tech-hero'.",
+    "2. `order: 2`, `role: 'product'`: Product craftsmanship or core benefit spotlight. One clear crisp sentence (subline <= 12 words). Choose `framing_mode: 'full-center'` or 'macro-detail' and `template_id: 'tech-hero'` or 'product-poster'.",
+    "3. `order: 3`, `role: 'cta'`: Action-driving close with explicit directive ('Tap link in bio', 'DM to order', 'Swipe to shop'). Choose `template_id: 'tech-hero'` or 'product-poster'.",
     "",
-    "CRITICAL SCENE BRIEF DIRECTIVE (PRODUCT RELEVANCE):",
-    "The `scene_brief` MUST strictly match the PHYSICAL PRODUCT'S REAL-WORLD UTILITY, CATEGORY, AND SENSORY ESSENCE, not random generic trend props.",
-    "- For drinkware/tumblers: Cold mist, crisp ice cubes, condensation droplets on a clean icy pedestal, or outdoor morning trail.",
-    "- For food/coffee/jars: Warm wooden table, golden sunbeam, morning breakfast setting, rustic ceramic tile.",
-    "- For footwear/apparel: Minimalist concrete studio, sleek dynamic floor, soft directional rim lighting.",
-    "- For skincare/beauty: Smooth marble surface, clean water ripple, luxury soft-glow studio.",
-    "NEVER use generic office unboxing props (like scissors or brown cardboard) unless the product is stationery or packaging.",
-    "Camera perspective must be an eye-level or slight low-angle commercial product shot with a clear pedestal or table surface where the product can rest with grounding shadows.",
+    "CRITICAL COPYWRITING DIRECTIVE (CLEAN & ON-POINT):",
+    "Never write cluttered, lengthy, or generic corporate copy. Headlines must be bold, short, and memorable (2-4 words). Sublines must be 1 clear sentence highlighting the authentic benefit.",
+    "",
+    "CRITICAL SCENE & PHOTOGRAPHY DIRECTIVE (PHYSICAL GROUNDING & SAME DIMENSION):",
+    "The product must look photographed in the same place as the scene, never like a pasted sticker.",
+    "- Explicitly specify `camera_angle`, and keep it eye-level or a slight low angle (e.g. 'eye-level commercial studio', 'slight low-angle hero view'). The real product photo is shot front-on and is composited as-is, so NEVER use top-down, overhead or steep high-angle views: the product would not match the scene's perspective.",
+    "- Explicitly specify `surface_type` (e.g. 'dark weathered wood planks with droplets', 'rugged slate rock pedestal with warm edge glow', 'polished Italian marble', 'frosted icy podium').",
+    "- The `scene_brief` MUST match the PHYSICAL PRODUCT'S REAL-WORLD UTILITY, CATEGORY, AND SENSORY ESSENCE:",
+    "  * Drinkware/beverages: Eye-level view on a weathered wooden table, water condensation droplets, cool moody lighting, or crisp ice pedestal.",
+    "  * Tech/gadgets/watches: Low-angle dramatic pedestal on slate rock with warm orange/amber rim backlighting, sleek dark studio environment.",
+    "  * Food/coffee/jars: Warm natural morning daylight, wooden or ceramic countertop, authentic cafe setting.",
+    "  * Beauty/skincare: Elegant marble or ripple water reflection, soft luxury diffused studio lighting.",
+    "Always include a clear pedestal, table or floor surface in the reserved product area where the product can rest with grounding shadows.",
+    "Optional `category_tag`: a 1-3 word label written in the content language (e.g. 'NEW DROP'); leave it empty rather than default to English.",
+    "NEVER draw or hallucinate the hero product in the scene background.",
     "",
     "Provide exactly 2 distinct caption options (Option A & Option B) and 5 to 15 relevant hashtags.",
-    'Respond strictly with valid JSON matching: { "product_id": string, "trend_id": string, "fit_reason": string, "slides": [{ "order": 1|2|3, "role": "hook"|"product"|"cta", "headline": string, "subline": string, "big_word": string, "template_id": "big-type-behind"|"color-block"|"pedestal-hero"|"tilted-hero", "text": string, "alt": string, "scene_brief": string }], "caption_options": [string, string], "hashtags": string[] }.',
+    'Respond strictly with valid JSON matching: { "product_id": string, "trend_id": string, "fit_reason": string, "slides": [{ "order": 1|2|3, "role": "hook"|"product"|"cta", "headline": string, "subline": string, "big_word": string, "category_tag": string, "framing_mode": "full-center"|"macro-detail"|"offset-left"|"offset-right"|"floating-hero", "camera_angle": string, "surface_type": string, "template_id": "offset-editorial"|"tech-hero"|"macro-detail"|"product-poster"|"big-type-behind"|"color-block"|"pedestal-hero"|"tilted-hero", "text": string, "alt": string, "scene_brief": string }], "caption_options": [string, string], "hashtags": string[] }.',
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -327,8 +339,17 @@ export async function planDailyCarousel(
     headline: s.headline?.trim() || s.text.trim(),
     subline: s.subline?.trim(),
     bigWord: s.big_word?.trim(),
-    // Product slides default to a layout that shows the slide text ("product-highlight" has none).
-    templateId: s.template_id ?? (s.role === "hook" ? "product-poster" : s.role === "product" ? "pedestal-hero" : "product-with-name"),
+    categoryTag: s.category_tag?.trim(),
+    framingMode: s.framing_mode,
+    cameraAngle: s.camera_angle?.trim(),
+    surfaceType: s.surface_type?.trim(),
+    templateId:
+      s.template_id ??
+      (s.role === "hook"
+        ? "offset-editorial"
+        : s.role === "product"
+        ? "product-poster"
+        : "tech-hero"),
   }));
 
   const captions: CarouselCaptionOption[] = finalPlan.caption_options.map(

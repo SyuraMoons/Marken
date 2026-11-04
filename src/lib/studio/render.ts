@@ -7,7 +7,7 @@ import path from "node:path";
 import { createElement } from "react";
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
-import { compositeProductSlide, type DropShadowOptions, type PlacedProductBox } from "./composite";
+import { compositeProductSlide, type DropShadowOptions, type FramingMode, type PlacedProductBox } from "./composite";
 import { buildTemplateBackgroundShapes } from "./templates";
 import { CANVAS_H, CANVAS_W, FONTS, normalizeLayers, textLineHeight, type Box, type FontId, type SlideLayers, type TextLayer } from "./layers";
 
@@ -22,9 +22,26 @@ const loadFont = (id: FontId) => {
 };
 
 /** One text layer as a transparent PNG the size of its box. */
+/** Light text (WCAG luminance above ~0.18, where black and white contrast equally) gets a dark halo. */
+function isLightColor(color: string): boolean {
+  let hex = color.trim().replace(/^#/, "");
+  if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return true;
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.179;
+}
+
 async function renderText(layer: TextLayer): Promise<{ input: Buffer; left: number; top: number } | null> {
   const text = layer.text.trim();
   if (!text) return null;
+  const isLight = isLightColor(layer.color);
+  const textShadow = isLight
+    ? "0 2px 14px rgba(0,0,0,0.75), 0 1px 3px rgba(0,0,0,0.92)"
+    : "0 1px 10px rgba(255,255,255,0.7)";
+
   const res = new ImageResponse(
     createElement(
       "div",
@@ -40,6 +57,7 @@ async function renderText(layer: TextLayer): Promise<{ input: Buffer; left: numb
           fontFamily: layer.font,
           fontSize: layer.size,
           lineHeight: textLineHeight,
+          textShadow,
         },
       },
       text,
@@ -90,6 +108,7 @@ export type RenderLayeredInput = {
   cutout: Buffer;
   layers: SlideLayers;
   shadow?: DropShadowOptions;
+  framingMode?: FramingMode;
   /** Background graphics (cards, banners) under text and product. Defaults to the ones `layers.background` describes. */
   backgroundShapes?: Buffer | null;
 };
@@ -108,7 +127,9 @@ export async function renderLayeredSlide(input: RenderLayeredInput): Promise<Ren
   // Rebuilt from the stored layers, so a slide edit keeps the template card or banner.
   const shapes =
     input.backgroundShapes ??
-    (layers.background ? buildTemplateBackgroundShapes(layers.background.template, layers.background) : null);
+    (layers.background
+      ? buildTemplateBackgroundShapes(layers.background.template, layers.background, layers.background.cta === true)
+      : null);
   if (shapes) {
     base = await sharp(base)
       .composite([{ input: shapes, left: 0, top: 0 }])
@@ -123,6 +144,7 @@ export async function renderLayeredSlide(input: RenderLayeredInput): Promise<Ren
     scene: withText,
     cutout: input.cutout,
     reservedBox: layers.product.box,
+    framingMode: input.framingMode,
     // The stored box is the product's own fit area, so no extra breathing room is added on re-render.
     paddingRatio: 0,
     shadow: input.shadow,

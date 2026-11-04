@@ -17,7 +17,7 @@ export function SandboxView() {
   const [platform, setPlatform] = useState<"instagram" | "facebook">("instagram");
   const reset = () => { setStage("product"); setCaption(0); setPlatform("instagram"); };
   return <div className="bg-app min-h-dvh">
-    <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-6"><Logo href="/sandbox" /><ButtonLink prefetch={false} href="/today" variant="text" className="w-auto!">{t("practice.exit")}</ButtonLink></header>
+    <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-6"><Logo href="/sandbox" /><ButtonLink prefetch={false} href="/posts" variant="text" className="w-auto!">{t("practice.exit")}</ButtonLink></header>
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-5 pb-28" data-practice-state={stage}>
       <section className="rounded-card border border-powder bg-white p-6" data-tour="practice-intro">
         <p className="text-xs font-bold uppercase text-blue">{t("practice.badge")}</p>
@@ -61,7 +61,7 @@ export function SandboxView() {
           {stage === "complete" && <>
             <h2 className="text-xl font-semibold">{t("practice.completeTitle")}</h2><p>{t("practice.completeBody")}</p>
             <p className="rounded-control bg-powder p-4">{t("practice.destination", { platform: t(`share.${platform}`) })}</p>
-            <Button onClick={reset}>{t("practice.reset")}</Button><ButtonLink prefetch={false} href="/today" variant="secondary">{t("practice.exit")}</ButtonLink>
+            <Button onClick={reset}>{t("practice.reset")}</Button><ButtonLink prefetch={false} href="/posts" variant="secondary">{t("practice.exit")}</ButtonLink>
           </>}
         </section>
       </div>

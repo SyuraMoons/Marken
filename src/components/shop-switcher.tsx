@@ -12,7 +12,7 @@ async function call(url: string): Promise<Result> {
   const res = await fetch(url, { method: "POST" }).catch(() => null);
   if (res?.ok) {
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload on purpose: drop all cached data of the old company
-    window.location.href = "/today"; // the proxy sends an unfinished company to its saved setup step
+    window.location.href = "/posts"; // the proxy sends an unfinished company to its saved setup step
     return "ok";
   }
   if (res?.status === 409 && (await res.json().catch(() => null))?.error === "shop_limit") return "limit";

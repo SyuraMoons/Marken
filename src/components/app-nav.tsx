@@ -6,12 +6,10 @@ import { useEffect, useRef } from "react";
 
 export type NavItem = { href: string; label: string; icon: string };
 
-// Post screens live under Today (DX-23).
+// A single post's screens (/today?post=, /posts/[id]/edit) live under History.
 function section(pathname: string) {
   if (pathname.startsWith("/create")) return "/products";
-  // The list is History; a single post's screens (edit) live under Today.
-  if (pathname === "/posts") return "/posts";
-  return pathname.startsWith("/posts") ? "/today" : "/" + pathname.split("/")[1];
+  return pathname.startsWith("/posts") || pathname.startsWith("/today") ? "/posts" : "/" + pathname.split("/")[1];
 }
 
 type Props = { items: NavItem[]; variant: "bar" | "side"; label: string };

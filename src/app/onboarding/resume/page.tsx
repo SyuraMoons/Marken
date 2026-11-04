@@ -20,7 +20,7 @@ async function Resume() {
   const owner = await getOwnerShop();
   if (!owner) redirect("/login");
   const { shop } = owner;
-  if (shop.onboarding_completed_at) redirect("/today");
+  if (shop.onboarding_completed_at) redirect("/posts");
 
   return (
     <AuthShell>

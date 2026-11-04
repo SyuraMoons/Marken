@@ -122,7 +122,7 @@ export function SettingsView({ email, igConnected, rules: savedRules, brandKit, 
           {t("settings.deletedCardBody")}
         </InfoCard>
         {next ? (
-          <AnchorButton href="/today">{t("settings.continueOther", { name: next.name || t("nav.newCompany") })}</AnchorButton>
+          <AnchorButton href="/posts">{t("settings.continueOther", { name: next.name || t("nav.newCompany") })}</AnchorButton>
         ) : (
           <AnchorButton href="/">{t("settings.startAgain")}</AnchorButton>
         )}

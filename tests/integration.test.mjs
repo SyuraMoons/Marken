@@ -92,7 +92,7 @@ test('landing remains public while dashboard, setup and OAuth routing stay prote
   assert.equal((await visit('/today', true)).kind, 'next');
   assert.equal((await visit('/today', false)).url, 'http://localhost:3000/login');
   assert.equal((await visit('/today', true, false)).url, 'http://localhost:3000/onboarding/2');
-  assert.equal((await visit('/login', true)).url, 'http://localhost:3000/today');
+  assert.equal((await visit('/login', true)).url, 'http://localhost:3000/posts');
   assert.equal((await visit('/?code=oauth-return', true)).url, 'http://localhost:3000/auth/callback?code=oauth-return');
 });
 

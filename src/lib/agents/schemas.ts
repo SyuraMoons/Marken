@@ -98,6 +98,12 @@ export const CarouselSlidePlanSchema = z.object({
   headline: z.string().optional(),
   subline: z.string().optional(),
   big_word: z.string().optional(),
+  category_tag: z.string().optional(),
+  framing_mode: z
+    .enum(["full-center", "macro-detail", "offset-left", "offset-right", "floating-hero"])
+    .optional(),
+  camera_angle: z.string().optional(),
+  surface_type: z.string().optional(),
   template_id: z.enum(TEMPLATE_IDS).optional(),
 });
 

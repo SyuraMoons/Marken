@@ -69,7 +69,7 @@ export default function LandingPage() {
             <p className="max-w-[350px] leading-6 lg:max-w-190 lg:text-[17px] lg:leading-normal">
               <R k="landing.body" />
             </p>
-            <ButtonLink showLoading href="/today" className="landing-hero-cta max-w-[350px] border-white/80! bg-white! text-navy! font-bold! lg:w-75">
+            <ButtonLink showLoading href="/posts" className="landing-hero-cta max-w-[350px] border-white/80! bg-white! text-navy! font-bold! lg:w-75">
               {t("landing.cta")}
             </ButtonLink>
             <LandingHero />

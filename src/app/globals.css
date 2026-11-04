@@ -196,3 +196,19 @@ body {
 .tour-spotlight { position:fixed; border:2px solid var(--color-blue); border-radius:12px; box-shadow:0 0 0 9999px rgb(17 27 54 / 60%); pointer-events:none; transition:left 350ms ease,top 350ms ease,width 350ms ease,height 350ms ease; }
 .tour-pointer { position:absolute; right:-12px; bottom:-28px; font-size:36px; color:var(--color-blue); text-shadow:0 1px 2px white; }
 .tour-card { position:fixed; right:20px; bottom:max(20px,env(safe-area-inset-bottom)); width:min(380px,calc(100vw - 40px)); max-height:60dvh; overflow-y:auto; }
+
+/* Hero autoplay stays enabled independently of the app motion preference. */
+:root .hero-panel { position:absolute; left:50%; top:50%; width:210px; height:210px; transform-origin:center; transition-property:transform,opacity; transition-duration:900ms !important; transition-timing-function:cubic-bezier(.22,1,.36,1); will-change:transform; }
+.hero-panel-center { transform:translate(-50%,-50%) scale(1); opacity:1; z-index:3; }
+.hero-panel-left { transform:translate(-145%,-50%) scale(.72) perspective(900px) rotateY(14deg) rotate(-3deg); opacity:.8; z-index:1; }
+.hero-panel-right { transform:translate(45%,-50%) scale(.72) perspective(900px) rotateY(-14deg) rotate(3deg); opacity:.8; z-index:1; }
+@media(min-width:1024px) {
+  :root .hero-panel { width:47%;height:auto;aspect-ratio:648/240; }
+  .hero-panel-left { transform:translate(-130%,-50%) scale(.52,.78) perspective(900px) rotateY(10deg) rotate(-2deg); }
+  .hero-panel-right { transform:translate(30%,-50%) scale(.52,.78) perspective(900px) rotateY(-10deg) rotate(2deg); }
+}
+@media(max-width:389px) { :root .hero-panel { width:180px;height:180px; } }
+@keyframes cta-arrive { from { transform:translateY(22px) scale(.86); opacity:.3; } to { transform:translateY(0) scale(1);opacity:1; } }
+@keyframes cta-breathe { 0%,100% { transform:scale(1); } 50% { transform:scale(1.045); } }
+:root .landing-hero-cta { position:relative; isolation:isolate; box-shadow:0 0 0 5px rgb(255 255 255 / 12%),0 10px 36px rgb(242 177 230 / 45%); animation-name:cta-arrive,cta-breathe; animation-duration:700ms,2800ms !important; animation-delay:0ms,900ms; animation-timing-function:cubic-bezier(.22,1,.36,1),ease-in-out; animation-iteration-count:1,infinite; animation-fill-mode:both; }
+.landing-hero-cta:hover { box-shadow:0 0 0 7px rgb(255 255 255 / 18%),0 12px 44px rgb(242 177 230 / 60%); }

@@ -189,3 +189,10 @@ The brief travels on the `post/generate.requested` event to the planner, which f
 **Addendum (FD-49):** History cards carry the same **Download** and **Delete** actions (compact), outside the card link so no control is nested in a link. Deleting there refreshes the list in place. A post opened from History (`?post=`) shows a "← Back to history" bar with its date above every sub-view.
 
 **Addendum 2 (FD-49):** An `approved` post can be deleted when Instagram is not connected, because Approve then queues no publish job and the owner downloads the images by hand. With Instagram connected it stays blocked (a job may be queued). `publishing` and `published` are never deletable. The rule lives in `src/lib/posts/deletable.ts` and is shared by the API route, History cards and Today.
+
+
+**Landing hero revision — 4 Nov 2026.**
+User requested faster autoplay, no pause button, and continuous hero motion independent of reduced-motion preferences. Three persistent photo panels change positions every 2 seconds using 900 ms transform transitions. Manual category/swipe/arrow controls remain. Headline increases to 94 px desktop / 46 px mobile; the main CTA uses a white treatment, pop-in entrance and subtle scale/glow emphasis. This exception applies to the landing hero; other app motion preferences remain intact.
+
+
+**Landing access — 4 Nov 2026.** Signed-in visitors may open `/`. The primary Create your first post CTA targets `/today`; logged-out requests are redirected to login, and unfinished setup still resumes onboarding. OAuth callback query parameters on the root are handled before landing-page access. This supersedes the earlier signed-in landing redirect.

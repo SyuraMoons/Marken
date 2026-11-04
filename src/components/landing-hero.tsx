@@ -1,29 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { t, type MessageKey } from "@/lib/i18n";
 import { Sprite } from "./sprite";
 
 const CATS = [0, 1, 2] as const;
-const DELAY = 3200; // FD-25
+const DELAY = 2000;
 
 function Panel({ cat, big, side }: { cat: number; big?: boolean; side?: "left" | "right" }) {
-  const tilt = side === "left" ? "rotate-2 skew-x-[-3.14deg] lg:skew-x-[7.15deg]" : side === "right" ? "-rotate-2 skew-x-[3.14deg] lg:skew-x-[-7.15deg]" : "skew-x-[-1.43deg] lg:skew-x-0";
-  // Desktop sizes are fractions of the track so 1024–1440 px never overflows; ratios match the 1440 frame.
-  const size = big
-    ? "size-[210px] max-[389px]:size-[180px] lg:aspect-[648/240] lg:h-auto lg:w-[47%] lg:max-w-162"
-    : "h-[150px] w-[60px] opacity-80 lg:aspect-[324/185] lg:h-auto lg:w-[23%] lg:max-w-81 lg:opacity-100";
-  const crop = big ? "lg:h-[540%] lg:top-[-220%]" : "lg:h-[350.27%] lg:top-[-125.14%]";
+  const position = big ? "hero-panel-center" : side === "left" ? "hero-panel-left" : "hero-panel-right";
   return (
     <div
       aria-hidden={!big}
-      className={`relative shrink-0 overflow-hidden rounded-md bg-white drop-shadow-[0_18px_14px_rgb(3_8_36/32%)] ${big ? "border-2 border-[#80a6f2]" : "border border-[#d9e5fa]"} ${tilt} ${size}`}
+      className={`hero-panel ${position} overflow-hidden rounded-md border border-powder bg-white shadow-xl`}
     >
       <Sprite
         src="/figma/landing-products.png"
         i={cat}
-        crop={crop}
+        crop="lg:h-[540%] lg:top-[-220%]"
         alt={big ? t("landing.slide", { name: t(`landing.cat${cat}` as MessageKey) }) : ""}
         sizes={big ? "(min-width: 1024px) 1944px, 630px" : "(min-width: 1024px) 972px, 180px"}
         priority={big}
@@ -32,16 +26,13 @@ function Panel({ cat, big, side }: { cat: number; big?: boolean; side?: "left" |
   );
 }
 
-// Hero product slider (228:16197, 245:2147..4464): 3 example states, autoplay, swipe, keys, pause.
+// Hero product slider (228:16197, 245:2147..4464): 3 example states, autoplay, swipe and keyboard controls.
 export function LandingHero() {
   const [active, setActive] = useState(1);
-  const [paused, setPaused] = useState(false);
-  const [held, setHeld] = useState(false); // hover or focus inside
   const [visible, setVisible] = useState(true);
-  const still = useReducedMotion();
   const root = useRef<HTMLDivElement>(null);
   const touchX = useRef<number | null>(null);
-  const playing = !still && !paused && !held && visible;
+  const playing = visible;
   const go = (n: number) => setActive((n + 3) % 3);
 
   useEffect(() => {
@@ -65,10 +56,6 @@ export function LandingHero() {
       aria-roledescription="carousel"
       aria-label={t("landing.slides")}
       className="flex w-full flex-col items-center gap-6 lg:gap-7"
-      onMouseEnter={() => setHeld(true)}
-      onMouseLeave={() => setHeld(false)}
-      onFocus={() => setHeld(true)}
-      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setHeld(false)}
       onKeyDown={(e) => {
         if (e.key === "ArrowRight") go(active + 1);
         if (e.key === "ArrowLeft") go(active - 1);
@@ -76,7 +63,7 @@ export function LandingHero() {
     >
       <div
         aria-live={playing ? "off" : "polite"}
-        className="flex min-h-[250px] w-full touch-pan-y items-center justify-center gap-2.5 py-6 lg:min-h-90 lg:max-w-336 lg:gap-6"
+        className="hero-panel-track relative min-h-[270px] w-full touch-pan-y lg:min-h-90 lg:max-w-336"
         onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
         onTouchEnd={(e) => {
           if (touchX.current === null) return;
@@ -85,9 +72,7 @@ export function LandingHero() {
           touchX.current = null;
         }}
       >
-        <Panel cat={(active + 2) % 3} side="left" />
-        <Panel cat={active} big />
-        <Panel cat={(active + 1) % 3} side="right" />
+        {CATS.map((cat) => <Panel key={cat} cat={cat} big={cat === active} side={cat === (active + 2) % 3 ? "left" : "right"} />) }
       </div>
       <div className="flex w-full max-w-[350px] gap-2 lg:max-w-125">
         {CATS.map((c) => (
@@ -102,15 +87,7 @@ export function LandingHero() {
           </button>
         ))}
       </div>
-      {!still && (
-        <button
-          type="button"
-          onClick={() => setPaused(!paused)}
-          className="min-h-11 rounded-2xl px-2 text-xs leading-[1.4] font-semibold text-white focus-visible:outline-2 focus-visible:outline-white"
-        >
-          {t(paused ? "landing.play" : "landing.pause")}
-        </button>
-      )}
+
     </div>
   );
 }

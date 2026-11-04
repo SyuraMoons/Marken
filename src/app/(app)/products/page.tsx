@@ -1,23 +1,5 @@
-import { redirect } from "next/navigation";
-import { Suspense } from "react";
-import { ProductsView } from "@/components/products-view";
-import { getProducts } from "@/lib/data/products";
-import { getOwnerShop } from "@/lib/data/today";
-import { FreshOnNavigate } from "@/components/fresh-on-navigate";
+import { Placeholder } from "@/components/placeholder";
 
-// Products grid + add/check/edit/delete flows (DX-07, DX-09, DX-27).
 export default function ProductsPage() {
-  return (
-    <FreshOnNavigate>
-      <Suspense fallback={<div className="h-64 animate-pulse rounded-card bg-white" />}>
-        <Products />
-      </Suspense>
-    </FreshOnNavigate>
-  );
-}
-
-async function Products() {
-  const owner = await getOwnerShop();
-  if (!owner) redirect("/login");
-  return <ProductsView shopId={owner.shop.id} products={await getProducts(owner.shop.id)} />;
+  return <Placeholder title="Products" refs="F-04, F-09 · products and studio photos" />;
 }

@@ -13,16 +13,15 @@ export type PostStatus = (typeof POST_STATUSES)[number];
 
 const TRANSITIONS: Record<PostStatus, readonly PostStatus[]> = {
   generating: ["ready", "failed"],
-  ready: ["approved", "skipped"],
+  ready: ["approved", "skipped", "generating"],
   approved: ["publishing"],
   publishing: ["published", "failed"],
   published: [],
-  failed: ["generating", "approved"],
+  failed: ["generating", "publishing"],
   skipped: [],
 };
 
 export function canTransition(from: PostStatus, to: PostStatus): boolean {
-  // Mirrors private.enforce_post_status(). A failed post may only return to approved
-  // (retry publish) if it had been approved before; callers check approved_at.
+  // A failed post may only retry publishing if it had been approved; callers check that.
   return TRANSITIONS[from].includes(to);
 }

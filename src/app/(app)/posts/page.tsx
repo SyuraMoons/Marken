@@ -3,14 +3,17 @@ import { Suspense } from "react";
 import { PostFeed } from "@/components/post-feed";
 import { shopToday } from "@/lib/api/owner";
 import { getOwnerShop, getPostHistory } from "@/lib/data/today";
+import { FreshOnNavigate } from "@/components/fresh-on-navigate";
 
 // History: every post Marken generated for the active shop as a feed plus a post calendar, so a post stays
 // reachable after a newer run. Each card or calendar day opens the post on Today (?post=).
 export default function PostsPage({ searchParams }: PageProps<"/posts">) {
   return (
-    <Suspense fallback={<div className="aspect-[4/5] max-w-120 animate-pulse rounded-card bg-white" />}>
-      <History searchParams={searchParams} />
-    </Suspense>
+    <FreshOnNavigate>
+      <Suspense fallback={<div className="aspect-[4/5] max-w-120 animate-pulse rounded-card bg-white" />}>
+        <History searchParams={searchParams} />
+      </Suspense>
+    </FreshOnNavigate>
   );
 }
 

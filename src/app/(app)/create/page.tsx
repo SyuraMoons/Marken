@@ -4,13 +4,16 @@ import { CreateFlow } from "@/components/create-flow";
 import { getBrandKit } from "@/lib/data/brand-kit";
 import { getProducts } from "@/lib/data/products";
 import { getOwnerShop } from "@/lib/data/today";
+import { FreshOnNavigate } from "@/components/fresh-on-navigate";
 
 // Generate image post: brief → brand kit → review, and only then the job starts (FD-46).
 export default function CreatePage({ searchParams }: PageProps<"/create">) {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-card bg-white" />}>
-      <Create searchParams={searchParams} />
-    </Suspense>
+    <FreshOnNavigate>
+      <Suspense fallback={<div className="h-64 animate-pulse rounded-card bg-white" />}>
+        <Create searchParams={searchParams} />
+      </Suspense>
+    </FreshOnNavigate>
   );
 }
 

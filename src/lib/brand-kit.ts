@@ -51,15 +51,6 @@ export const MAX_BRIEF = 600;
 export const BRIEF_GOALS = ["launch", "bestseller", "event", "everyday"] as const;
 export type BriefGoal = (typeof BRIEF_GOALS)[number];
 
-/** A brief Marken drafts from the shop and product, so first-time owners never start from an empty box. */
-export const DraftedBrief = z.object({
-  goal: z.enum(BRIEF_GOALS).catch("everyday"),
-  audience: z.string().trim().min(1).max(160),
-  mood: z.string().trim().min(1).max(100),
-  highlight: z.string().trim().min(1).max(200),
-});
-export type DraftedBrief = z.infer<typeof DraftedBrief>;
-
 /** Three brand directions drafted from the owner's brief, shown as cards before a post is generated. */
 export const BrandDirections = z.object({
   directions: z

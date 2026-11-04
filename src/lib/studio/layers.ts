@@ -18,6 +18,16 @@ export const FONTS = {
   poppins: { label: "Poppins", file: "Poppins-Regular.ttf", family: "Poppins" },
   bebas: { label: "Bebas Neue", file: "BebasNeue-Regular.ttf", family: "Bebas Neue" },
   "dm-serif": { label: "DM Serif Display", file: "DMSerifDisplay-Regular.ttf", family: "DM Serif Display" },
+  "montserrat-bold": { label: "Montserrat Bold", file: "Montserrat-Bold.ttf", family: "Montserrat Bold" },
+  montserrat: { label: "Montserrat", file: "Montserrat-Regular.ttf", family: "Montserrat" },
+  "space-grotesk-bold": { label: "Space Grotesk Bold", file: "SpaceGrotesk-Bold.ttf", family: "Space Grotesk Bold" },
+  "space-grotesk": { label: "Space Grotesk", file: "SpaceGrotesk-Regular.ttf", family: "Space Grotesk" },
+  "science-gothic": { label: "Science Gothic", file: "ScienceGothic-Regular.ttf", family: "Science Gothic" },
+  forum: { label: "Forum", file: "Forum-Regular.ttf", family: "Forum" },
+  italiana: { label: "Italiana", file: "Italiana-Regular.ttf", family: "Italiana" },
+  cambo: { label: "Cambo", file: "Cambo-Regular.ttf", family: "Cambo" },
+  "cherry-cream-soda": { label: "Cherry Cream Soda", file: "CherryCreamSoda-Regular.ttf", family: "Cherry Cream Soda" },
+  amethysta: { label: "Amethysta", file: "Amethysta-Regular.ttf", family: "Amethysta" },
 } as const;
 export type FontId = keyof typeof FONTS;
 export const FONT_IDS = Object.keys(FONTS) as [FontId, ...FontId[]];
@@ -48,11 +58,15 @@ export const TEMPLATE_IDS = [
   "color-block",
   "pedestal-hero",
   "tilted-hero",
+  "offset-editorial",
+  "tech-hero",
+  "macro-detail",
 ] as const;
 export type TemplateId = (typeof TEMPLATE_IDS)[number];
 
 /** Template graphics (cards, banners) drawn between the scene and the text, so edits redraw them too. */
-export type SlideBackground = { template: TemplateId; dominant: string; accent: string };
+/** `cta: true` means the template draws its CTA pill (tech-hero, product-poster). */
+export type SlideBackground = { template: TemplateId; dominant: string; accent: string; cta?: boolean };
 
 /** Everything needed to rebuild a slide without a model call (except a new scene). */
 export type SlideLayers = {
@@ -89,7 +103,9 @@ export const SlideLayersSchema = z.object({
   sceneBrief: z.string().max(2000),
   product: z.object({ box: BoxSchema }),
   text: z.array(TextLayerSchema).max(6),
-  background: z.object({ template: z.enum(TEMPLATE_IDS), dominant: HexSchema, accent: HexSchema }).optional(),
+  background: z
+    .object({ template: z.enum(TEMPLATE_IDS), dominant: HexSchema, accent: HexSchema, cta: z.boolean().optional() })
+    .optional(),
 });
 
 /** Brand kit values the layers read (colours, fonts). All optional: a shop may have none. */
@@ -103,7 +119,22 @@ export function defaultTextBox(role: "hook" | "product" | "cta" | undefined): Bo
 }
 
 // Average glyph width per font, in em. Satori has no text measuring, so size is estimated, then stored on the layer.
-const EM_WIDTH: Record<FontId, number> = { "poppins-bold": 0.62, poppins: 0.58, bebas: 0.42, "dm-serif": 0.52 };
+const EM_WIDTH: Record<FontId, number> = {
+  "poppins-bold": 0.62,
+  poppins: 0.58,
+  bebas: 0.42,
+  "dm-serif": 0.52,
+  "montserrat-bold": 0.64,
+  montserrat: 0.58,
+  "space-grotesk-bold": 0.63,
+  "space-grotesk": 0.59,
+  "science-gothic": 0.56,
+  forum: 0.50,
+  italiana: 0.48,
+  cambo: 0.52,
+  "cherry-cream-soda": 0.60,
+  amethysta: 0.54,
+};
 const LINE_HEIGHT = 1.12;
 export const textLineHeight = LINE_HEIGHT;
 

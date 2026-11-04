@@ -4,13 +4,16 @@ import { SettingsView } from "@/components/settings-view";
 import { getBrandKit } from "@/lib/data/brand-kit";
 import { getOwnerShop } from "@/lib/data/today";
 import { createClient } from "@/lib/supabase/server";
+import { FreshOnNavigate } from "@/components/fresh-on-navigate";
 
 // Settings rows + sub-views (F-15, DX-06, DX-27).
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<div className="h-64 max-w-xl animate-pulse rounded-card bg-white" />}>
-      <Settings />
-    </Suspense>
+    <FreshOnNavigate>
+      <Suspense fallback={<div className="h-64 max-w-xl animate-pulse rounded-card bg-white" />}>
+        <Settings />
+      </Suspense>
+    </FreshOnNavigate>
   );
 }
 

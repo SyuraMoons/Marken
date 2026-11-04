@@ -142,6 +142,8 @@ export type HistoryItem = {
   createdAt: string;
   productName: string | null;
   caption: string;
+  hashtags: string[];
+  slideCount: number;
   thumb: string | null;
   /** Signed attachment URLs, only when every slide passed the product check (FR-FD-01). */
   downloads: string[];
@@ -149,24 +151,25 @@ export type HistoryItem = {
 };
 
 // Every post the active shop ever generated, newest first, so nothing is lost when a newer run
-// replaces it on Today. Only slide 1 is signed, as the thumbnail.
+// replaces it on Today. Only slide 1 is signed, as the thumbnail, and only when every slide passed the product check
+// (the detail view shows no slides otherwise, FR-FD-01).
 export async function getPostHistory(limit = 60): Promise<HistoryItem[] | null> {
   const owner = await getOwnerShop();
   if (!owner) return null;
   const supabase = await createClient();
   const { data } = await supabase
     .from("posts")
-    .select("id, status, post_date, created_at, approved_at, slides, chosen_caption, caption_options, products(name)")
+    .select("id, status, post_date, created_at, approved_at, slides, chosen_caption, caption_options, hashtags, products(name)")
     .eq("shop_id", owner.shop.id)
     .order("created_at", { ascending: false })
     .limit(limit);
   const rows = data ?? [];
-  const first = rows.map((r) => asSlides(r.slides)[0]?.slide_path ?? "");
-  const savable = rows.map((r) => {
+  const passed = rows.map((r) => {
     const slides = asSlides(r.slides);
     return allSlidesPassed(slides) ? slides.map((s) => s.slide_path) : [];
   });
-  const [signed, files] = await Promise.all([sign(first), sign(savable.flat(), true)]);
+  const first = passed.map((paths) => paths[0] ?? "");
+  const [signed, files] = await Promise.all([sign(first), sign(passed.flat(), true)]);
   return rows.map((r, i) => {
     return {
       id: r.id,
@@ -175,8 +178,10 @@ export async function getPostHistory(limit = 60): Promise<HistoryItem[] | null> 
       createdAt: r.created_at,
       productName: r.products?.name ?? null,
       caption: r.chosen_caption ?? asCaptions(r.caption_options)[0] ?? "",
+      hashtags: r.hashtags ?? [],
+      slideCount: asSlides(r.slides).length,
       thumb: signed.get(first[i]) ?? null,
-      downloads: savable[i].map((p) => files.get(p) ?? ""),
+      downloads: passed[i].map((p) => files.get(p) ?? ""),
       canDelete: canDeletePost(r, Boolean(owner.shop.ig_account_id)),
     };
   });

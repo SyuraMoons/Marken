@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { t, type MessageKey } from "@/lib/i18n";
 import { Sprite } from "./sprite";
 
@@ -27,12 +28,15 @@ function Panel({ cat, big, side }: { cat: number; big?: boolean; side?: "left" |
 }
 
 // Hero product slider (228:16197, 245:2147..4464): 3 example states, autoplay, swipe and keyboard controls.
+// Autoplay stops for reduced-motion users (OS or Settings) and holds while the pointer or focus is inside (WCAG 2.2.2).
 export function LandingHero() {
   const [active, setActive] = useState(1);
+  const [held, setHeld] = useState(false);
   const [visible, setVisible] = useState(true);
+  const still = useReducedMotion();
   const root = useRef<HTMLDivElement>(null);
   const touchX = useRef<number | null>(null);
-  const playing = visible;
+  const playing = !still && !held && visible;
   const go = (n: number) => setActive((n + 3) % 3);
 
   useEffect(() => {
@@ -56,6 +60,10 @@ export function LandingHero() {
       aria-roledescription="carousel"
       aria-label={t("landing.slides")}
       className="flex w-full flex-col items-center gap-6 lg:gap-7"
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setHeld(false)}
       onKeyDown={(e) => {
         if (e.key === "ArrowRight") go(active + 1);
         if (e.key === "ArrowLeft") go(active - 1);
@@ -72,7 +80,9 @@ export function LandingHero() {
           touchX.current = null;
         }}
       >
-        {CATS.map((cat) => <Panel key={cat} cat={cat} big={cat === active} side={cat === (active + 2) % 3 ? "left" : "right"} />) }
+        {CATS.map((cat) => (
+          <Panel key={cat} cat={cat} big={cat === active} side={cat === (active + 2) % 3 ? "left" : "right"} />
+        ))}
       </div>
       <div className="flex w-full max-w-[350px] gap-2 lg:max-w-125">
         {CATS.map((c) => (
@@ -87,7 +97,6 @@ export function LandingHero() {
           </button>
         ))}
       </div>
-
     </div>
   );
 }

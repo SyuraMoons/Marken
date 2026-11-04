@@ -9,6 +9,7 @@ import { SlideEditor } from "./slide-editor";
 import { StatusScreen } from "./status-screen";
 import { t } from "@/lib/i18n";
 import type { Slide } from "@/lib/posts/slides";
+import { fromParam } from "@/lib/posts/back";
 
 const POLL_MS = 3000;
 const GIVE_UP_MS = 60_000;
@@ -16,7 +17,8 @@ const MAX_REWRITES = 5;
 const field = "glass rounded-card p-3.5 text-base leading-[1.4] text-ink placeholder:text-muted focus:outline-2 focus:outline-blue";
 
 // Edit the caption (228:10507, F-11, FR-ED-01/02). The edited caption goes to "Publish this post?" and is sent with Approve.
-export function CaptionEditor({ postId, slides, captions, initial = 0, product }: { postId: string; slides: Slide[]; captions: string[]; initial?: number; product?: string }) {
+export function CaptionEditor({ postId, slides, captions, initial = 0, product, from = null }: { postId: string; slides: Slide[]; captions: string[]; initial?: number; product?: string; from?: string | null }) {
+  const back = `/today?post=${postId}${fromParam(from)}`;
   const router = useRouter();
   const [text, setText] = useState(captions[initial] ?? captions[0] ?? "");
   const [feedback, setFeedback] = useState("");
@@ -111,7 +113,7 @@ export function CaptionEditor({ postId, slides, captions, initial = 0, product }
         {t("edit.rewrite")}
       </Button>
       {text.trim() ? (
-        <ButtonLink href={`/today?post=${postId}&caption=${encodeURIComponent(text.trim())}`} variant="secondary">
+        <ButtonLink href={`${back}&caption=${encodeURIComponent(text.trim())}`} variant="secondary">
           {t("edit.save")}
         </ButtonLink>
       ) : (
@@ -123,7 +125,7 @@ export function CaptionEditor({ postId, slides, captions, initial = 0, product }
       <Button variant="secondary" onClick={() => setScene(true)}>
         {t("edit.slides")}
       </Button>
-      <ButtonLink href={`/today?post=${postId}`} variant="text">
+      <ButtonLink href={back} variant="text">
         {t("edit.cancel")}
       </ButtonLink>
     </StatusScreen>

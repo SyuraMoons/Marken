@@ -18,13 +18,18 @@ import { getTodayData } from "@/lib/data/today";
 
 type TodayData = Extract<NonNullable<Awaited<ReturnType<typeof getTodayData>>>, { missing: false }>;
 import { allSlidesPassed } from "@/lib/posts/slides";
+import { backTarget } from "@/lib/posts/back";
+import { FreshOnNavigate } from "@/components/fresh-on-navigate";
 
-// Today (F-10, FR-TD-01..04, FR-FD-03, F-24). One screen per post status; ?view= opens the post's sub-pages (Figma page 01).
+// Today (F-10, FR-TD-01..04, FR-FD-03, F-24): today's latest post (Figma page 01). ?post=<id> opens an earlier
+// post from History's feed or calendar, and ?view= its sub-pages.
 export default function TodayPage({ searchParams }: PageProps<"/today">) {
   return (
-    <Suspense fallback={<div className="aspect-[4/5] max-w-120 animate-pulse rounded-card bg-white" />}>
-      <Today searchParams={searchParams} />
-    </Suspense>
+    <FreshOnNavigate>
+      <Suspense fallback={<div className="aspect-[4/5] max-w-120 animate-pulse rounded-card bg-white" />}>
+        <Today searchParams={searchParams} />
+      </Suspense>
+    </FreshOnNavigate>
   );
 }
 
@@ -34,12 +39,13 @@ async function Today({ searchParams }: Pick<PageProps<"/today">, "searchParams">
   const data = await getTodayData(typeof q.post === "string" ? q.post : undefined);
   if (!data) redirect("/login");
   if (data.missing) notFound();
+  const from = backTarget(q.from);
   return (
     <>
       {data.post && typeof q.post === "string" && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-control bg-powder px-4 py-3 text-sm">
-          <ButtonLink href="/posts" variant="text" className="w-auto! font-semibold!">
-            {t("history.back")}
+          <ButtonLink href={from ?? "/posts"} variant="text" className="w-auto! font-semibold!">
+            {from ? t("today.backToCreate") : t("history.back")}
           </ButtonLink>
           <span className="text-muted">{t("history.from", { date: formatDay(data.post.post_date) })}</span>
         </div>
@@ -57,7 +63,8 @@ function TodayView({ q, data }: { q: Awaited<PageProps<"/today">["searchParams"]
   const { shop, post, steps, calls } = data;
   // Links to this screen keep the open post, so a post from History stays open through share, download and compare.
   const today = (extra: Record<string, string> = {}) => {
-    const params = new URLSearchParams({ ...(post && q.post ? { post: post.id } : {}), ...extra });
+    const from = backTarget(q.from);
+    const params = new URLSearchParams({ ...(post && q.post ? { post: post.id } : {}), ...(post && q.post && from ? { from } : {}), ...extra });
     return params.size ? `/today?${params}` : "/today";
   };
   const back = (
@@ -185,7 +192,7 @@ function TodayView({ q, data }: { q: Awaited<PageProps<"/today">["searchParams"]
           <ActivityPanel steps={steps} calls={calls} />
         </section>
 
-        <ReviewPanel postId={post.id} scoped={Boolean(q.post)} captions={[...new Set([caption, ...captions].filter(Boolean))]} hashtags={post.hashtags} canSkip={post.status === "ready"}>
+        <ReviewPanel postId={post.id} scoped={Boolean(q.post)} from={q.post ? backTarget(q.from) : null} captions={[...new Set([caption, ...captions].filter(Boolean))]} hashtags={post.hashtags} canSkip={post.status === "ready"}>
           <section className="flex flex-col gap-3 max-lg:glass max-lg:rounded-card max-lg:px-5 max-lg:py-6 lg:py-6">
             {/* eslint-disable-next-line @next/next/no-img-element -- static design illustration */}
             <img src="/figma/vector-research.svg" width={78} height={50} alt="" />

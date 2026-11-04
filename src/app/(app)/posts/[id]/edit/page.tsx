@@ -5,20 +5,24 @@ import { CaptionEditor } from "@/components/caption-editor";
 import { getOwnedPost } from "@/lib/api/owner";
 import { signPath } from "@/lib/data/today";
 import { asSlides } from "@/lib/posts/slides";
+import { backTarget } from "@/lib/posts/back";
 import { createClient } from "@/lib/supabase/server";
+import { FreshOnNavigate } from "@/components/fresh-on-navigate";
 
 // Edit caption (F-11, FR-ED-01/02). Only a ready post can be edited.
 export default function EditPostPage({ params, searchParams }: PageProps<"/posts/[id]/edit">) {
   return (
-    <Suspense fallback={<div className="aspect-[4/5] max-w-120 animate-pulse rounded-card bg-white" />}>
-      <Edit params={params} searchParams={searchParams} />
-    </Suspense>
+    <FreshOnNavigate>
+      <Suspense fallback={<div className="aspect-[4/5] max-w-120 animate-pulse rounded-card bg-white" />}>
+        <Edit params={params} searchParams={searchParams} />
+      </Suspense>
+    </FreshOnNavigate>
   );
 }
 
 async function Edit({ params, searchParams }: Pick<PageProps<"/posts/[id]/edit">, "params" | "searchParams">) {
   const { id } = await params;
-  const { c } = await searchParams;
+  const { c, from } = await searchParams;
   const guard = await getOwnedPost(id);
   if (!guard.ok || guard.value.status !== "ready") notFound();
   const post = guard.value;
@@ -29,5 +33,5 @@ async function Edit({ params, searchParams }: Pick<PageProps<"/posts/[id]/edit">
   const pick = Number(c);
   const initial = Number.isInteger(pick) && captions[pick] ? pick : 0;
   const product = post.product_id ? (await (await createClient()).from("products").select("name").eq("id", post.product_id).maybeSingle()).data : null;
-  return <CaptionEditor postId={post.id} slides={slides} captions={captions} initial={initial} product={product?.name} />;
+  return <CaptionEditor postId={post.id} slides={slides} captions={captions} initial={initial} product={product?.name} from={backTarget(from)} />;
 }

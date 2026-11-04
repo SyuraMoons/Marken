@@ -34,6 +34,8 @@ import {
 } from "./fidelity";
 import { defaultTextBox, defaultTextLayer, type BrandStyle, type SlideLayers } from "./layers";
 import { pickTextColor, renderLayeredSlide } from "./render";
+import { extractProductPalette } from "./palette";
+import { applyTemplateLayout, TEMPLATES_WITH_TEXT_ON_SHAPE, type TemplateId } from "./templates";
 import {
   buildScenePrompt,
   clampReservedBox,
@@ -88,6 +90,10 @@ export type RenderAndVerifySlideInput = {
   slideRole?: "hook" | "product" | "cta";
   /** Optional visual style guidance */
   visualStyle?: string;
+  headline?: string;
+  subline?: string;
+  bigWord?: string;
+  templateId?: TemplateId;
   /** Confirmed transparent RGBA product cutout buffer, Uint8Array, or data URL */
   cutout: Buffer | Uint8Array | string;
   /** Optional custom reserved box on the 1080x1350 canvas */
@@ -190,6 +196,46 @@ export async function renderAndVerifySlide(
       : 1;
   const maxAttempts = 1 + maxRetries;
 
+  const cutoutBuf = Buffer.isBuffer(input.cutout)
+    ? input.cutout
+    : typeof input.cutout === "string"
+    ? Buffer.from(input.cutout.replace(/^data:image\/[a-z+]+;base64,/, ""), "base64")
+    : Buffer.from(input.cutout);
+
+  // Layout first: the template decides where the product goes, and that same box is the
+  // area Muse Image must leave empty (FR-CG-04). Product slides default to a layout with text.
+  const chosenTemplate: TemplateId | undefined = input.templateId ?? (
+    input.slideRole === "hook" ? "product-poster" :
+    input.slideRole === "product" ? "pedestal-hero" :
+    input.slideRole === "cta" ? "product-with-name" : undefined
+  );
+  let templateLayers: SlideLayers | null = null;
+  if (chosenTemplate) {
+    const productPalette = await extractProductPalette(cutoutBuf);
+    // Brand kit colours (SRD A-09) win over colours read from the product.
+    const brandColors = (input.brand?.colors ?? []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c));
+    const palette = {
+      ...productPalette,
+      dominant: brandColors[0] ?? productPalette.dominant,
+      accent: brandColors[1] ?? productPalette.accent,
+    };
+    const headline = input.headline?.trim() || input.slideText?.trim() || "";
+    const text = input.slideText?.trim();
+    templateLayers = applyTemplateLayout({
+      templateId: chosenTemplate,
+      sceneBrief: input.sceneBrief.trim(),
+      headline,
+      subline: input.subline?.trim(),
+      // The call to action slide keeps its action line when the headline is something else.
+      cta: input.slideRole === "cta" && text && text !== headline ? text : undefined,
+      bigWord: input.bigWord?.trim(),
+      palette,
+      productBox: input.reservedBox,
+      fontHeading: input.brand?.headingFont ?? undefined,
+      fontBody: input.brand?.bodyFont ?? undefined,
+    });
+  }
+
   const allTelemetry: ModelCallTelemetry[] = [];
   let lastScene!: GenerateSlideSceneResult;
   let lastComposite!: CompositeProductSlideResult;
@@ -211,35 +257,51 @@ export async function renderAndVerifySlide(
       slideText: "",
       slideRole: input.slideRole,
       visualStyle: input.visualStyle,
-      reservedBox: input.reservedBox,
+      reservedBox: templateLayers?.product.box ?? input.reservedBox,
       step: isRetry ? "regenerate_image" : "render_image",
       shopId: input.shopId,
       postId: input.postId,
     });
     allTelemetry.push(lastScene.telemetry);
 
-    // Step 2: Layers. Text is drawn by code in a readable brand colour; the product goes last (`FR-CG-09`).
-    const textBox = defaultTextBox(input.slideRole);
-    const textColor = await pickTextColor(lastScene.sceneBuffer, textBox, input.brand?.colors);
-    const inset = Math.round(lastScene.reservedBox.width * 0.06);
-    const insetY = Math.round(lastScene.reservedBox.height * 0.06);
-    lastLayers = {
-      sceneBrief: input.sceneBrief.trim(),
-      product: {
-        box: {
-          x: lastScene.reservedBox.x + inset,
-          y: lastScene.reservedBox.y + insetY,
-          width: lastScene.reservedBox.width - inset * 2,
-          height: lastScene.reservedBox.height - insetY * 2,
+    // Step 2: Layers. Text is drawn by code; the product goes last (`FR-CG-09`).
+    if (templateLayers && chosenTemplate) {
+      const scene = lastScene.sceneBuffer;
+      const brandColors = input.brand?.colors ?? [];
+      // Text on a template card or banner keeps the template colour. Text on the scene itself
+      // gets a colour that reads against it; the decorative big word stays the accent.
+      const text = TEMPLATES_WITH_TEXT_ON_SHAPE.has(chosenTemplate)
+        ? templateLayers.text
+        : await Promise.all(
+            templateLayers.text.map(async (t) =>
+              t.id === "big-type-behind" ? t : { ...t, color: await pickTextColor(scene, t.box, [...brandColors, t.color]) },
+            ),
+          );
+      lastLayers = { ...templateLayers, product: { box: lastScene.reservedBox }, text };
+    } else {
+      const textBox = defaultTextBox(input.slideRole);
+      const textColor = await pickTextColor(lastScene.sceneBuffer, textBox, input.brand?.colors);
+      const inset = Math.round(lastScene.reservedBox.width * 0.06);
+      const insetY = Math.round(lastScene.reservedBox.height * 0.06);
+      lastLayers = {
+        sceneBrief: input.sceneBrief.trim(),
+        product: {
+          box: {
+            x: lastScene.reservedBox.x + inset,
+            y: lastScene.reservedBox.y + insetY,
+            width: lastScene.reservedBox.width - inset * 2,
+            height: lastScene.reservedBox.height - insetY * 2,
+          },
         },
-      },
-      text: input.slideText?.trim()
-        ? [defaultTextLayer({ role: input.slideRole, text: input.slideText.trim(), color: textColor, brand: input.brand })]
-        : [],
-    };
+        text: input.slideText?.trim()
+          ? [defaultTextLayer({ role: input.slideRole, text: input.slideText.trim(), color: textColor, brand: input.brand })]
+          : [],
+      };
+    }
+
     const rendered = await renderLayeredSlide({
       scene: lastScene.sceneBuffer,
-      cutout: Buffer.isBuffer(input.cutout) ? input.cutout : typeof input.cutout === "string" ? Buffer.from(input.cutout.replace(/^data:image\/[a-z+]+;base64,/, ""), "base64") : Buffer.from(input.cutout),
+      cutout: cutoutBuf,
       layers: lastLayers,
       shadow: input.shadow,
     });
@@ -263,7 +325,8 @@ export async function renderAndVerifySlide(
       slide: lastComposite.slideBuffer,
       scaledCutout: lastComposite.scaledCutoutBuffer,
       placedBox: lastComposite.placedBox,
-      slideText: input.slideText ?? "",
+      // Check the words actually drawn on the slide (headline, subline, big word, CTA).
+      slideText: lastLayers.text.map((t) => t.text.trim()).filter(Boolean).join(" "),
       shopTone: input.shopTone,
       styleRules: input.styleRules,
       contentLanguage: input.contentLanguage,

@@ -104,38 +104,55 @@ export function ResultsView() {
     );
   }
 
-  // Post results (228:14416 / 228:14490).
+  // Post results, styled after the landing page "05 / Results" demo (demo-scene.tsx feature 5):
+  // a results window with three metric tiles, plus a floating "↗" card that opens post performance.
+  const metrics = [
+    ["results.reach", "results.reachNote"],
+    ["results.saves", "results.savesNote"],
+    ["results.orders", "results.ordersNoteShort"],
+  ] as const;
   return (
     <div className="flex flex-col gap-6 lg:gap-7">
-      <PageHeader eyebrow={t("results.eyebrow")} title={t("results.title")} body={t("results.body")}>
+      <PageHeader eyebrow={t("results.eyebrow")} title={t("results.title")} body={t("results.body")} />
+      <section className="overflow-hidden rounded-card border border-border bg-white leading-[1.4] shadow-[0_24px_48px_rgb(33_61_140/0.13)]">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3 lg:px-6">
+          <h2 className="text-[15px] font-semibold">{t("nav.results")}</h2>
+          <button
+            type="button"
+            onClick={() => start(() => router.refresh())}
+            className="flex min-h-11 items-center text-sm font-medium text-muted hover:text-navy hover:underline focus-visible:outline-2 focus-visible:outline-blue"
+          >
+            {t("results.refresh")}
+          </button>
+        </div>
+        <div className="grid gap-3 p-5 sm:grid-cols-3 lg:gap-4 lg:p-6">
+          {metrics.map(([label, note]) => (
+            <div key={label} className="flex flex-col gap-1.5 rounded-control bg-surface p-4 lg:p-5">
+              <span className="text-sm text-muted">{t(label)}</span>
+              {/* No metrics backend yet: always "—", never an invented number. */}
+              <b className="text-3xl font-semibold text-ink">—</b>
+              <span className="text-[13px] text-muted">{t(note)}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-col gap-1 border-t border-border px-5 py-4 lg:px-6">
+          <p className="text-[15px] font-semibold">{t("results.emptyTitle")}</p>
+          <p className="text-sm text-muted">{t("results.emptyBody")}</p>
+        </div>
+      </section>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
         <button
           type="button"
-          onClick={() => start(() => router.refresh())}
-          className="relative flex min-h-11 items-center self-start text-sm font-medium text-navy hover:underline focus-visible:outline-2 focus-visible:outline-blue"
+          onClick={() => setView("detail")}
+          className="flex items-center gap-4 rounded-card bg-white p-4 text-left shadow-[0_18px_30px_rgb(33_61_140/0.15)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-blue lg:max-w-md"
         >
-          {t("results.refresh")}
+          <span aria-hidden="true" className="text-3xl text-blue">↗</span>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[15px] font-semibold">{t("results.viewPost")}</span>
+            <span className="text-[13px] text-muted">{t("results.detailBody")}</span>
+          </span>
         </button>
-      </PageHeader>
-      <div className="grid gap-6 lg:grid-cols-3 lg:gap-5">
-        <InfoCard vector="research" title={t("results.reach")}>
-          <span className="whitespace-pre-wrap">{t("results.none")}</span>
-        </InfoCard>
-        <InfoCard vector="heart" title={t("results.engagement")}>
-          <span className="whitespace-pre-wrap">{t("results.none")}</span>
-        </InfoCard>
-        <InfoCard vector="orders" title={t("results.orders")}>
-          <span className="whitespace-pre-wrap">{t("results.none")}</span>
-        </InfoCard>
-      </div>
-      <section className="glass flex flex-col gap-3 rounded-card p-5 leading-[1.4] lg:p-6">
-        {/* eslint-disable-next-line @next/next/no-img-element -- static design illustration */}
-        <img src="/figma/vector-clock.svg" width={78} height={50} alt="" />
-        <h2 className="text-lg font-semibold">{t("results.emptyTitle")}</h2>
-        <p className="text-[15px] text-muted">{t("results.emptyBody")}</p>
-        <div className="flex flex-col gap-3 lg:flex-row lg:gap-4 lg:[&>*]:w-60">
-          <Button variant="secondary" onClick={() => setView("detail")}>
-            {t("results.viewPost")}
-          </Button>
+        <div className="flex flex-col gap-3 lg:flex-row lg:gap-4">
           <Button variant="secondary" onClick={() => setView("learning")}>
             {t("results.weekly")}
           </Button>
@@ -143,7 +160,7 @@ export function ResultsView() {
             {t("results.backToday")}
           </ButtonLink>
         </div>
-      </section>
+      </div>
     </div>
   );
 }

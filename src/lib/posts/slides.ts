@@ -9,7 +9,11 @@ export type Slide = {
   scene_path: string;
   slide_path: string;
   fidelity_score: number;
+  /** Product check (FR-FD-01). The only check that blocks Approve. */
   fidelity_passed: boolean;
+  /** Spelling and style rules (FR-FD-02). False shows a note on the slide; missing on older posts. */
+  text_passed?: boolean;
+  text_issues?: string[];
   /** Editable layers (SRD A-09). Slides made before A-09 have none and cannot be edited. */
   layers?: SlideLayers;
 };

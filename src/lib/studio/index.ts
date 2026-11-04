@@ -10,6 +10,7 @@ import {
   type CompositeProductSlideInput,
   type CompositeProductSlideResult,
   type DropShadowOptions,
+  type FramingMode,
   type PlacedProductBox,
 } from "./composite";
 import {
@@ -93,6 +94,11 @@ export type RenderAndVerifySlideInput = {
   headline?: string;
   subline?: string;
   bigWord?: string;
+  categoryTag?: string;
+  framingMode?: FramingMode;
+  cameraAngle?: string;
+  surfaceType?: string;
+  lightingStyle?: string;
   templateId?: TemplateId;
   /** Confirmed transparent RGBA product cutout buffer, Uint8Array, or data URL */
   cutout: Buffer | Uint8Array | string;
@@ -229,6 +235,7 @@ export async function renderAndVerifySlide(
       // The call to action slide keeps its action line when the headline is something else.
       cta: input.slideRole === "cta" && text && text !== headline ? text : undefined,
       bigWord: input.bigWord?.trim(),
+      categoryTag: input.categoryTag?.trim(),
       palette,
       productBox: input.reservedBox,
       fontHeading: input.brand?.headingFont ?? undefined,
@@ -257,6 +264,9 @@ export async function renderAndVerifySlide(
       slideText: "",
       slideRole: input.slideRole,
       visualStyle: input.visualStyle,
+      cameraAngle: input.cameraAngle,
+      surfaceType: input.surfaceType,
+      lightingStyle: input.lightingStyle,
       reservedBox: templateLayers?.product.box ?? input.reservedBox,
       step: isRetry ? "regenerate_image" : "render_image",
       shopId: input.shopId,
@@ -304,6 +314,7 @@ export async function renderAndVerifySlide(
       cutout: cutoutBuf,
       layers: lastLayers,
       shadow: input.shadow,
+      framingMode: input.framingMode,
     });
     // Store the tight placed box so later edits re-render the same size.
     lastLayers = {

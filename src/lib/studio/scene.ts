@@ -40,6 +40,12 @@ export type GenerateSlideSceneInput = {
   slideRole?: "hook" | "product" | "cta";
   /** Optional visual style guidance from the trend analysis */
   visualStyle?: string;
+  /** Specific camera perspective: top-down, low-angle hero, eye-level, macro */
+  cameraAngle?: string;
+  /** Realistic surface material: slate rock, weathered wood, matte marble, icy podium */
+  surfaceType?: string;
+  /** Directional lighting style: side rim-light, top-down daylight, soft studio glow */
+  lightingStyle?: string;
   /** Custom pixel bounding box reserved for the real product cutout */
   reservedBox?: Partial<ReservedBox>;
   /** Gateway step (`render_image` by default, or `regenerate_image` for P1 slide regen) */
@@ -114,10 +120,23 @@ export function buildScenePrompt(
     ? `Visual style: ${input.visualStyle.trim()}.`
     : "Commercial product photography in a luxury style, photorealism, 8K, soft studio-style lighting, uniform matte background.";
 
+  const cameraClause = input.cameraAngle?.trim()
+    ? `Camera perspective: ${input.cameraAngle.trim()}.`
+    : "";
+  const surfaceClause = input.surfaceType?.trim()
+    ? `Surface grounding: The product stage features a physical, realistic ${input.surfaceType.trim()} surface with natural texture and physical contact plane.`
+    : "";
+  const lightingClause = input.lightingStyle?.trim()
+    ? `Lighting: ${input.lightingStyle.trim()} with realistic ambient occlusion and directional shadows.`
+    : "";
+
   return [
     `Create a vertical 4:5 (1080x1350) Instagram commercial product background scene${roleLabel}.`,
     `Scene brief: ${input.sceneBrief.trim()}.`,
     styleClause,
+    cameraClause,
+    surfaceClause,
+    lightingClause,
     "Do not render any text, letters, numbers, logos or watermarks anywhere in the image. Slide text is added separately by code (SRD A-09), so keep the top and bottom bands calm and uncluttered.",
     `MANDATORY RESERVED EMPTY PRODUCT AREA: Leave the central zone x=${box.x}..${x2}, y=${box.y}..${y2} (${box.width}x${box.height}px) completely empty, clean, and unobstructed on top of the podium/surface so the real physical product cutout can be composited later.`,
     `CRITICAL RULE (FR-CG-04): NEVER draw, render, or hallucinate any product, bottle, jar, package, box, container, sunglasses, or merchandise in the reserved area or anywhere as the hero subject. Only generate the empty stage, podium, environmental textures, and atmospheric lighting.`,

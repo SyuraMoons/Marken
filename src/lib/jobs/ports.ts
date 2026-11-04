@@ -8,6 +8,7 @@ import { planDailyCarousel as agentPlanDailyCarousel } from "@/lib/agents/planne
 import { renderAndVerifySlide as studioRenderAndVerifySlide } from "@/lib/studio";
 import { regenerateCaptionFromFeedback as agentRegenerateCaption } from "@/lib/agents/caption";
 import type { BrandStyle, SlideLayers, TemplateId } from "@/lib/studio/layers";
+import type { FramingMode } from "@/lib/studio/composite";
 
 // The AI steps the jobs call (docs/TEAM.md §2).
 // Wired to the real modules:
@@ -61,6 +62,10 @@ export type CarouselSlide = {
   headline?: string;
   subline?: string;
   bigWord?: string;
+  categoryTag?: string;
+  framingMode?: FramingMode;
+  cameraAngle?: string;
+  surfaceType?: string;
   templateId?: TemplateId;
 };
 
@@ -90,6 +95,10 @@ export type RenderSlideInput = {
   headline?: string;
   subline?: string;
   bigWord?: string;
+  categoryTag?: string;
+  framingMode?: FramingMode;
+  cameraAngle?: string;
+  surfaceType?: string;
   templateId?: TemplateId;
   cutout?: Buffer;
   cutoutPath?: string | null;
@@ -283,6 +292,10 @@ export async function renderAndVerifySlide(input: RenderSlideInput): Promise<Ren
     headline: input.headline,
     subline: input.subline,
     bigWord: input.bigWord,
+    categoryTag: input.categoryTag,
+    framingMode: input.framingMode,
+    cameraAngle: input.cameraAngle,
+    surfaceType: input.surfaceType,
     templateId: input.templateId,
     cutout: cutoutBuffer,
     shopTone: input.shopTone,

@@ -1,5 +1,6 @@
-// Contemporary commercial poster templates (inspired by high-performance social creative like BLU).
-// Provides deterministic typography, color card blocks, and product positioning.
+// Contemporary commercial poster templates.
+// Provides deterministic typography, brand color integration, and dynamic product positioning.
+// STRICT RULE (Evaluation #1): NO opaque box background behind titles. Clean text directly on background.
 
 import {
   CANVAS_H,
@@ -20,7 +21,7 @@ export type { TemplateId } from "./layers";
 export type PostCategory = "product-highlight" | "product-poster" | "product-with-name";
 
 /** Templates whose headline sits on a drawn card or banner, so its colour is fixed by the template. */
-export const TEMPLATES_WITH_TEXT_ON_SHAPE: ReadonlySet<TemplateId> = new Set(["color-block", "product-poster", "tilted-hero"]);
+export const TEMPLATES_WITH_TEXT_ON_SHAPE: ReadonlySet<TemplateId> = new Set(["color-block", "tilted-hero"]);
 
 export type TemplateInput = {
   templateId: TemplateId;
@@ -29,6 +30,7 @@ export type TemplateInput = {
   subline?: string;
   cta?: string;
   bigWord?: string;
+  categoryTag?: string;
   palette: ProductPalette;
   productBox?: Partial<Box>;
   fontHeading?: FontId;
@@ -36,19 +38,19 @@ export type TemplateInput = {
 };
 
 /**
- * Creates SVG for background graphic shapes (cards, pills, blocks) matching the template style.
+ * Creates SVG for background graphic shapes.
+ * STRICT RULE: No rectangular card boxes behind the title text.
+ * Only renders a subtle rounded CTA pill at the bottom if a call to action is present.
  */
 export function buildTemplateBackgroundShapes(
   templateId: TemplateId,
   palette: Pick<ProductPalette, "dominant" | "accent">,
+  hasCta: boolean = false,
 ): Buffer | null {
-  if (templateId === "color-block" || templateId === "product-poster") {
-    // Large stylish rounded rectangular card in the upper portion of the canvas (BLU style)
+  if (templateId === "color-block") {
     const cardSvg = `
       <svg width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}" xmlns="http://www.w3.org/2000/svg">
-        <rect x="80" y="100" width="920" height="420" rx="40" fill="${palette.dominant}" />
-        <!-- Subtle accent border or inner glow -->
-        <rect x="82" y="102" width="916" height="416" rx="38" fill="none" stroke="${palette.accent}" stroke-width="3" opacity="0.4"/>
+        <rect x="70" y="80" width="940" height="380" rx="36" fill="${palette.dominant}" />
       </svg>
     `;
     return Buffer.from(cardSvg);
@@ -65,6 +67,23 @@ export function buildTemplateBackgroundShapes(
     return Buffer.from(bannerSvg);
   }
 
+  if (hasCta && (templateId === "tech-hero" || templateId === "product-poster")) {
+    // Elegant pill button at bottom strictly when a CTA is requested
+    const pillSvg = `
+      <svg width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="cta_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="${palette.dominant}" stop-opacity="0.95"/>
+            <stop offset="100%" stop-color="${palette.accent}" stop-opacity="0.95"/>
+          </linearGradient>
+        </defs>
+        <rect x="290" y="1195" width="500" height="74" rx="37" fill="url(#cta_grad)"/>
+        <rect x="291" y="1196" width="498" height="72" rx="36" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.35"/>
+      </svg>
+    `;
+    return Buffer.from(pillSvg);
+  }
+
   return null;
 }
 
@@ -79,34 +98,171 @@ export function templateBackground(templateId: TemplateId, palette: ProductPalet
 }
 
 export function applyTemplateLayout(input: TemplateInput): SlideLayers {
-  const { templateId, sceneBrief, headline, subline, cta, bigWord, palette } = input;
-  const fontH: FontId = input.fontHeading ?? (templateId === "big-type-behind" ? "bebas" : "poppins-bold");
-  const fontB: FontId = input.fontBody ?? "poppins";
+  const { templateId, sceneBrief, headline, subline, cta, bigWord, categoryTag, palette } = input;
+  const fontH: FontId = input.fontHeading ?? (templateId === "tech-hero" ? "space-grotesk-bold" : "montserrat-bold");
+  const fontB: FontId = input.fontBody ?? (templateId === "tech-hero" ? "montserrat" : "poppins");
 
   const textLayers: TextLayer[] = [];
 
-  // Default product box centred in the lower-middle half
+  // Default product box centered in lower-middle half
   let productBox: Box = {
     x: 240,
-    y: 350,
+    y: 380,
     width: 600,
-    height: 850,
+    height: 820,
   };
 
   switch (templateId) {
+    case "offset-editorial": {
+      // Inspired by Pepsi top-down / high-angle ad:
+      // Product anchored on left side, clean punchy typography top-left / left
+      const hBox: Box = { x: 80, y: 80, width: 720, height: 190 };
+      textLayers.push({
+        id: "headline",
+        role: "headline",
+        text: headline.toUpperCase(),
+        box: hBox,
+        font: fontH,
+        size: fitFontSize(headline.toUpperCase(), fontH, hBox, 92),
+        color: "#ffffff",
+        align: "left",
+      });
+
+      if (subline) {
+        const sBox: Box = { x: 80, y: 280, width: 700, height: 90 };
+        textLayers.push({
+          id: "subline",
+          role: "body",
+          text: subline.toUpperCase(),
+          box: sBox,
+          font: fontB,
+          size: fitFontSize(subline.toUpperCase(), fontB, sBox, 44),
+          color: palette.accent || "#e0e0e0",
+          align: "left",
+        });
+      }
+
+      if (cta) {
+        const cBox: Box = { x: 80, y: 1220, width: 920, height: 70 };
+        textLayers.push({
+          id: "cta",
+          role: "cta",
+          text: cta,
+          box: cBox,
+          font: "montserrat-bold",
+          size: fitFontSize(cta, "montserrat-bold", cBox, 34),
+          color: "#ffffff",
+          align: "left",
+        });
+      }
+
+      // Off-center product on lower left
+      productBox = { x: 70, y: 400, width: 560, height: 870 };
+      break;
+    }
+
+    case "tech-hero": {
+      // Inspired by Apple Watch Moskitao tech hero:
+      // Tag at top + Hero title + 1-sentence value prop + CTA pill button
+      const tagText = (categoryTag || "FEATURED").toUpperCase();
+      const tagBox: Box = { x: 100, y: 70, width: 880, height: 50 };
+      textLayers.push({
+        id: "tag",
+        role: "headline",
+        text: tagText,
+        box: tagBox,
+        font: "space-grotesk",
+        size: fitFontSize(tagText, "space-grotesk", tagBox, 32),
+        color: palette.accent || "#ff7a45",
+        align: "center",
+      });
+
+      const hBox: Box = { x: 90, y: 130, width: 900, height: 160 };
+      textLayers.push({
+        id: "headline",
+        role: "headline",
+        text: headline,
+        box: hBox,
+        font: fontH,
+        size: fitFontSize(headline, fontH, hBox, 86),
+        color: "#ffffff",
+        align: "center",
+      });
+
+      if (subline) {
+        const sBox: Box = { x: 120, y: 300, width: 840, height: 100 };
+        textLayers.push({
+          id: "subline",
+          role: "body",
+          text: subline,
+          box: sBox,
+          font: fontB,
+          size: fitFontSize(subline, fontB, sBox, 38),
+          color: "#d4d4d8",
+          align: "center",
+        });
+      }
+
+      if (cta && cta.trim()) {
+        const cBox: Box = { x: 300, y: 1200, width: 480, height: 64 };
+        textLayers.push({
+          id: "cta",
+          role: "cta",
+          text: cta.trim(),
+          box: cBox,
+          font: "montserrat-bold",
+          size: fitFontSize(cta.trim(), "montserrat-bold", cBox, 32),
+          color: "#ffffff",
+          align: "center",
+        });
+      }
+
+      productBox = { x: 220, y: 410, width: 640, height: 760 };
+      break;
+    }
+
+    case "macro-detail": {
+      // Close-up detail shot with clean minimal copy
+      const hBox: Box = { x: 80, y: 70, width: 920, height: 150 };
+      textLayers.push({
+        id: "headline",
+        role: "headline",
+        text: headline.toUpperCase(),
+        box: hBox,
+        font: fontH,
+        size: fitFontSize(headline.toUpperCase(), fontH, hBox, 80),
+        color: "#ffffff",
+        align: "center",
+      });
+
+      if (subline) {
+        const sBox: Box = { x: 80, y: 1230, width: 920, height: 60 };
+        textLayers.push({
+          id: "subline",
+          role: "body",
+          text: subline,
+          box: sBox,
+          font: fontB,
+          size: fitFontSize(subline, fontB, sBox, 34),
+          color: "#f4f4f5",
+          align: "center",
+        });
+      }
+
+      // Large macro crop box
+      productBox = { x: 140, y: 220, width: 800, height: 1000 };
+      break;
+    }
+
     case "product-highlight": {
-      // Category 1: Product Highlight (Text-Free Aesthetic)
-      // Pure product immersion interacting with the stylized luxury environment/podium.
-      // Strictly no overlaid text, no logos, no CTA.
-      productBox = { x: 220, y: 260, width: 640, height: 920 };
+      // Text-Free pure product immersion
+      productBox = { x: 200, y: 250, width: 680, height: 940 };
       break;
     }
 
     case "product-with-name": {
-      // Category 3: Product with Name (Minimalist Identification)
-      // Balanced layout stating strictly the identifying brand, collaboration, or model name.
-      // E.g. "MAISON MARGIELA - GENTLE MONSTER" or "HYDRO FLASK"
-      const brandOrName = (headline || bigWord || "BRAND PRODUCT").toUpperCase();
+      // Minimalist Identification (e.g. "HYDRO FLASK" or "PEPSI ZERO SUGAR")
+      const brandOrName = (headline || bigWord || "PRODUCT").toUpperCase();
       const nBox: Box = { x: 80, y: 80, width: 920, height: 90 };
       const chosenFont: FontId = input.fontHeading ?? "dm-serif";
       textLayers.push({
@@ -115,58 +271,58 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
         text: brandOrName,
         box: nBox,
         font: chosenFont,
-        size: fitFontSize(brandOrName, chosenFont, nBox, 54),
-        color: palette.darkNeutral,
+        size: fitFontSize(brandOrName, chosenFont, nBox, 56),
+        color: "#ffffff",
         align: "center",
       });
-      productBox = { x: 250, y: 280, width: 580, height: 900 };
+      productBox = { x: 250, y: 260, width: 580, height: 920 };
       break;
     }
 
-    case "product-poster": {
-      // Category 2: Product Poster (Campaign & Messaging - Stanley / BLU style)
-      // Graphic-heavy layout with prominent campaign headline, brand block, and punchline.
-      const cardTextBox: Box = { x: 100, y: 120, width: 880, height: 260 };
+    case "product-poster":
+    case "color-block": {
+      // Clean modern campaign poster with NO BOX behind title
+      const hBox: Box = { x: 80, y: 90, width: 920, height: 190 };
       textLayers.push({
         id: "headline",
         role: "headline",
         text: headline.toUpperCase(),
-        box: cardTextBox,
+        box: hBox,
         font: fontH,
-        size: fitFontSize(headline.toUpperCase(), fontH, cardTextBox, 88),
+        size: fitFontSize(headline.toUpperCase(), fontH, hBox, 86),
         color: "#ffffff",
         align: "center",
       });
 
       if (subline) {
-        const subBox: Box = { x: 120, y: 390, width: 840, height: 90 };
+        const sBox: Box = { x: 100, y: 290, width: 880, height: 90 };
         textLayers.push({
           id: "subline",
           role: "body",
-          text: subline.toUpperCase(),
-          box: subBox,
-          font: "bebas",
-          size: fitFontSize(subline.toUpperCase(), "bebas", subBox, 48),
-          color: palette.accent,
+          text: subline,
+          box: sBox,
+          font: fontB,
+          size: fitFontSize(subline, fontB, sBox, 40),
+          color: palette.accent || "#e4e4e7",
           align: "center",
         });
       }
 
       if (cta) {
-        const ctaBox: Box = { x: 100, y: 1210, width: 880, height: 80 };
+        const cBox: Box = { x: 300, y: 1200, width: 480, height: 64 };
         textLayers.push({
           id: "cta",
           role: "cta",
           text: cta,
-          box: ctaBox,
-          font: "poppins-bold",
-          size: fitFontSize(cta, "poppins-bold", ctaBox, 34),
-          color: palette.darkNeutral,
+          box: cBox,
+          font: "montserrat-bold",
+          size: fitFontSize(cta, "montserrat-bold", cBox, 32),
+          color: "#ffffff",
           align: "center",
         });
       }
 
-      productBox = { x: 250, y: 440, width: 580, height: 760 };
+      productBox = { x: 240, y: 400, width: 600, height: 780 };
       break;
     }
 
@@ -177,8 +333,7 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
       const keyword = (bigWord || headline.split(" ")[0] || "COLD").toUpperCase();
       const bgTextBox: Box = { x: 20, y: 190, width: 1040, height: 420 };
       const calcSize = fitFontSize(keyword, "bebas", bgTextBox, MAX_TEXT_SIZE);
-      // Use vibrant neon/accent color from palette or hot contrast
-      const bgWordColor = palette.accent;
+      const bgWordColor = palette.accent.toLowerCase() === "#ffffff" ? "#ff007f" : palette.accent;
       textLayers.push({
         id: "big-type-behind",
         role: "headline",
@@ -190,7 +345,6 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
         align: "center",
       });
 
-      // 2. High-contrast headline on top
       if (headline) {
         const hBox: Box = { x: 90, y: 70, width: 900, height: 110 };
         textLayers.push({
@@ -205,18 +359,17 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
         });
       }
 
-      // 3. Subline or CTA near the bottom/flank
       if (subline || cta) {
         const text = (subline || cta)!.trim();
-        const bBox: Box = { x: 100, y: 1180, width: 880, height: 100 };
+        const bBox: Box = { x: 100, y: 1200, width: 880, height: 80 };
         textLayers.push({
           id: "subline",
           role: "body",
           text,
           box: bBox,
           font: fontB,
-          size: fitFontSize(text, fontB, bBox, 40),
-          color: palette.lightNeutral,
+          size: fitFontSize(text, fontB, bBox, 38),
+          color: "#ffffff",
           align: "center",
         });
       }
@@ -320,7 +473,6 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
 
     case "pedestal-hero":
     default: {
-      // Clean high-impact headline on top
       const hBox: Box = { x: 90, y: 90, width: 900, height: 180 };
       textLayers.push({
         id: "headline",
@@ -329,12 +481,12 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
         box: hBox,
         font: fontH,
         size: fitFontSize(headline, fontH, hBox, 84),
-        color: palette.darkNeutral,
+        color: "#ffffff",
         align: "center",
       });
 
       if (subline) {
-        const sBox: Box = { x: 100, y: 270, width: 880, height: 90 };
+        const sBox: Box = { x: 100, y: 280, width: 880, height: 90 };
         textLayers.push({
           id: "subline",
           role: "body",
@@ -342,7 +494,7 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
           box: sBox,
           font: fontB,
           size: fitFontSize(subline, fontB, sBox, 40),
-          color: palette.dominant,
+          color: palette.accent || "#e4e4e7",
           align: "center",
         });
       }
@@ -354,14 +506,14 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
           role: "cta",
           text: cta,
           box: cBox,
-          font: "poppins-bold",
-          size: fitFontSize(cta, "poppins-bold", cBox, 36),
-          color: palette.darkNeutral,
+          font: "montserrat-bold",
+          size: fitFontSize(cta, "montserrat-bold", cBox, 36),
+          color: "#ffffff",
           align: "center",
         });
       }
 
-      productBox = { x: 270, y: 360, width: 540, height: 820 };
+      productBox = { x: 250, y: 380, width: 580, height: 800 };
       break;
     }
   }

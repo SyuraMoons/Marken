@@ -7,7 +7,7 @@ import path from "node:path";
 import { createElement } from "react";
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
-import { compositeProductSlide, type DropShadowOptions, type PlacedProductBox } from "./composite";
+import { compositeProductSlide, type DropShadowOptions, type FramingMode, type PlacedProductBox } from "./composite";
 import { buildTemplateBackgroundShapes } from "./templates";
 import { CANVAS_H, CANVAS_W, FONTS, normalizeLayers, textLineHeight, type Box, type FontId, type SlideLayers, type TextLayer } from "./layers";
 
@@ -25,6 +25,12 @@ const loadFont = (id: FontId) => {
 async function renderText(layer: TextLayer): Promise<{ input: Buffer; left: number; top: number } | null> {
   const text = layer.text.trim();
   if (!text) return null;
+  const hex = layer.color.toLowerCase();
+  const isLight = hex === "#ffffff" || hex === "#fff" || hex.startsWith("#f") || hex.startsWith("#e");
+  const textShadow = isLight
+    ? "0 2px 14px rgba(0,0,0,0.75), 0 1px 3px rgba(0,0,0,0.92)"
+    : "0 1px 10px rgba(255,255,255,0.7)";
+
   const res = new ImageResponse(
     createElement(
       "div",
@@ -40,6 +46,7 @@ async function renderText(layer: TextLayer): Promise<{ input: Buffer; left: numb
           fontFamily: layer.font,
           fontSize: layer.size,
           lineHeight: textLineHeight,
+          textShadow,
         },
       },
       text,
@@ -90,6 +97,7 @@ export type RenderLayeredInput = {
   cutout: Buffer;
   layers: SlideLayers;
   shadow?: DropShadowOptions;
+  framingMode?: FramingMode;
   /** Background graphics (cards, banners) under text and product. Defaults to the ones `layers.background` describes. */
   backgroundShapes?: Buffer | null;
 };
@@ -123,6 +131,7 @@ export async function renderLayeredSlide(input: RenderLayeredInput): Promise<Ren
     scene: withText,
     cutout: input.cutout,
     reservedBox: layers.product.box,
+    framingMode: input.framingMode,
     // The stored box is the product's own fit area, so no extra breathing room is added on re-render.
     paddingRatio: 0,
     shadow: input.shadow,

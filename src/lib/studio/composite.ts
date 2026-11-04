@@ -33,6 +33,8 @@ export type DropShadowOptions = {
   blurSigma?: number;
   /** Shadow opacity multiplier `[0..1]` (default: 0.32) */
   opacity?: number;
+  /** Whether to include a tight dark contact shadow under the product base (default: true) */
+  contactShadow?: boolean;
 };
 
 export type CompositeProductSlideInput = {
@@ -79,6 +81,36 @@ function resolveImageBytes(input: Buffer | Uint8Array | string): Buffer {
  * Creating a 1080x1350 canvas layer guarantees `sharp.composite` never throws out-of-bounds
  * errors even when the product or blur margin sits near the edge of the slide.
  */
+
+/**
+ * Builds an intense, tight elliptical contact shadow directly under the bottom base of the product.
+ * This physically anchors the product to the pedestal / floor surface so it never looks floaty.
+ */
+async function buildContactShadowLayer(placedBox: PlacedProductBox): Promise<Buffer> {
+  const ellipseW = Math.round(placedBox.width * 0.82);
+  const ellipseH = Math.max(16, Math.round(placedBox.width * 0.14));
+  const cx = Math.round(placedBox.left + placedBox.width / 2);
+  const cy = Math.round(placedBox.top + placedBox.height - ellipseH * 0.35);
+
+  const svg = `
+    <svg width="${SLIDE_WIDTH}" height="${SLIDE_HEIGHT}" viewBox="0 0 ${SLIDE_WIDTH} ${SLIDE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="cg" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#0a0503" stop-opacity="0.85"/>
+          <stop offset="50%" stop-color="#0f0907" stop-opacity="0.55"/>
+          <stop offset="100%" stop-color="#140d0a" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="cblur">
+          <feGaussianBlur stdDeviation="6"/>
+        </filter>
+      </defs>
+      <ellipse cx="${cx}" cy="${cy}" rx="${Math.round(ellipseW / 2)}" ry="${Math.round(ellipseH / 2)}" fill="url(#cg)" filter="url(#cblur)"/>
+    </svg>
+  `;
+
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
 async function buildCanvasShadowLayer(params: {
   scaledCutoutBuffer: Buffer;
   placedBox: PlacedProductBox;
@@ -219,6 +251,7 @@ export async function compositeProductSlide(
   const layers: OverlayOptions[] = [];
 
   if (shadowEnabled) {
+    // 1. Diffuse cast shadow
     const shadowLayerBuffer = await buildCanvasShadowLayer({
       scaledCutoutBuffer,
       placedBox,
@@ -228,6 +261,12 @@ export async function compositeProductSlide(
       opacity: input.shadow?.opacity ?? 0.32,
     });
     layers.push({ input: shadowLayerBuffer, left: 0, top: 0 });
+
+    // 2. Realistic tight contact shadow anchoring the product base
+    if (input.shadow?.contactShadow !== false) {
+      const contactBuffer = await buildContactShadowLayer(placedBox);
+      layers.push({ input: contactBuffer, left: 0, top: 0 });
+    }
   }
 
   layers.push({

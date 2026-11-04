@@ -81,10 +81,16 @@ export async function parseSamOutput(text: string): Promise<ParsedSamOutput> {
     );
   }
 
-  // Several matches: the largest one is the main product
-  const area = ({ bounds }: (typeof masks)[number]) =>
-    (bounds.right - bounds.left) * (bounds.bottom - bounds.top);
-  const chosen = masks.reduce((best, m) => (area(m) > area(best) ? m : best));
+  // Several matches: the main product is large and near the centre of the frame. Area alone
+  // picks a big background object over a smaller product held in the middle.
+  const score = ({ bounds, confidence }: (typeof masks)[number]) => {
+    const area = (bounds.right - bounds.left) * (bounds.bottom - bounds.top);
+    const dx = (bounds.left + bounds.right) / 2 / size.w - 0.5;
+    const dy = (bounds.top + bounds.bottom) / 2 / size.h - 0.5;
+    const centrality = 1 - Math.min(1, Math.hypot(dx, dy) / Math.SQRT1_2);
+    return area * (0.5 + 0.5 * centrality) * (confidence ?? 1);
+  };
+  const chosen = masks.reduce((best, m) => (score(m) > score(best) ? m : best));
   const { left, top, right, bottom } = chosen.bounds;
 
   const box = recordsOfKind(result.records, "box").find(

@@ -4,7 +4,7 @@ import { t } from "@/lib/i18n";
 import { AppNav, Crumb, NavLinks, type NavItem } from "./app-nav";
 import { Logo } from "./logo";
 import { ProfileMenu, type Account } from "./profile-menu";
-import { ShopSwitcher, type SwitcherShop } from "./shop-switcher";
+import { ProductSwitcher, type SwitcherProduct } from "./product-switcher";
 
 const NAV: NavItem[] = [
   { href: "/today", label: t("nav.today"), icon: "today" },
@@ -24,7 +24,7 @@ function Nav({ variant }: { variant: "bar" | "side" }) {
 }
 
 // One shell keeps mobile web tabs below the header and the desktop sidebar consistent.
-export function AppShell({ shopName, shops, account, children }: { shopName: string; shops: SwitcherShop[]; account?: Account; children: ReactNode }) {
+export function AppShell({ shopName, products, account, children }: { shopName: string; products: SwitcherProduct[]; account?: Account; children: ReactNode }) {
   return (
     <div className="bg-app flex min-h-dvh">
       <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col justify-between bg-navy px-6 pt-8 pb-6 lg:flex">
@@ -32,16 +32,16 @@ export function AppShell({ shopName, shops, account, children }: { shopName: str
           <Logo href="/today" tone="white" />
           <Nav variant="side" />
         </div>
-        <ShopSwitcher shops={shops} variant="side" />
+        <Suspense><ProductSwitcher products={products} variant="side" /></Suspense>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-15 items-center justify-between gap-2 px-5 lg:glass lg:h-auto lg:border-x-0 lg:border-t-0 lg:px-10 lg:py-[22px]">
+        <header className="relative z-40 flex h-15 items-center justify-between gap-2 px-5 lg:glass lg:h-auto lg:border-x-0 lg:border-t-0 lg:px-10 lg:py-[22px]">
           <span className="lg:hidden">
             <Logo href="/today" />
           </span>
           <span className="lg:hidden">
-            <ShopSwitcher shops={shops} variant="pill" />
+            <Suspense><ProductSwitcher products={products} variant="pill" /></Suspense>
           </span>
           <span className="hidden lg:block">
             <Suspense fallback={<span className="text-[13px] text-muted">{t("nav.workspace")}</span>}>
@@ -56,7 +56,7 @@ export function AppShell({ shopName, shops, account, children }: { shopName: str
         <div className="min-w-0 lg:hidden">
           <Nav variant="bar" />
         </div>
-        <main className="flex-1 px-5 pt-6 pb-24 lg:px-10 lg:pt-10 lg:pb-24">{children}</main>
+        <main className="relative z-0 flex-1 px-5 pt-6 pb-24 lg:px-10 lg:pt-10 lg:pb-24">{children}</main>
       </div>
       <AppHelp />
     </div>

@@ -3,6 +3,8 @@
   "app.tagline": "Your AI marketing team. One ready post every day.",
   "nav.today": "Today",
   "nav.products": "Products",
+  "nav.switchProduct": "Switch product",
+  "nav.noProducts": "Add your first product to get started.",
   "nav.results": "Results",
   "nav.history": "History",
   "nav.settings": "Settings",

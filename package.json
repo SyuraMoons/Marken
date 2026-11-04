@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test:integration": "node --test tests/integration.test.mjs"
+    "test:integration": "node --test tests/integration.test.mjs",
+    "lab:cutout": "node --env-file=.env.local --import tsx scripts/lab/cutout.ts",
+    "lab:slide": "node --env-file=.env.local --import tsx scripts/lab/slide.ts",
+    "lab:fixtures": "node --env-file=.env.local --import tsx scripts/lab/make-fixtures.ts",
+    "test:unit": "node --import tsx --test tests/cutout.test.ts"
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",
@@ -30,6 +34,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   },
   "packageManager": "pnpm@11.2.2"

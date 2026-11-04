@@ -112,18 +112,15 @@ export function buildScenePrompt(
   const roleLabel = input.slideRole ? ` (${input.slideRole.toUpperCase()} slide)` : "";
   const styleClause = input.visualStyle?.trim()
     ? `Visual style: ${input.visualStyle.trim()}.`
-    : "Visual style: Clean, high-contrast commercial lifestyle studio background.";
-  const cleanText = input.slideText.trim();
+    : "Commercial product photography in a luxury style, photorealism, 8K, soft studio-style lighting, uniform matte background.";
 
   return [
-    `Create a vertical 4:5 (1080x1350) Instagram carousel background scene${roleLabel}.`,
+    `Create a vertical 4:5 (1080x1350) Instagram commercial product background scene${roleLabel}.`,
     `Scene brief: ${input.sceneBrief.trim()}.`,
     styleClause,
-    cleanText
-      ? `Render this exact slide headline text cleanly in the top header zone (y < ${Math.max(160, box.y - 20)}px) or bottom footer zone (y > ${Math.min(1260, y2 + 20)}px): "${cleanText}".`
-      : "Do not render any text, letters, numbers, logos or watermarks anywhere in the image. Slide text is added separately by code (SRD A-09), so keep the top and bottom bands calm and uncluttered.",
-    `MANDATORY RESERVED EMPTY PRODUCT AREA: Leave the central rectangle x=${box.x}..${x2}, y=${box.y}..${y2} (${box.width}x${box.height}px) completely empty, unobstructed, and clean (flat surface, pedestal, or uncluttered negative space) so the real product cutout can be composited later.`,
-    `CRITICAL RULE (FR-CG-04): NEVER draw, render, or hallucinate any product, bottle, jar, package, box, container, or merchandise in the reserved area or anywhere as the hero subject.`,
+    "Do not render any text, letters, numbers, logos or watermarks anywhere in the image. Slide text is added separately by code (SRD A-09), so keep the top and bottom bands calm and uncluttered.",
+    `MANDATORY RESERVED EMPTY PRODUCT AREA: Leave the central zone x=${box.x}..${x2}, y=${box.y}..${y2} (${box.width}x${box.height}px) completely empty, clean, and unobstructed on top of the podium/surface so the real physical product cutout can be composited later.`,
+    `CRITICAL RULE (FR-CG-04): NEVER draw, render, or hallucinate any product, bottle, jar, package, box, container, sunglasses, or merchandise in the reserved area or anywhere as the hero subject. Only generate the empty stage, podium, environmental textures, and atmospheric lighting.`,
   ]
     .filter(Boolean)
     .join(" ");

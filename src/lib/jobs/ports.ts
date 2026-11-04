@@ -7,7 +7,7 @@ import {
 import { planDailyCarousel as agentPlanDailyCarousel } from "@/lib/agents/planner";
 import { renderAndVerifySlide as studioRenderAndVerifySlide } from "@/lib/studio";
 import { regenerateCaptionFromFeedback as agentRegenerateCaption } from "@/lib/agents/caption";
-import type { BrandStyle, SlideLayers } from "@/lib/studio/layers";
+import type { BrandStyle, SlideLayers, TemplateId } from "@/lib/studio/layers";
 
 // The AI steps the jobs call (docs/TEAM.md §2).
 // Wired to the real modules:
@@ -51,10 +51,23 @@ export type PlanInput = {
   brief?: string;
 };
 
+/** Template fields come from the planner (headline, subline, big word, layout); all optional. */
+export type CarouselSlide = {
+  order: number;
+  role: "hook" | "product" | "cta";
+  text: string;
+  alt: string;
+  sceneBrief: string;
+  headline?: string;
+  subline?: string;
+  bigWord?: string;
+  templateId?: TemplateId;
+};
+
 export type CarouselPlan = {
   productId: string;
   fitReason: string;
-  slides: { order: number; role: "hook" | "product" | "cta"; text: string; alt: string; sceneBrief: string }[];
+  slides: CarouselSlide[];
   captions: { label: string; text: string }[];
   hashtags: string[];
 };
@@ -74,6 +87,10 @@ export type RenderSlideInput = {
   sceneBrief: string;
   role?: "hook" | "product" | "cta";
   alt?: string;
+  headline?: string;
+  subline?: string;
+  bigWord?: string;
+  templateId?: TemplateId;
   cutout?: Buffer;
   cutoutPath?: string | null;
   shopId?: string;
@@ -200,6 +217,10 @@ export async function planDailyCarousel(input: PlanInput): Promise<CarouselPlan>
           text: s.text,
           alt: s.alt,
           sceneBrief: s.sceneBrief,
+          headline: s.headline,
+          subline: s.subline,
+          bigWord: s.bigWord,
+          templateId: s.templateId,
         })),
         captions: res.captions.map((c) => ({
           label: c.label,
@@ -259,6 +280,10 @@ export async function renderAndVerifySlide(input: RenderSlideInput): Promise<Ren
     sceneBrief: input.sceneBrief,
     slideText: input.text,
     slideRole: input.role,
+    headline: input.headline,
+    subline: input.subline,
+    bigWord: input.bigWord,
+    templateId: input.templateId,
     cutout: cutoutBuffer,
     shopTone: input.shopTone,
     styleRules: input.styleRules,

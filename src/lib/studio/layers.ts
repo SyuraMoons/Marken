@@ -22,6 +22,9 @@ export const FONTS = {
 export type FontId = keyof typeof FONTS;
 export const FONT_IDS = Object.keys(FONTS) as [FontId, ...FontId[]];
 
+/** Largest font size a text layer may store (the edit API rejects bigger ones). */
+export const MAX_TEXT_SIZE = 260;
+
 export type TextRole = "headline" | "body" | "cta";
 export type TextLayer = {
   id: string;
@@ -36,6 +39,21 @@ export type TextLayer = {
   align: "left" | "center" | "right";
 };
 
+/** Poster layouts in src/lib/studio/templates.ts. */
+export const TEMPLATE_IDS = [
+  "product-highlight",
+  "product-poster",
+  "product-with-name",
+  "big-type-behind",
+  "color-block",
+  "pedestal-hero",
+  "tilted-hero",
+] as const;
+export type TemplateId = (typeof TEMPLATE_IDS)[number];
+
+/** Template graphics (cards, banners) drawn between the scene and the text, so edits redraw them too. */
+export type SlideBackground = { template: TemplateId; dominant: string; accent: string };
+
 /** Everything needed to rebuild a slide without a model call (except a new scene). */
 export type SlideLayers = {
   /** The Muse Image brief the scene came from, reused by "New background". */
@@ -43,6 +61,8 @@ export type SlideLayers = {
   /** Where the product cutout sits. Aspect ratio is kept, so only the fit area is stored. */
   product: { box: Box };
   text: TextLayer[];
+  /** Template graphics; absent on slides made without a template. */
+  background?: SlideBackground;
 };
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(n)));
@@ -60,14 +80,16 @@ export const TextLayerSchema = z.object({
   text: z.string().max(200),
   box: BoxSchema,
   font: z.enum(FONT_IDS),
-  size: z.number().min(16).max(260),
+  size: z.number().min(16).max(MAX_TEXT_SIZE),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   align: z.enum(["left", "center", "right"]),
 });
+const HexSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 export const SlideLayersSchema = z.object({
   sceneBrief: z.string().max(2000),
   product: z.object({ box: BoxSchema }),
   text: z.array(TextLayerSchema).max(6),
+  background: z.object({ template: z.enum(TEMPLATE_IDS), dominant: HexSchema, accent: HexSchema }).optional(),
 });
 
 /** Brand kit values the layers read (colours, fonts). All optional: a shop may have none. */
@@ -132,6 +154,7 @@ export function normalizeLayers(layers: SlideLayers): SlideLayers {
     sceneBrief: layers.sceneBrief,
     product: { box: clampBox(layers.product.box, 120) },
     text: layers.text.map((t) => ({ ...t, box: clampBox(t.box) })),
+    ...(layers.background ? { background: layers.background } : {}),
   };
 }
 

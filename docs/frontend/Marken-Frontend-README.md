@@ -155,3 +155,27 @@ The latest audit checked 1,814 internal links and found no missing destinations,
 - Cross-feature panel specimens are copied locally where necessary to preserve an overlay chain. The canonical complete prototype remains authoritative; local copies are supporting handoff assets.
 - Today Skip now opens skip confirmation, not caption editing.
 - Browser focus handling, file-picker behavior, real request cancellation and API errors remain frontend integration work; structural Figma checks do not validate these runtime behaviors.
+
+## Native sharing in Today (4 November 2026)
+
+- Open **Share your post** below the caption. This expands inside Today; it is not a new route.
+- **01 Copy caption** uses the current caption choice plus hashtags. If clipboard access fails, a selectable read-only caption appears.
+- **02 Prepare slides** fetches the original signed image files, preserving slide order and bytes. It makes no model or publishing calls.
+- **03 Share images** opens the real device share sheet on a fresh tap. Instagram/Facebook selectors change instructions only; the device decides which apps support the supplied files. Captions are copied separately because target apps may ignore shared text.
+- Per-slide downloads remain available even when sharing is unsupported or fails. Refresh Today if signed links expire. History's existing download controls remain unchanged.
+- Canceling is harmless. A completed share handoff is not proof of publication and never changes post status. Failed-fidelity slides are not offered.
+- Native file sharing needs a supported browser and a secure context. To test on a phone, use an HTTPS deployment; a desktop's LAN HTTP address is not sufficient. Check the real Instagram/Facebook targets on both iOS and Android before release.
+
+Implementation: `SharePost`, `src/lib/sharing/native.ts`, and `ReviewPanel`. No new dependencies or credentials are required for the sharing flow.
+
+Figma: Today sharing panels in **00 Prototype — Complete app** and **01 Today**; full mobile handoff reference `372:775`. Preserve the existing blue/white palette, subtle pink atmosphere, Inter typography, 28px platform SVGs, and numbered steps. Do not imitate the OS share sheet in app UI.
+
+## Analytics demo
+
+Results is now **Analytics** (`/analytics`); legacy `/results` bookmarks redirect. Demo mode shows three fixed sample LUMI posts, a seven-day reach chart with an accessible data table, engagement breakdown, sample orders and per-post context. All values and chart points are derived from `src/lib/mock/analytics.ts`. Post and platform filters use those same fixtures. Demo dates are fixed and visible; do not relabel them as the current week. Reach is summed across posts and must not be described as unique people. My account mode shows the unconnected state until real analytics collection is implemented. Never associate these sample outcomes with a user's generated posts.
+
+## Dedicated loading
+
+Reuse `CookingScreen` for server/page fallbacks and replace-screen processing states; use `CookingOverlay` for pending work over forms so drafts stay mounted. Both render the same `CookingContent` illustration, built from the existing Marken four-point vector. Exact copy: **Marken is cooking...**. Motion is a 1.8-second orbit followed by a 0.6-second hold, repeating only during real work. Preserve reduced-motion behavior. `NavigationLoading` belongs inside a Next Link and uses `useLinkStatus`; do not add timeouts to keep completed navigation on a loading screen. Shared ButtonLink, Logo, app navigation and SubmitButton already include pending handling. Async job generation keeps polling and offers progress details and a route back to History. Figma Mobile `393:561` / Desktop `393:574` are the visual source.
+
+**Loading scope amendment:** Use the dedicated cooking loader ONLY for landing-page buttons (`ButtonLink showLoading`), image generation in the new-post flow, and existing-product switching. Other forms and route fallbacks retain normal loading feedback. No global navigation or form-submit cooking overlay. This supersedes the broader trigger list above.

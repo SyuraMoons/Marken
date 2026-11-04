@@ -12,7 +12,7 @@ const pages: Record<string, Step[]> = {
   posts: [{ selector: 'main h1', body: 'tour.history' }, { selector: '[data-tour="feed-post"]', body: 'tour.feedPost' }, { selector: '[data-tour="calendar"]', body: 'tour.calendar' }],
   today: [{ selector: 'main h1', body: 'tour.today' }, { selector: '[data-tour="carousel"] button', body: 'tour.carousel' }, { selector: '[data-tour="caption"]', body: 'tour.caption' }, { selector: '[data-tour="approve"]', body: 'tour.approve' }],
   products: [{ selector: 'main h1', body: 'tour.products' }, { selector: '[data-tour="add-product"]', body: 'tour.addProduct' }, { selector: '[data-tour="product-photo"]', body: 'tour.productPhoto' }],
-  results: [{ selector: 'main h1', body: 'tour.results' }, { selector: 'main section', body: 'tour.resultsData' }],
+  analytics: [{ selector: 'main h1', body: 'tour.results' }, { selector: 'main section', body: 'tour.resultsData' }],
   settings: [{ selector: 'main h1', body: 'tour.settings' }, { selector: '[data-tour="settings-1"]', body: 'tour.company' }, { selector: '[data-tour="settings-2"]', body: 'tour.voice' }, { selector: '[data-tour="settings-3"]', body: 'tour.social' }, { selector: '[data-tour="settings-6"]', body: 'tour.account' }],
   activity: [{ selector: 'main h1', body: 'tour.activity' }, { selector: 'main details', body: 'tour.activityDetails' }],
   onboarding: [{ selector: 'main h1, h1', body: 'tour.onboarding' }, { selector: 'main input, main button', body: 'tour.onboardingInput' }],

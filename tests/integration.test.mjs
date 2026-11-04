@@ -5,14 +5,14 @@ import path from 'node:path';
 import vm from 'node:vm';
 import ts from 'typescript';
 
-function load(relative, dependencies = {}) {
+function load(relative, dependencies = {}, globals = {}) {
   const filename = path.join(import.meta.dirname, '..', relative);
   const source = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   const exports = {};
   vm.runInNewContext(source, {
-    exports, Buffer, console, process, URL,
+    exports, Buffer, console, process, URL, Error, ...globals,
     require(name) {
       if (name === 'server-only') return {};
       if (name in dependencies) return dependencies[name];
@@ -92,6 +92,59 @@ test('landing remains public while dashboard, setup and OAuth routing stay prote
   assert.equal((await visit('/today', true)).kind, 'next');
   assert.equal((await visit('/today', false)).url, 'http://localhost:3000/login');
   assert.equal((await visit('/today', true, false)).url, 'http://localhost:3000/onboarding/2');
-  assert.equal((await visit('/login', true)).url, 'http://localhost:3000/today');
+  assert.equal((await visit('/login', true)).url, 'http://localhost:3000/posts');
   assert.equal((await visit('/?code=oauth-return', true)).url, 'http://localhost:3000/auth/callback?code=oauth-return');
+});
+
+test('native sharing keeps original image bytes and slide order', async () => {
+  const seen = [];
+  const { prepareShareFiles } = load('src/lib/sharing/native.ts', {}, {
+    File,
+    fetch: async (url, options) => {
+      seen.push([url, options.credentials]);
+      return new Response(new Blob([url], { type: url === 'first' ? 'image/png' : 'image/jpeg' }));
+    },
+  });
+  const files = await prepareShareFiles(['first', 'second']);
+  assert.equal(files[0].name, 'marken-slide-01.png');
+  assert.equal(files[1].name, 'marken-slide-02.jpg');
+  assert.equal(await files[0].text(), 'first');
+  assert.equal(await files[1].text(), 'second');
+  assert.deepEqual(seen, [['first', 'omit'], ['second', 'omit']]);
+});
+
+test('native sharing refuses missing, expired, empty and non-image slides', async () => {
+  for (const response of [new Response('expired', { status: 403 }), new Response('', { headers: { 'Content-Type': 'image/png' } }), new Response('<html>login</html>', { headers: { 'Content-Type': 'text/html' } })]) {
+    const { prepareShareFiles } = load('src/lib/sharing/native.ts', {}, { File, fetch: async () => response });
+    await assert.rejects(() => prepareShareFiles(['slide']));
+    await assert.rejects(() => prepareShareFiles(['slide', '']));
+  }
+});
+
+test('native handoff shares files only and distinguishes cancellation and unavailable devices', async () => {
+  const { sharePreparedFiles } = load('src/lib/sharing/native.ts');
+  const files = [new File(['pixels'], 'slide.png', { type: 'image/png' })];
+  let payload;
+  assert.equal(await sharePreparedFiles(files, { canShare: () => true, share: async (data) => { payload = data; } }), 'handed-off');
+  assert.equal(payload.files, files);
+  assert.deepEqual(Object.keys(payload), ['files']);
+  assert.equal(await sharePreparedFiles(files, { canShare: () => false, share: () => assert.fail('unsupported must not open share sheet') }), 'unsupported');
+  const cancel = new Error('cancelled'); cancel.name = 'AbortError';
+  assert.equal(await sharePreparedFiles(files, { canShare: () => true, share: async () => { throw cancel; } }), 'cancelled');
+  await assert.rejects(() => sharePreparedFiles(files, { canShare: () => true, share: async () => { throw new Error('denied'); } }), /denied/);
+});
+
+test('analytics demo totals reconcile with post and daily fixtures', () => {
+  const { DEMO_ANALYTICS, summarizeAnalytics } = load('src/lib/mock/analytics.ts');
+  const summary = summarizeAnalytics(DEMO_ANALYTICS);
+  assert.equal(summary.reach, 4080);
+  assert.equal(summary.interactions, 335);
+  assert.equal(summary.saves, 85);
+  assert.equal(summary.orders, 9);
+  assert.equal(summary.dailyReach.reduce((sum, n) => sum + n, 0), summary.reach);
+  for (const post of DEMO_ANALYTICS) {
+    assert.equal(post.dailyReach.reduce((sum, n) => sum + n, 0), post.reach);
+    assert.ok(post.impressions >= post.reach);
+  }
+  assert.equal(summarizeAnalytics(DEMO_ANALYTICS.filter(post => post.platform === 'instagram')).reach, 3100);
 });

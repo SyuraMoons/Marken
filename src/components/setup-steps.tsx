@@ -32,7 +32,8 @@ export type SetupShop = {
 };
 
 // The owner's real product for steps 4 and 5: signed URLs only (NFR-13).
-export type SetupPreview = { name: string; cutout: string | null; photo: string | null; slide: string | null; postStatus: string | null };
+// `stalled`: the first post is generating but the job queue never started it (lib/posts/stalled).
+export type SetupPreview = { name: string; cutout: string | null; photo: string | null; slide: string | null; postStatus: string | null; stalled: boolean };
 
 // A photo uploaded earlier that has no product yet (signed URL only).
 export type PendingUpload = { id: string; url: string | null; createdAt: string };
@@ -197,18 +198,9 @@ const TIPS = [
   ["backdrop", "ob2.tipBackdrop"],
 ] as const;
 
-// Loading panel tied to the real upload/extract phases (270:1497, 270:1639; FD-24): the owner's own photos
-// get the same scan-line animation and live step list as adding a product.
+// Keep upload and extraction loading tied to their real phases.
 function Loading({ phase, urls }: { phase: "uploading" | "preparing"; urls: string[] }) {
-  return (
-    <div className="flex max-w-xl flex-col gap-5">
-      <Head title={t(`ob2.${phase}Title`)} body={t(`ob2.${phase}Body`)} />
-      <ProcessingPhoto src={urls[0]} more={urls.slice(1)} from={phase === "preparing" ? 1 : 0} />
-      <InfoCard vector="check" title={t("ob2.waitTitle")}>
-        {t("ob2.waitBody")}
-      </InfoCard>
-    </div>
-  );
+  return <div className="flex max-w-xl flex-col gap-5"><Head title={t(`ob2.${phase}Title`)} body={t(`ob2.${phase}Body`)} /><ProcessingPhoto src={urls[0]} more={urls.slice(1)} from={phase === "preparing" ? 1 : 0} /><InfoCard vector="check" title={t("ob2.waitTitle")}>{t("ob2.waitBody")}</InfoCard></div>;
 }
 
 // The owner's product on the soft stage; `working` adds the scan-line while the real slide is still being made.
@@ -734,7 +726,18 @@ function Step5({ ctx, preview }: { ctx: Ctx; preview: SetupPreview | null }) {
   const [failed, setFailed] = useState(false);
   const started = useRef(false);
   // The first slide is still being made: re-read the page until it lands (tour state is kept across refreshes).
-  const waiting = Boolean(preview) && !preview?.slide && (preview?.postStatus === "generating" || (preview?.postStatus == null && !ctx.shop.completed));
+  const stalled = Boolean(preview?.stalled);
+  const waiting = Boolean(preview) && !stalled && !preview?.slide && (preview?.postStatus === "generating" || (preview?.postStatus == null && !ctx.shop.completed));
+  const [retrying, startRetry] = useTransition();
+  const [retryFailed, setRetryFailed] = useState(false);
+  // The route fails the dead post and starts a new one; the refresh picks it up and polling resumes.
+  const retry = () =>
+    startRetry(async () => {
+      setRetryFailed(false);
+      const res = await fetch(`/api/shops/${ctx.shop.id}/posts/generate`, { method: "POST" }).catch(() => null);
+      if (!res?.ok) return setRetryFailed(true);
+      router.refresh();
+    });
 
   // Replay tour (Settings) must not start another post.
   useEffect(() => {
@@ -743,11 +746,12 @@ function Step5({ ctx, preview }: { ctx: Ctx; preview: SetupPreview | null }) {
     void fetch(`/api/shops/${ctx.shop.id}/posts/generate`, { method: "POST" }).catch(() => null);
   }, [ctx.shop.id, ctx.shop.completed]);
 
-  // Capped at ~3 minutes so a failed start never polls forever.
+  // A run takes 3-5 minutes (plus queue time), so poll for up to 10 like Today's AutoRefresh;
+  // the old ~3 minute cap stopped seconds before the slide landed and left "Building slide 1" up.
   useEffect(() => {
     if (!waiting) return;
-    let left = 45;
-    const id = setInterval(() => (--left <= 0 ? clearInterval(id) : router.refresh()), 4000);
+    const until = Date.now() + 10 * 60_000;
+    const id = setInterval(() => (Date.now() > until ? clearInterval(id) : router.refresh()), 4000);
     return () => clearInterval(id);
   }, [waiting, router]);
 
@@ -755,7 +759,23 @@ function Step5({ ctx, preview }: { ctx: Ctx; preview: SetupPreview | null }) {
   const after = preview?.slide ?? preview?.cutout ?? null;
   const afterCaption = preview?.slide ? t("ob5.afterCaption") : t("ob5.afterWorking");
   const realPost = preview ? (
-    <RealPhoto src={after} alt={preview.name} eyebrow={t("ob5.realEyebrow")} caption={preview.slide ? preview.name : t("ob5.realWorking", { product: preview.name })} working={!preview.slide} />
+    <div className="flex flex-col gap-4">
+      <RealPhoto
+        src={after}
+        alt={preview.name}
+        eyebrow={t("ob5.realEyebrow")}
+        caption={preview.slide ? preview.name : stalled ? t("ob5.stalled") : t("ob5.realWorking", { product: preview.name })}
+        working={!preview.slide && !stalled}
+      />
+      {stalled && (
+        <div className="flex flex-col gap-1 lg:max-w-75">
+          <Button variant="secondary" onClick={retry} disabled={retrying} aria-busy={retrying}>
+            {t("status.stalled.action")}
+          </Button>
+          <Err show={retryFailed} />
+        </div>
+      )}
+    </div>
   ) : (
     <Guide eyebrow={t("ob5.sampleEyebrow")} caption={t("ob5.sample")} />
   );
@@ -766,6 +786,7 @@ function Step5({ ctx, preview }: { ctx: Ctx; preview: SetupPreview | null }) {
       if (!(await ctx.save(action === "finish" ? { action, tour_completed: true } : { action }))) return setFailed(true);
       ctx.go(6);
     });
+
 
   if (tour === 3) {
     return (

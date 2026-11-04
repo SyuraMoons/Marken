@@ -4,9 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Carousel } from "./carousel";
 import { Button, ButtonLink } from "./button";
-import { InfoCard } from "./info-card";
 import { SlideEditor } from "./slide-editor";
 import { StatusScreen } from "./status-screen";
+import { InfoCard } from "./info-card";
 import { t } from "@/lib/i18n";
 import type { Slide } from "@/lib/posts/slides";
 import { fromParam } from "@/lib/posts/back";
@@ -69,18 +69,10 @@ export function CaptionEditor({ postId, slides, captions, initial = 0, product, 
 
   // Preparing caption options (270:2121): the current caption stays until new options arrive.
   if (waiting) {
-    return (
-      <StatusScreen title={t("loading.captionsTitle")} body={t("loading.captionsBody")}>
-        <div aria-busy="true" aria-live="polite">
-          <InfoCard vector="build" title={t("loading.captionsCard")}>
-            {t("loading.captionsCardBody")}
-          </InfoCard>
-        </div>
-        <InfoCard vector="check" title={t("loading.waitTitle")}>
-          {t("loading.waitBody")}
-        </InfoCard>
-      </StatusScreen>
-    );
+    return <StatusScreen title={t("loading.captionsTitle")} body={t("loading.captionsBody")}>
+      <div aria-busy="true" aria-live="polite"><InfoCard vector="build" title={t("loading.captionsCard")}>{t("loading.captionsCardBody")}</InfoCard></div>
+      <InfoCard vector="check" title={t("loading.waitTitle")}>{t("loading.waitBody")}</InfoCard>
+    </StatusScreen>;
   }
 
   const preview = <Carousel slides={slides} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} eyebrow={product} />;

@@ -8,6 +8,7 @@ import { shopToday, type Post, type Shop } from "@/lib/api/owner";
 import { asCaptions } from "@/lib/posts/captions";
 import { canDeletePost } from "@/lib/posts/deletable";
 import { allSlidesPassed, asSlides, type Slide } from "@/lib/posts/slides";
+import { neverStarted } from "@/lib/posts/stalled";
 
 const TTL_S = 60 * 60;
 
@@ -76,7 +77,7 @@ export async function getTodayData(postId?: string) {
         .maybeSingle()
     ).data;
   if (!latest) {
-    return { shop, post: null, slides: [] as Slide[], downloads: [] as string[], trend: null, photo: null, cutout: null, productName: null, steps: [], calls: [], missing: false as const };
+    return { shop, post: null, slides: [] as Slide[], downloads: [] as string[], trend: null, photo: null, cutout: null, productName: null, steps: [], calls: [], stalled: false, missing: false as const };
   }
   return { ...(await loadPost(supabase, shop, latest)), missing: false as const };
 }
@@ -84,7 +85,7 @@ export async function getTodayData(postId?: string) {
 type Db = Awaited<ReturnType<typeof createClient>>;
 
 async function loadPost(supabase: Db, shop: Shop, latest: Post) {
-  const [trend, product, steps, calls] = await Promise.all([
+  const [trend, product, steps, calls, stalled] = await Promise.all([
     latest.trend_id
       ? supabase.from("trends").select("title, url").eq("id", latest.trend_id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -97,6 +98,7 @@ async function loadPost(supabase: Db, shop: Shop, latest: Post) {
       .select("step, latency_ms, cost_usd, cache_hit, fallback")
       .eq("post_id", latest.id)
       .order("created_at"),
+    neverStarted(supabase, latest),
   ]);
 
   let originalPath: string | null = null;
@@ -132,6 +134,8 @@ async function loadPost(supabase: Db, shop: Shop, latest: Post) {
     productName: product.data?.name ?? null,
     steps: steps.data ?? [],
     calls: calls.data ?? [],
+    // Generating, but the job queue never started it: Today offers a retry instead of loading forever.
+    stalled,
   };
 }
 

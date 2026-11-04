@@ -1,9 +1,10 @@
+import { CookingScreen } from "@/components/cooking-screen";
 import { asCaptions } from "@/lib/posts/captions";
 import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ActionButton } from "@/components/action-button";
-import { ActivityPanel, stepLabel } from "@/components/activity-panel";
+import { ActivityPanel } from "@/components/activity-panel";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { ButtonLink } from "@/components/button";
 import { Carousel } from "@/components/carousel";
@@ -142,8 +143,22 @@ function TodayView({ q, data }: { q: Awaited<PageProps<"/today">["searchParams"]
     );
   }
 
+  // The job queue never picked this post up (lib/posts/stalled): say so instead of loading forever.
+  if (post.status === "generating" && data.stalled) {
+    return (
+      <StatusScreen title={t("status.stalled.title")} body={t("status.stalled.body")}>
+        <ActionButton url={`/api/shops/${shop.id}/posts/generate`} body={post.product_id ? { productId: post.product_id } : {}} openPost>
+          {t("status.stalled.action")}
+        </ActionButton>
+        <ButtonLink href="/posts" variant="text">
+          {t("history.back")}
+        </ButtonLink>
+      </StatusScreen>
+    );
+  }
+
   if (post.status === "generating") {
-    return <Studio cutout={data.cutout} productName={productName} steps={steps} calls={calls} />;
+    return <Studio productName={productName} steps={steps} calls={calls} />;
   }
 
   // A post whose product check failed shows no slides (FR-FD-01).
@@ -189,12 +204,12 @@ function TodayView({ q, data }: { q: Awaited<PageProps<"/today">["searchParams"]
               {t("status.published.action")}
             </ButtonLink>
           )}
-          <PostTools postId={post.id} downloads={downloads} canDelete={canDeletePost(post, connected)} />
+          <PostTools postId={post.id} downloads={[]} canDelete={canDeletePost(post, connected)} />
           {/* How this post was made sits under the result, not in a separate tab. */}
           <ActivityPanel steps={steps} calls={calls} />
         </section>
 
-        <ReviewPanel postId={post.id} scoped={Boolean(q.post)} from={q.post ? backTarget(q.from) : null} captions={[...new Set([caption, ...captions].filter(Boolean))]} hashtags={post.hashtags} canSkip={post.status === "ready"}>
+        <ReviewPanel postId={post.id} downloads={allSlidesPassed(slides) ? downloads : []} scoped={Boolean(q.post)} from={q.post ? backTarget(q.from) : null} captions={[...new Set([caption, ...captions].filter(Boolean))]} hashtags={post.hashtags} canSkip={post.status === "ready"}>
           <section className="flex flex-col gap-3 max-lg:glass max-lg:rounded-card max-lg:px-5 max-lg:py-6 lg:py-6">
             {/* eslint-disable-next-line @next/next/no-img-element -- static design illustration */}
             <img src="/figma/vector-research.svg" width={78} height={50} alt="" />
@@ -230,55 +245,16 @@ function FidelityFailed({ shopId, postId, slide, steps, calls }: { shopId: strin
   );
 }
 
-const SLIDE_LABELS = ["today.slide1", "today.slide2", "today.slide3"] as const;
 
 // Studio (generate image post): the confirmed cutout, the three slides being built around it,
 // and the live agent steps on one screen, so the owner watches the post take shape (F-24, NFR-17).
-function Studio({ cutout, productName, steps, calls }: { cutout: string | null; productName: string | null; steps: Steps; calls: Calls }) {
-  const done = steps.filter((s) => s.status === "succeeded" || s.status === "skipped").length;
-  const running = steps.find((s) => s.status === "running");
-  return (
-    <div className="flex flex-col gap-6 lg:gap-7">
-      <AutoRefresh />
-      <PageHeader eyebrow={t("studio.eyebrow")} title={t("status.generating.title")} body={t("studio.body")} />
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,616fr)_minmax(0,496fr)]">
-        <section aria-label={t("studio.canvas")} className="flex flex-col gap-4 lg:glass lg:rounded-2xl lg:p-6">
-          <figure className="glass flex items-center gap-4 rounded-card p-4">
-            <div className="relative aspect-[4/5] w-24 shrink-0 overflow-hidden rounded-control bg-[radial-gradient(circle_at_30%_40%,#e5f0ff,#f9f9ff)]">
-              {cutout && <Image src={cutout} alt={productName ?? ""} fill sizes="96px" className="object-contain" />}
-            </div>
-            <figcaption className="flex min-w-0 flex-col gap-1 leading-[1.4]">
-              <span className="text-[10px] font-semibold text-muted uppercase">{t("studio.productEyebrow")}</span>
-              <span className="text-lg font-semibold">{productName ?? t("studio.productPicked")}</span>
-              <span className="text-sm text-muted">{t("studio.productBody")}</span>
-            </figcaption>
-          </figure>
-          <ol className="grid grid-cols-3 gap-3" aria-busy="true">
-            {SLIDE_LABELS.map((key, i) => (
-              <li key={key} className="flex flex-col gap-2">
-                <div className="relative aspect-[4/5] overflow-hidden rounded-card bg-white">
-                  <div className="absolute inset-0 animate-pulse bg-[linear-gradient(135deg,#e5f0ff,#f9f9ff_60%,#e5f0ff)]" style={{ animationDelay: `${i * 200}ms` }} />
-                </div>
-                <span className="text-xs font-semibold">{t(key)}</span>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section className="flex flex-col gap-4">
-          <div role="status" aria-live="polite" className="glass flex flex-col gap-1.5 rounded-card p-5 leading-[1.4]">
-            <span className="text-[10px] font-semibold text-muted uppercase">{t("studio.now")}</span>
-            <span className="text-lg font-semibold">
-              {running ? stepLabel(running.step) : steps.length ? t("studio.nextStep") : t("studio.starting")}
-            </span>
-            <span className="text-sm text-muted">{t("studio.progress", { n: done })}</span>
-          </div>
-          <ActivityPanel steps={steps} calls={calls} open />
-          <InfoCard vector="check" title={t("status.approvalTitle")}>
-            {t("status.approvalBody")}
-          </InfoCard>
-        </section>
-      </div>
-    </div>
-  );
+function Studio({ productName, steps, calls }: { productName: string | null; steps: Steps; calls: Calls }) {
+  return <CookingScreen detail={productName ?? t("status.generating.title")}>
+    <AutoRefresh />
+    <details className="w-full max-w-lg rounded-card border border-border bg-white p-4 text-left">
+      <summary className="cursor-pointer text-center text-sm font-semibold text-link">{t("loading.progress")}</summary>
+      <ActivityPanel steps={steps} calls={calls} open />
+    </details>
+    <ButtonLink href="/posts" variant="text" className="w-auto!">{t("loading.backHistory")}</ButtonLink>
+  </CookingScreen>;
 }

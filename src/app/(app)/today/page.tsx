@@ -7,14 +7,13 @@ import { ActivityPanel, stepLabel } from "@/components/activity-panel";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { ButtonLink } from "@/components/button";
 import { Carousel } from "@/components/carousel";
-import { DownloadFlow } from "@/components/download-flow";
 import { InfoCard } from "@/components/info-card";
 import { PageHeader } from "@/components/page-header";
 import { PostTools } from "@/components/post-tools";
 import { canDeletePost } from "@/lib/posts/deletable";
 import { ReviewPanel } from "@/components/review-panel";
 import { StatusScreen } from "@/components/status-screen";
-import { t } from "@/lib/i18n";
+import { t, type MessageKey } from "@/lib/i18n";
 import { getTodayData } from "@/lib/data/today";
 
 type TodayData = Extract<NonNullable<Awaited<ReturnType<typeof getTodayData>>>, { missing: false }>;
@@ -81,7 +80,6 @@ function TodayView({ q, data }: { q: Awaited<PageProps<"/today">["searchParams"]
   // An edited caption from Edit arrives as ?caption= (owners cannot write posts directly, FD-08).
   const edited = typeof q.caption === "string" && q.caption.trim() ? q.caption.trim().slice(0, 2200) : null;
   const caption = edited ?? (Number.isInteger(pick) && captions[pick] ? captions[pick] : (post.chosen_caption ?? captions[0] ?? ""));
-  const captionText = `${caption}\n\n${post.hashtags.join(" ")}`;
   const connected = Boolean(shop.ig_account_id);
 
   // Activity (228:10153): a plain-language summary; real per-step data lives in Run details (FD-28).
@@ -135,130 +133,31 @@ function TodayView({ q, data }: { q: Awaited<PageProps<"/today">["searchParams"]
     );
   }
 
-  // Download instead (228:10910): from the publish screen or a failed publish.
-  if (q.view === "download" && allSlidesPassed(slides)) {
-    return <DownloadFlow slides={slides} downloads={downloads} captionText={captionText} connected={connected} backHref={today()} />;
+  if (post.status === "generating") {
+    return <Studio cutout={data.cutout} productName={productName} steps={steps} calls={calls} />;
   }
 
-  // A ready post with a failed product check never offers Approve (FR-FD-01).
-  const unchecked = post.status === "ready" ? slides.find((s) => !s.fidelity_passed) : undefined;
+  // A post whose product check failed shows no slides (FR-FD-01).
+  const unchecked = slides.find((s) => !s.fidelity_passed);
   if (unchecked || (post.status === "ready" && slides.length === 0)) {
     return <FidelityFailed shopId={shop.id} postId={post.id} slide={unchecked?.order ?? 1} steps={steps} calls={calls} />;
   }
-
-  // Publish this post? (228:10628, SRD v2.1 A-04): Approve opens it so the owner sees where it goes.
-  if (q.view === "share" && post.status === "ready") {
+  if (slides.length === 0) {
     return (
-      <StatusScreen title={t("share.title")} body={t("share.body")}>
-        <div className="mx-auto w-full max-w-90">
-          <Carousel slides={slides} labels={[t("today.slide1"), t("today.slide2"), t("today.slide3")]} eyebrow={photo?.name} />
-        </div>
-        <section className="flex flex-col gap-3 rounded-2xl bg-white px-4 py-5 leading-[1.4]">
-          <h2 className="text-sm font-semibold">{t("share.to")}</h2>
-          <Platform icon="instagram" name={`${t("share.instagram")}${connected ? "  ✓" : ""}`} note={t(connected ? "share.igConnected" : "share.igMissing")} selected />
-          {/* shortcut: Facebook has no publish route yet (A-04), so it is shown but cannot be picked. */}
-          <Platform icon="facebook" name={t("share.facebook")} note={t("share.fbSoon")} />
-        </section>
-        <InfoCard vector="check" title={t("share.readyTitle")}>
-          {t("share.readyBody")}
-        </InfoCard>
-        <ActionButton url={`/api/posts/${post.id}/approve`} body={{ caption }} then={today()}>
-          {t("share.approve")}
-        </ActionButton>
-        <ButtonLink href={today({ view: "download", caption })} variant="secondary">
-          {t("share.download")}
-        </ButtonLink>
-        <ButtonLink href={`/posts/${post.id}/edit`} variant="text">
-          {t("share.keepEditing")}
-        </ButtonLink>
+      <StatusScreen title={t("status.genFailed.title")} body={t("status.genFailed.body")}>
+        <ActionButton url={`/api/shops/${shop.id}/posts/generate`}>{t("status.fidelity.action")}</ActionButton>
+        <PostTools postId={post.id} downloads={[]} canDelete={canDeletePost(post, connected)} />
+        <ActivityPanel steps={steps} calls={calls} open />
       </StatusScreen>
     );
   }
 
-  switch (post.status) {
-    case "generating":
-      return <Studio cutout={data.cutout} productName={productName} steps={steps} calls={calls} />;
-
-    case "approved":
-    case "publishing":
-      // Not connected: download + copy caption, approve still completes (FR-PB-04).
-      if (!connected) {
-        return (
-          <DownloadFlow slides={slides} downloads={downloads} captionText={captionText} connected={false} backHref={today()}>
-            {canDeletePost(post, false) && <PostTools postId={post.id} downloads={[]} canDelete />}
-          </DownloadFlow>
-        );
-      }
-      return (
-        <StatusScreen title={t("status.publishing.title")} body={t("status.publishing.body")}>
-          <AutoRefresh />
-          <InfoCard vector="social" title={t("status.publishing.cardTitle")}>
-            {t("status.savedBody")}
-          </InfoCard>
-          <ActivityPanel steps={steps} calls={calls} open />
-        </StatusScreen>
-      );
-
-    case "published":
-      return (
-        <StatusScreen title={t("status.published.title")} body={t("status.published.body")}>
-          {post.permalink && (
-            <ButtonLink href={post.permalink} target="_blank" rel="noopener noreferrer">
-              {t("status.published.action")}
-            </ButtonLink>
-          )}
-          <InfoCard vector="plan" title={t("status.published.nextTitle")}>
-            {t("status.published.nextBody")}
-          </InfoCard>
-          <PostTools postId={post.id} downloads={downloads} canDelete={false} />
-        </StatusScreen>
-      );
-
-    case "failed": {
-      const bad = slides.find((s) => !s.fidelity_passed);
-      // A failed product check never offers Approve (FR-FD-01); a failed publish retries via Approve.
-      if (bad) return <FidelityFailed shopId={shop.id} postId={post.id} slide={bad.order} steps={steps} calls={calls} />;
-      if (!post.approved_at) {
-        return (
-          <StatusScreen title={t("status.genFailed.title")} body={t("status.genFailed.body")}>
-            <ActionButton url={`/api/shops/${shop.id}/posts/generate`}>{t("status.fidelity.action")}</ActionButton>
-            <PostTools postId={post.id} downloads={[]} canDelete />
-            <ActivityPanel steps={steps} calls={calls} open />
-          </StatusScreen>
-        );
-      }
-      return (
-        <StatusScreen title={t("status.failed.title")} body={t("status.failed.body")}>
-          <InfoCard vector="clock" title={t("status.failed.cardTitle")}>
-            {t("status.failed.cardBody")}
-          </InfoCard>
-          <ActionButton url={`/api/posts/${post.id}/approve`} body={{ caption }}>
-            {t("status.failed.action")}
-          </ActionButton>
-          <ButtonLink href={today({ view: "download" })} variant="secondary">
-            {t("status.failed.download")}
-          </ButtonLink>
-          <ActivityPanel steps={steps} calls={calls} />
-        </StatusScreen>
-      );
-    }
-
-    case "skipped":
-      return (
-        <StatusScreen title={t("status.skipped.title")} body={t("status.skipped.body")}>
-          <InfoCard vector="clock" title={t("status.skipped.cardTitle")}>
-            {t("status.skipped.cardBody")}
-          </InfoCard>
-          <PostTools postId={post.id} downloads={allSlidesPassed(slides) ? downloads : []} canDelete />
-          <ActivityPanel steps={steps} calls={calls} />
-        </StatusScreen>
-      );
-  }
-
-  // ready (Figma 228:9965 / 228:10045)
+  // Review (Figma 228:9965 / 228:10045). Every finished post, whatever its status, opens here so the owner
+  // can always see the generated slides. Publishing to Instagram is not built yet, so there is no Approve.
+  const statusKey = `history.status.${post.status}` as MessageKey;
   return (
     <div className="flex flex-col gap-6 lg:gap-7">
-      <PageHeader eyebrow={t("today.eyebrow")} title={t("today.title")} body={t("today.subtitle")} />
+      <PageHeader eyebrow={q.post ? t(statusKey) : t("today.eyebrow")} title={t("today.title")} body={t("today.subtitle")} />
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,616fr)_minmax(0,496fr)]">
         <section data-tour="carousel" aria-label={t("today.carousel")} className="flex flex-col gap-2.5 lg:glass lg:gap-4 lg:rounded-2xl lg:p-6">
@@ -276,12 +175,17 @@ function TodayView({ q, data }: { q: Awaited<PageProps<"/today">["searchParams"]
               {t("today.compare")}
             </ButtonLink>
           )}
-          <PostTools postId={post.id} downloads={downloads} canDelete />
+          {post.status === "published" && post.permalink && (
+            <ButtonLink href={post.permalink} target="_blank" rel="noopener noreferrer" variant="secondary">
+              {t("status.published.action")}
+            </ButtonLink>
+          )}
+          <PostTools postId={post.id} downloads={downloads} canDelete={canDeletePost(post, connected)} />
           {/* How this post was made sits under the result, not in a separate tab. */}
           <ActivityPanel steps={steps} calls={calls} />
         </section>
 
-        <ReviewPanel postId={post.id} scoped={Boolean(q.post)} captions={captions} hashtags={post.hashtags}>
+        <ReviewPanel postId={post.id} scoped={Boolean(q.post)} captions={[...new Set([caption, ...captions].filter(Boolean))]} hashtags={post.hashtags} canSkip={post.status === "ready"}>
           <section className="flex flex-col gap-3 max-lg:glass max-lg:rounded-card max-lg:px-5 max-lg:py-6 lg:py-6">
             {/* eslint-disable-next-line @next/next/no-img-element -- static design illustration */}
             <img src="/figma/vector-research.svg" width={78} height={50} alt="" />
@@ -366,20 +270,6 @@ function Studio({ cutout, productName, steps, calls }: { cutout: string | null; 
           </InfoCard>
         </section>
       </div>
-    </div>
-  );
-}
-
-// A publish destination row (228:10649).
-function Platform({ icon, name, note, selected }: { icon: string; name: string; note: string; selected?: boolean }) {
-  return (
-    <div aria-disabled={!selected} className={`flex items-center gap-2.5 rounded-control p-3 ${selected ? "bg-powder" : "opacity-70"}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- static platform icon */}
-      <img src={`/figma/platform-${icon}.svg`} width={28} height={28} alt="" />
-      <span className="flex flex-col gap-[3px]">
-        <span className="text-sm font-semibold whitespace-pre-wrap">{name}</span>
-        <span className="text-xs text-muted">{note}</span>
-      </span>
     </div>
   );
 }

@@ -9,13 +9,13 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { AnchorButton, Button } from "./button";
 import { Field, glassInput } from "./field";
 import { InfoCard } from "./info-card";
-import { Photo, ProductForm } from "./products-view";
+import { Photo, ProcessingPhoto, ProductForm } from "./products-view";
 import { Stage, Stages } from "./stages";
 import { UploadError } from "./upload-error";
-import { deleteProduct, saveProduct, setCutoutConfirmed } from "@/lib/actions/products";
+import { deleteProduct, removeUpload, saveProduct, setCutoutConfirmed } from "@/lib/actions/products";
 import type { ProductView } from "@/lib/data/products";
 import { t, type MessageKey } from "@/lib/i18n";
-import { asTone, CATEGORIES, COUNTRIES, TIME_ZONES, TONES, type Tone } from "@/lib/options";
+import { CATEGORIES, COUNTRIES, LOOK_PHRASE, LOOKS, lookOf, NEVER_KEYS, NEVER_PRESETS, TIME_ZONES, TONES, type Look, type NeverKey, type Tone } from "@/lib/options";
 import { ACCEPT, patchOnboarding, uploadAndExtract, validPhoto } from "@/lib/upload";
 
 export type SetupShop = {
@@ -31,10 +31,16 @@ export type SetupShop = {
   completed: boolean;
 };
 
+// The owner's real product for steps 4 and 5: signed URLs only (NFR-13).
+export type SetupPreview = { name: string; cutout: string | null; photo: string | null; slide: string | null; postStatus: string | null };
+
+// A photo uploaded earlier that has no product yet (signed URL only).
+export type PendingUpload = { id: string; url: string | null; createdAt: string };
+
 type Ctx = { shop: SetupShop; go: (step: number) => void; save: (body: Record<string, unknown>) => Promise<boolean> };
 
 // All 5 onboarding steps (F-03, FR-OB, Figma page 05). Each step saves server-side before moving on (FR-OB-11).
-export function SetupSteps({ step, shop, products, rules, brandKit }: { step: number; shop: SetupShop; products: ProductView[]; rules: string[]; brandKit: BrandKitValue }) {
+export function SetupSteps({ step, shop, products, rules, brandKit, preview, pending }: { step: number; shop: SetupShop; products: ProductView[]; rules: string[]; brandKit: BrandKitValue; preview: SetupPreview | null; pending: PendingUpload[] }) {
   const router = useRouter();
   const ctx: Ctx = {
     shop,
@@ -50,11 +56,11 @@ export function SetupSteps({ step, shop, products, rules, brandKit }: { step: nu
   return (
     <>
       {step === 1 && <Step1 ctx={ctx} />}
-      {step === 2 && <Step2 ctx={ctx} hasProducts={products.length > 0} />}
+      {step === 2 && <Step2 ctx={ctx} products={products} pending={pending} />}
       {/* Keyed by ids so a replaced photo (router.refresh) resets the list. */}
       {step === 3 && <Step3 key={products.map((p) => p.id).join()} ctx={ctx} initial={products} />}
-      {step === 4 && <Step4 ctx={ctx} initialRules={rules} initialKit={brandKit} />}
-      {step === 5 && <Step5 ctx={ctx} />}
+      {step === 4 && <Step4 ctx={ctx} initialRules={rules} initialKit={brandKit} preview={preview} />}
+      {step === 5 && <Step5 ctx={ctx} preview={preview} />}
     </>
   );
 }
@@ -191,22 +197,13 @@ const TIPS = [
   ["backdrop", "ob2.tipBackdrop"],
 ] as const;
 
-// Loading panel tied to the real upload/extract phases (270:1497, 270:1639; FD-24).
-function Loading({ phase }: { phase: "uploading" | "preparing" }) {
+// Loading panel tied to the real upload/extract phases (270:1497, 270:1639; FD-24): the owner's own photos
+// get the same scan-line animation and live step list as adding a product.
+function Loading({ phase, urls }: { phase: "uploading" | "preparing"; urls: string[] }) {
   return (
-    <div aria-busy="true" aria-live="polite" className="flex max-w-xl flex-col gap-5">
+    <div className="flex max-w-xl flex-col gap-5">
       <Head title={t(`ob2.${phase}Title`)} body={t(`ob2.${phase}Body`)} />
-      <section className="glass flex flex-col gap-3 rounded-card p-5">
-        <div className="flex flex-col gap-2.5" aria-hidden="true">
-          <span className="h-11 animate-pulse rounded-control bg-powder" />
-          <span className="h-3 animate-pulse rounded-full bg-powder" />
-          <span className="h-3 w-2/3 animate-pulse rounded-full bg-powder" />
-        </div>
-        {/* eslint-disable-next-line @next/next/no-img-element -- static design illustration */}
-        <img src={`/figma/vector-${phase === "uploading" ? "photo" : "build"}.svg`} width={78} height={50} alt="" />
-        <h2 className="text-lg font-semibold">{t(`ob2.${phase}Card`)}</h2>
-        <p className="text-[15px] text-muted">{t(`ob2.${phase}CardBody`)}</p>
-      </section>
+      <ProcessingPhoto src={urls[0]} more={urls.slice(1)} from={phase === "preparing" ? 1 : 0} />
       <InfoCard vector="check" title={t("ob2.waitTitle")}>
         {t("ob2.waitBody")}
       </InfoCard>
@@ -214,25 +211,73 @@ function Loading({ phase }: { phase: "uploading" | "preparing" }) {
   );
 }
 
-// Add one product (228:16642 / 228:16711). Onboarding needs at least 1 photo, up to 10 (route need_a_photo, SRD A-10).
-function Step2({ ctx, hasProducts }: { ctx: Ctx; hasProducts: boolean }) {
+// The owner's product on the soft stage; `working` adds the scan-line while the real slide is still being made.
+function RealPhoto({ src, alt, eyebrow, caption, working = false }: { src: string | null; alt: string; eyebrow: string; caption: string; working?: boolean }) {
+  return (
+    <figure className="flex w-full flex-col gap-2 leading-[1.35] font-semibold lg:max-w-75">
+      <div className={`relative aspect-[4/5] overflow-hidden rounded-card bg-[radial-gradient(circle_at_30%_40%,#e5f0ff,#f9f9ff)] ${working ? "photo-processing" : ""}`}>
+        {src && <Image src={src} alt={alt} fill sizes="(min-width: 1024px) 300px, 90vw" className="object-contain" />}
+        {working && (
+          <>
+            <div aria-hidden="true" className="photo-shimmer absolute inset-0" />
+            <div aria-hidden="true" className="photo-scan-line" />
+          </>
+        )}
+      </div>
+      <figcaption className="flex flex-col gap-2">
+        <span className="text-[10px] uppercase">{eyebrow}</span>
+        <span>{caption}</span>
+      </figcaption>
+    </figure>
+  );
+}
+
+const RESUME_MS = 3 * 60 * 1000;
+
+// Add products (228:16642 / 228:16711). Onboarding needs at least 1 photo, up to 10 (route need_a_photo, SRD A-10).
+// Everything already saved comes back here: prepared products, and photos whose preparation is still running or died.
+function Step2({ ctx, products, pending }: { ctx: Ctx; products: ProductView[]; pending: PendingUpload[] }) {
+  const router = useRouter();
   const pick = useRef<HTMLInputElement>(null);
   const next = useRef(1);
   const [photos, setPhotos] = useState<Picked[]>([]);
   const [error, setError] = useState<MessageKey | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
-  const ok = photos.length >= 1;
+  const [gaveUp, setGaveUp] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [now] = useState(() => Date.now());
+
+  // A recent upload without a product is most likely still being prepared by the request from before the refresh.
+  const running = gaveUp ? [] : pending.filter((u) => now - Date.parse(u.createdAt) < RESUME_MS);
+  const stuck = pending.filter((u) => !running.includes(u));
+  const resuming = phase === "idle" && running.length > 0 && photos.length === 0;
+  const saved = products.length + pending.length;
+  const total = saved + photos.length;
   const busy = phase !== "idle";
+  const canContinue = photos.length > 0 || saved > 0;
 
   // Free the preview blobs on leave.
   const urls = useRef<string[]>([]);
   useEffect(() => () => urls.current.forEach(URL.revokeObjectURL), []);
 
+  // Re-read the page until the running photos turn into products (capped, so a dead run never polls forever).
+  useEffect(() => {
+    if (!resuming) return;
+    let left = 45;
+    const id = setInterval(() => {
+      if (--left <= 0) {
+        clearInterval(id);
+        setGaveUp(true);
+      } else router.refresh();
+    }, 4000);
+    return () => clearInterval(id);
+  }, [resuming, router]);
+
   const add = (files: FileList | null) => {
     if (!files) return;
     const good = Array.from(files).filter(validPhoto);
     setError(good.length < files.length ? "ob2.badFile" : null);
-    const added = good.slice(0, 10 - photos.length).map((file) => {
+    const added = good.slice(0, 10 - total).map((file) => {
       const url = URL.createObjectURL(file);
       urls.current.push(url);
       return { id: next.current++, file, url };
@@ -241,16 +286,39 @@ function Step2({ ctx, hasProducts }: { ctx: Ctx; hasProducts: boolean }) {
     if (pick.current) pick.current.value = "";
   };
 
+  const drop = async (id: string, job: () => Promise<{ ok: boolean }>) => {
+    setBusyId(id);
+    const res = await job().catch(() => null);
+    setBusyId(null);
+    if (!res?.ok) return setError("common.error");
+    setError(null);
+    router.refresh();
+  };
+
   const submit = async () => {
     setError(null);
-    setPhase("uploading");
-    const res = await uploadAndExtract(ctx.shop.id, photos.map((p) => p.file), () => setPhase("preparing")).catch(() => null);
-    if (!res || res.products.length === 0) return (setPhase("idle"), setError("ob2.failed"));
+    // Only new photos are uploaded, and only photos without a product are prepared: the rest is already done.
+    if (photos.length > 0 || stuck.length > 0) {
+      setPhase("uploading");
+      const res = await uploadAndExtract(ctx.shop.id, photos.map((p) => p.file), () => setPhase("preparing"), stuck.map((u) => u.id)).catch(() => null);
+      if (!res || res.products.length === 0) return (setPhase("idle"), setError("ob2.failed"));
+    }
     if (!(await ctx.save({ action: "finish" }))) return (setPhase("idle"), setError("common.error"));
     ctx.go(3);
   };
 
-  if (busy) return <Loading phase={phase} />;
+  if (busy) return <Loading phase={phase} urls={photos.length ? photos.map((p) => p.url) : stuck.map((u) => u.url ?? "").filter(Boolean)} />;
+  if (resuming) return <Loading phase="preparing" urls={running.map((u) => u.url ?? "").filter(Boolean)} />;
+
+  const tile = "relative aspect-square overflow-hidden rounded-control bg-white";
+  const tag = "absolute bottom-1 left-1 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-medium text-ink";
+  const remove = (label: string, onClick: () => void, disabled = false) => (
+    <button type="button" onClick={onClick} disabled={disabled} aria-label={label} className="absolute top-0 right-0 flex size-11 items-center justify-center text-lg text-ink disabled:opacity-50">
+      <span aria-hidden="true" className="flex size-6 items-center justify-center rounded-full bg-white/90">
+        ×
+      </span>
+    </button>
+  );
 
   return (
     <>
@@ -276,24 +344,29 @@ function Step2({ ctx, hasProducts }: { ctx: Ctx; hasProducts: boolean }) {
         right={
           <section className="glass flex flex-col gap-3 rounded-card p-5">
             <h2 className="text-lg font-semibold">{t("ob2.cardTitle")}</h2>
-            <p className="text-[15px] text-muted">{photos.length ? t("ob2.count", { n: photos.length }) : t("ob2.cardBody")}</p>
-            {hasProducts && photos.length === 0 && <p className="text-sm">{t("ob2.have")}</p>}
-            {photos.length > 0 && (
+            <p className="text-[15px] text-muted">{total ? t("ob2.count", { n: total }) : t("ob2.cardBody")}</p>
+            {saved > 0 && photos.length === 0 && <p className="text-sm">{t("ob2.have")}</p>}
+            {total > 0 && (
               <ul className="grid grid-cols-3 gap-2">
+                {products.map((p, i) => (
+                  <li key={p.id} className={tile}>
+                    {p.cutout_url && <Image src={p.cutout_url} alt={p.name} fill sizes="120px" className="object-contain" />}
+                    <span className={tag}>{t("ob2.ready")}</span>
+                    {remove(t("ob2.removeSaved", { n: i + 1 }), () => void drop(p.id, () => deleteProduct(p.id)), busyId === p.id)}
+                  </li>
+                ))}
+                {pending.map((u, i) => (
+                  <li key={u.id} className={tile}>
+                    {u.url && <Image src={u.url} alt="" fill sizes="120px" className="object-cover" />}
+                    <span className={tag}>{t("ob2.preparing")}</span>
+                    {remove(t("ob2.removeSaved", { n: products.length + i + 1 }), () => void drop(u.id, () => removeUpload(u.id)), busyId === u.id)}
+                  </li>
+                ))}
                 {photos.map((p, i) => (
-                  <li key={p.id} className="relative aspect-square overflow-hidden rounded-control bg-white">
+                  <li key={p.id} className={tile}>
                     {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
                     <img src={p.url} alt={t("ob2.photo", { n: i + 1 })} className="size-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => setPhotos(photos.filter((x) => x.id !== p.id))}
-                      aria-label={t("ob2.remove", { n: i + 1 })}
-                      className="absolute top-0 right-0 flex size-11 items-center justify-center text-lg text-ink"
-                    >
-                      <span aria-hidden="true" className="flex size-6 items-center justify-center rounded-full bg-white/90">
-                        ×
-                      </span>
-                    </button>
+                    {remove(t("ob2.remove", { n: i + 1 }), () => setPhotos(photos.filter((x) => x.id !== p.id)))}
                   </li>
                 ))}
               </ul>
@@ -304,14 +377,14 @@ function Step2({ ctx, hasProducts }: { ctx: Ctx; hasProducts: boolean }) {
             ) : (
               <>
                 <Err show={Boolean(error)} text={error ?? undefined} />
-                {photos.length < 10 && (
+                {total < 10 && (
                   <Button variant="secondary" onClick={() => pick.current?.click()}>
-                    {t(photos.length ? "ob2.add" : "ob2.choose")}
+                    {t(total ? "ob2.add" : "ob2.choose")}
                   </Button>
                 )}
-                {!ok && photos.length > 0 && <p className="text-sm text-muted">{t("ob2.need")}</p>}
-                <Button onClick={ok ? submit : () => ctx.go(3)} disabled={!ok && !(hasProducts && photos.length === 0)}>
-                  {t("ob2.continue")}
+                {!canContinue && <p className="text-sm text-muted">{t("ob2.need")}</p>}
+                <Button onClick={submit} disabled={!canContinue}>
+                  {t(stuck.length > 0 && photos.length === 0 ? "ob2.retry" : "ob2.continue")}
                 </Button>
               </>
             )}
@@ -322,8 +395,6 @@ function Step2({ ctx, hasProducts }: { ctx: Ctx; hasProducts: boolean }) {
   );
 }
 
-const price = (p: ProductView) => (p.price != null ? `${p.currency ?? ""} ${Number(p.price).toLocaleString()}`.trim() : t("ob3.noPrice"));
-
 // Review this product, one photo at a time (228:16787, 228:17683, 228:17796), plus details (228:17913).
 function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
   const router = useRouter();
@@ -333,7 +404,6 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
-  const done = items.length > 0 && items.every((p) => p.cutout_confirmed);
   const current = items[Math.min(index, items.length - 1)];
 
   const act = (job: () => Promise<{ ok: boolean } | null>, after: () => void) =>
@@ -344,16 +414,19 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
       after();
     });
 
+  // One confirm per product; the last one saves the step and moves straight to step 4.
   const confirm = () =>
-    act(
-      () => setCutoutConfirmed(current.id, true),
-      () => {
-        const next = items.map((x) => (x.id === current.id ? { ...x, cutout_confirmed: true } : x));
-        setItems(next);
-        const todo = next.findIndex((x) => !x.cutout_confirmed);
-        if (todo >= 0) setIndex(todo);
-      },
-    );
+    start(async () => {
+      setFailed(false);
+      const res = await setCutoutConfirmed(current.id, true).catch(() => null);
+      if (!res?.ok) return setFailed(true);
+      const next = items.map((x) => (x.id === current.id ? { ...x, cutout_confirmed: true } : x));
+      setItems(next);
+      const todo = next.findIndex((x) => !x.cutout_confirmed);
+      if (todo >= 0) return setIndex(todo);
+      if (!(await ctx.save({ action: "finish" }))) return setFailed(true);
+      ctx.go(4);
+    });
 
   // Replace = upload the new photo as a product, then drop the old one.
   const replace = (file: File | undefined) => {
@@ -366,13 +439,6 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
       () => router.refresh(),
     );
   };
-
-  const finish = () =>
-    start(async () => {
-      setFailed(false);
-      if (!(await ctx.save({ action: "finish" }))) return setFailed(true);
-      ctx.go(4);
-    });
 
   if (editing && current) {
     return (
@@ -401,21 +467,6 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
     );
   }
 
-  if (done) {
-    return (
-      <>
-        <Head title={t("ob3.title")} body={t("ob3.body")} />
-        <div className="flex flex-col gap-4 lg:max-w-136">
-          <InfoCard vector="check" title={t("ob3.allDone")} />
-          <Err show={failed} />
-          <Button onClick={finish} disabled={pending} aria-busy={pending}>
-            {t("ob3.continue")}
-          </Button>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <Head title={t("ob3.title")} body={t("ob3.body")} />
@@ -426,12 +477,6 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
             <InfoCard vector="check" title={t("ob3.visibleTitle")}>
               {t("ob3.visibleBody")}
             </InfoCard>
-            <Field n={1} cue="product" label={t("ob3.name")}>
-              <input value={current.name} readOnly className={glassInput} />
-            </Field>
-            <Field n={2} cue="tag" label={t("ob3.price")}>
-              <input value={price(current)} readOnly className={glassInput} />
-            </Field>
             <input ref={pick} type="file" accept={ACCEPT} className="sr-only" aria-label={t("ob3.replace")} onChange={(e) => replace(e.target.files?.[0])} />
             <Err show={failed} />
             <Button onClick={confirm} disabled={pending} aria-busy={pending}>
@@ -450,106 +495,230 @@ function Step3({ ctx, initial }: { ctx: Ctx; initial: ProductView[] }) {
   );
 }
 
-// Voice & Instagram (228:16936 / 228:17005), connected state (228:18124).
-function Step4({ ctx, initialRules, initialKit }: { ctx: Ctx; initialRules: string[]; initialKit: BrandKitValue }) {
+// Voice, look and Instagram as one question card at a time (Lovart-style). Each answer is saved when confirmed,
+// so leaving for Instagram or skipping a question never loses anything.
+const CARDS = ["tone", "never", "look", "ig", "summary"] as const;
+type CardId = (typeof CARDS)[number];
+const MAX_RULES = 10;
+
+const toneOf = (v: string | null): Tone | null => TONES.find((x) => x === v) ?? null;
+
+function Chip({ on, onClick, children, hint }: { on: boolean; onClick: () => void; children: ReactNode; hint?: string }) {
+  return (
+    <button type="button" aria-pressed={on} onClick={onClick} className={`glass flex min-h-11 flex-col items-start gap-0.5 rounded-card px-4 py-3 text-left text-base font-medium ${on ? "outline-2 outline-blue" : ""}`}>
+      {children}
+      {hint && <span className="text-[13px] font-normal text-muted">{hint}</span>}
+    </button>
+  );
+}
+
+function Step4({ ctx, initialRules, initialKit, preview }: { ctx: Ctx; initialRules: string[]; initialKit: BrandKitValue; preview: SetupPreview | null }) {
   const igResult = useSearchParams().get("ig");
-  const [tone, setTone] = useState<Tone>(asTone(ctx.shop.tone));
-  const [rules, setRules] = useState<string[]>(initialRules.length ? initialRules : [""]);
+  const [card, setCard] = useState<CardId>(igResult ? "ig" : "tone");
+  const [editing, setEditing] = useState(false);
+  const [tone, setTone] = useState<Tone | null>(toneOf(ctx.shop.tone));
+  // Saved rules that match a preset tick that chip; the rest are the owner's own.
+  const [never, setNever] = useState<NeverKey[]>(() => NEVER_KEYS.filter((k) => initialRules.includes(NEVER_PRESETS[k])));
+  const [own, setOwn] = useState<string[]>(() => initialRules.filter((r) => !NEVER_KEYS.some((k) => NEVER_PRESETS[k] === r)));
   const [kit, setKit] = useState(initialKit);
+  const [look, setLook] = useState<Look | null>(lookOf(initialKit.photo_style));
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
 
-  const finish = (action: "finish" | "skip") =>
+  const rules = [...never.map((k) => NEVER_PRESETS[k]), ...own.map((r) => r.trim()).filter(Boolean)].slice(0, MAX_RULES);
+  const index = CARDS.indexOf(card);
+  const move = (to: CardId) => {
+    setFailed(false);
+    setCard(to);
+  };
+  // After a confirm: back to the summary when editing from it, otherwise on to the next card.
+  const advance = () => {
+    setEditing(false);
+    move(editing ? "summary" : CARDS[index + 1]);
+  };
+  const run = (job: () => Promise<boolean>) =>
     start(async () => {
       setFailed(false);
-      const data = { tone, rules: rules.map((r) => r.trim()).filter(Boolean) };
-      // Skipping leaves the kit as it was; Continue saves what the owner chose (SRD A-09).
-      if (action === "finish" && !(await saveBrandKit(kit)).ok) return setFailed(true);
-      if (!(await ctx.save(action === "finish" ? { action, data } : { action }))) return setFailed(true);
+      if (await job()) advance();
+      else setFailed(true);
+    });
+
+  const confirm = () => {
+    if (card === "tone" && tone) run(() => ctx.save({ action: "save", data: { tone } }));
+    else if (card === "never") run(() => ctx.save({ action: "save", data: { rules } }));
+    else if (card === "look" && look) run(async () => (await saveBrandKit({ ...kit, photo_style: LOOK_PHRASE[look] })).ok);
+  };
+  const canConfirm = card === "tone" ? tone !== null : card === "look" ? look !== null : true;
+
+  const finish = () =>
+    start(async () => {
+      setFailed(false);
+      const data = tone ? { tone, rules } : { rules };
+      if (!(await ctx.save({ action: "finish", data }))) return setFailed(true);
       ctx.go(5);
     });
 
-  if (ctx.shop.igConnected && igResult === "connected") {
-    return (
-      <div className="flex flex-col gap-5 lg:max-w-136">
-        <Head title={t("ob4.connectedTitle")} body={t("ob4.connectedBody")} />
-        <InfoCard vector="social" title={t("ob4.connectedTitle")}>
-          {t("ob4.connectedCard")}
-        </InfoCard>
-        <Err show={failed} />
-        <Button onClick={() => finish("finish")} disabled={pending} aria-busy={pending}>
-          {t("ob4.connectedContinue")}
+  const toggleNever = (k: NeverKey) => setNever(never.includes(k) ? never.filter((x) => x !== k) : [...never, k]);
+  const edit = (to: CardId) => {
+    setEditing(true);
+    move(to);
+  };
+
+  const product = preview?.name ?? "your product";
+  const sample = tone
+    ? t(`ob4.sample${tone}` as MessageKey, { product, emoji: never.includes("emojis") ? "" : t("ob4.sampleEmoji") })
+    : t("ob4.samplePending");
+
+  const nav = (
+    <>
+      <Err show={failed} text="ob4.qSaveFailed" />
+      <div className="flex flex-col gap-2">
+        <Button onClick={confirm} disabled={pending || !canConfirm} aria-busy={pending}>
+          {t("ob4.qConfirm")}
         </Button>
+        {(card === "never" || card === "look") && (
+          <Button variant="text" onClick={advance} disabled={pending}>
+            {t("ob4.qSkipQuestion")}
+          </Button>
+        )}
+        {index > 0 && !editing && (
+          <Button variant="text" onClick={() => move(CARDS[index - 1])} disabled={pending}>
+            {t("ob4.qBack")}
+          </Button>
+        )}
       </div>
+    </>
+  );
+
+  const left =
+    card === "tone" ? (
+      <>
+        <h2 className="text-xl font-semibold">{t("ob4.qToneTitle")}</h2>
+        <div className="flex flex-col gap-2">
+          {TONES.map((x) => (
+            <Chip key={x} on={tone === x} onClick={() => setTone(x)}>
+              {t(`ob4.tone${x}` as MessageKey)}
+            </Chip>
+          ))}
+        </div>
+        {nav}
+      </>
+    ) : card === "never" ? (
+      <>
+        <h2 className="text-xl font-semibold">{t("ob4.qNeverTitle")}</h2>
+        <p className="text-sm text-muted">{t("ob4.qNeverHint")}</p>
+        <div className="flex flex-col gap-2">
+          {NEVER_KEYS.map((k) => (
+            <Chip key={k} on={never.includes(k)} onClick={() => toggleNever(k)}>
+              {t(`ob4.never${k}` as MessageKey)}
+            </Chip>
+          ))}
+        </div>
+        {own.map((r, i) => (
+          <span key={i} className="flex gap-2">
+            <input value={r} onChange={(e) => setOwn(own.map((x, j) => (j === i ? e.target.value : x)))} maxLength={200} placeholder={t("ob4.qOwnRulePlaceholder")} aria-label={t("ob4.qOwnRule")} className={glassInput} />
+            <button type="button" aria-label={t("ob4.removeRule", { n: i + 1 })} onClick={() => setOwn(own.filter((_, j) => j !== i))} className="flex size-11 shrink-0 items-center justify-center self-center text-xl text-danger">
+              ×
+            </button>
+          </span>
+        ))}
+        {never.length + own.length < MAX_RULES && (
+          <Button variant="secondary" onClick={() => setOwn([...own, ""])}>
+            {own.length ? t("ob4.qAddOwn") : t("ob4.qOwnRule")}
+          </Button>
+        )}
+        {nav}
+      </>
+    ) : card === "look" ? (
+      <>
+        <h2 className="text-xl font-semibold">{t("ob4.qLookTitle")}</h2>
+        <div className="flex flex-col gap-2">
+          {LOOKS.map((k) => (
+            <Chip key={k} on={look === k} onClick={() => setLook(k)} hint={t(`ob4.qLook${k === "clean" ? "Clean" : k === "lifestyle" ? "Lifestyle" : "Bold"}Hint` as MessageKey)}>
+              {t(`ob4.look${k}` as MessageKey)}
+            </Chip>
+          ))}
+        </div>
+        <details className="glass rounded-card p-4">
+          <summary className="min-h-11 cursor-pointer text-sm font-medium">{t("ob4.qColours")}</summary>
+          <div className="flex flex-col gap-4 pt-3">
+            <BrandKitEditor shopId={ctx.shop.id} value={kit} onChange={setKit} hasDescription={Boolean(ctx.shop.description?.trim())} />
+          </div>
+        </details>
+        {nav}
+      </>
+    ) : card === "ig" ? (
+      <>
+        <InfoCard vector="social" title={ctx.shop.igConnected ? t("ob4.connectedTitle") : t("ob4.igTitle")}>
+          {ctx.shop.igConnected ? t("ob4.connectedCard") : t("ob4.igBody")}
+        </InfoCard>
+        {!ctx.shop.igConnected && (
+          <>
+            {igResult === "error" && (
+              <p role="alert" className="text-sm text-danger">
+                {t("settings.igError")}
+              </p>
+            )}
+            <p className="text-[13px] text-muted">{t("settings.igHint")}</p>
+            <AnchorButton variant="secondary" href="/api/auth/instagram?next=onboarding">
+              {t("ob4.connect")}
+            </AnchorButton>
+          </>
+        )}
+        <Button variant={ctx.shop.igConnected ? "primary" : "text"} onClick={advance}>
+          {ctx.shop.igConnected ? t("ob4.qNext") : t("ob4.qSkipIg")}
+        </Button>
+        {!editing && (
+          <Button variant="text" onClick={() => move("look")}>
+            {t("ob4.qBack")}
+          </Button>
+        )}
+      </>
+    ) : (
+      <>
+        <h2 className="text-xl font-semibold">{t("ob4.summaryTitle")}</h2>
+        <p className="text-sm text-muted">{t("ob4.summaryBody")}</p>
+        <ul className="flex flex-col gap-2">
+          {(
+            [
+              ["tone", tone ? t("ob4.summaryTone", { tone: t(`ob4.tone${tone}` as MessageKey).toLowerCase() }) : t("ob4.summaryToneNone")],
+              ["never", rules.length ? t("ob4.summaryRules", { rules: rules.join("; ") }) : t("ob4.summaryRulesNone")],
+              ["look", look ? t("ob4.summaryLook", { look: t(`ob4.look${look}` as MessageKey).toLowerCase() }) : t("ob4.summaryLookNone")],
+              ["ig", t("ob4.summaryIg", { state: t(ctx.shop.igConnected ? "ob4.igStateOn" : "ob4.igStateOff") })],
+            ] as [CardId, string][]
+          ).map(([id, line]) => (
+            <li key={id} className="glass flex items-center justify-between gap-3 rounded-card p-3.5">
+              <span className="text-[15px]">{line}</span>
+              <Button variant="text" onClick={() => edit(id)} disabled={pending}>
+                {t("ob4.summaryEdit")}
+              </Button>
+            </li>
+          ))}
+        </ul>
+        <Err show={failed} />
+        <Button onClick={finish} disabled={pending} aria-busy={pending}>
+          {t("ob4.summaryFinish")}
+        </Button>
+      </>
     );
-  }
 
   return (
     <>
-      <Head title={t("ob4.title")} body={t("ob4.body")} />
+      <Head title={t("ob4.title")} body={card === "summary" ? t("ob4.summaryBody") : t("ob4.progress", { n: index + 1, total: CARDS.length })} />
       <Split
-        left={
-          <>
-            <BrandKitEditor shopId={ctx.shop.id} value={kit} onChange={setKit} hasDescription={Boolean(ctx.shop.description?.trim())} />
-            <Field n={5} cue="voice" label={t("ob4.tone")}>
-              <select value={tone} onChange={(e) => setTone(e.target.value as Tone)} className={glassInput}>
-                {TONES.map((x) => (
-                  <option key={x} value={x}>
-                    {t(`ob4.tone${x}` as MessageKey)}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            {rules.map((r, i) => (
-              <Field key={i} n={i + 6} cue="rules" label={t("ob4.rule", { n: i + 1 })}>
-                <span className="flex gap-2">
-                  <input value={r} onChange={(e) => setRules(rules.map((x, j) => (j === i ? e.target.value : x)))} maxLength={200} placeholder={t("ob4.rulePlaceholder")} className={glassInput} />
-                  {rules.length > 1 && (
-                    <button type="button" aria-label={t("ob4.removeRule", { n: i + 1 })} onClick={() => setRules(rules.filter((_, j) => j !== i))} className="flex size-11 shrink-0 items-center justify-center self-center text-xl text-danger">
-                      ×
-                    </button>
-                  )}
-                </span>
-              </Field>
-            ))}
-            <p className="text-xs text-muted">{t("ob4.ruleHint")}</p>
-            {rules.length < 10 && (
-              <Button variant="secondary" onClick={() => setRules([...rules, ""])}>
-                {t("ob4.addRule")}
-              </Button>
-            )}
-            <section className="glass flex flex-col gap-2 rounded-card p-5">
-              <h2 className="text-lg font-semibold">{t("ob4.sample")}</h2>
-              <p className="text-[15px] text-muted">{t("ob4.sampleText")}</p>
-            </section>
-          </>
-        }
+        left={left}
         right={
-          <>
-            <InfoCard vector="social" title={ctx.shop.igConnected ? t("ob4.connectedTitle") : t("ob4.igTitle")}>
-              {ctx.shop.igConnected ? t("ob4.connectedCard") : t("ob4.igBody")}
-            </InfoCard>
-            {!ctx.shop.igConnected && (
-              <>
-                {igResult === "error" && (
-                  <p role="alert" className="text-sm text-danger">
-                    {t("settings.igError")}
-                  </p>
-                )}
-                <p className="text-[13px] text-muted">{t("settings.igHint")}</p>
-                <AnchorButton variant="secondary" href="/api/auth/instagram?next=onboarding">
-                  {t("ob4.connect")}
-                </AnchorButton>
-              </>
-            )}
-            <Err show={failed} />
-            <Button onClick={() => finish("finish")} disabled={pending} aria-busy={pending}>
-              {t("ob4.continue")}
-            </Button>
-            <Button variant="text" onClick={() => finish("skip")} disabled={pending}>
-              {t("ob4.skip")}
-            </Button>
-          </>
+          <section className="glass flex flex-col gap-3 rounded-card p-5">
+            <h2 className="text-lg font-semibold">{t("ob4.sampleIntro")}</h2>
+            <div className="flex items-center gap-3">
+              {preview?.cutout && (
+                <span className="relative aspect-[4/5] w-16 shrink-0 overflow-hidden rounded-control bg-[radial-gradient(circle_at_30%_40%,#e5f0ff,#f9f9ff)]">
+                  <Image src={preview.cutout} alt={preview.name} fill sizes="64px" className="object-contain" />
+                </span>
+              )}
+              <p className="text-[15px] text-muted">{sample}</p>
+            </div>
+          </section>
         }
       />
     </>
@@ -557,12 +726,15 @@ function Step4({ ctx, initialRules, initialKit }: { ctx: Ctx; initialRules: stri
 }
 
 // First post + tour (228:17081, 228:17182, 228:17301): runs on a labelled sample while the real post generates (FR-OB-09).
-function Step5({ ctx }: { ctx: Ctx }) {
+function Step5({ ctx, preview }: { ctx: Ctx; preview: SetupPreview | null }) {
+  const router = useRouter();
   const [tour, setTour] = useState<1 | 2 | 3>(1);
   const [showFailed, setShowFailed] = useState(false);
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
   const started = useRef(false);
+  // The first slide is still being made: re-read the page until it lands (tour state is kept across refreshes).
+  const waiting = Boolean(preview) && !preview?.slide && (preview?.postStatus === "generating" || (preview?.postStatus == null && !ctx.shop.completed));
 
   // Replay tour (Settings) must not start another post.
   useEffect(() => {
@@ -570,6 +742,23 @@ function Step5({ ctx }: { ctx: Ctx }) {
     started.current = true;
     void fetch(`/api/shops/${ctx.shop.id}/posts/generate`, { method: "POST" }).catch(() => null);
   }, [ctx.shop.id, ctx.shop.completed]);
+
+  // Capped at ~3 minutes so a failed start never polls forever.
+  useEffect(() => {
+    if (!waiting) return;
+    let left = 45;
+    const id = setInterval(() => (--left <= 0 ? clearInterval(id) : router.refresh()), 4000);
+    return () => clearInterval(id);
+  }, [waiting, router]);
+
+  // The owner's product: the real first slide once built, otherwise the confirmed cutout being worked on.
+  const after = preview?.slide ?? preview?.cutout ?? null;
+  const afterCaption = preview?.slide ? t("ob5.afterCaption") : t("ob5.afterWorking");
+  const realPost = preview ? (
+    <RealPhoto src={after} alt={preview.name} eyebrow={t("ob5.realEyebrow")} caption={preview.slide ? preview.name : t("ob5.realWorking", { product: preview.name })} working={!preview.slide} />
+  ) : (
+    <Guide eyebrow={t("ob5.sampleEyebrow")} caption={t("ob5.sample")} />
+  );
 
   const finish = (action: "finish" | "skip") =>
     start(async () => {
@@ -603,8 +792,17 @@ function Step5({ ctx }: { ctx: Ctx }) {
         <Split
           left={
             <div className="flex flex-col gap-6 lg:flex-row">
-              <Guide eyebrow={t("ob5.before")} caption={t("ob5.beforeCaption")} />
-              <Guide eyebrow={t("ob5.after")} caption={t("ob5.afterCaption")} />
+              {preview ? (
+                <>
+                  <RealPhoto src={preview.photo ?? preview.cutout} alt={preview.name} eyebrow={t("ob5.beforeReal")} caption={t("ob5.beforeCaption")} />
+                  <RealPhoto src={after} alt={preview.name} eyebrow={t("ob5.afterReal")} caption={afterCaption} working={!preview.slide} />
+                </>
+              ) : (
+                <>
+                  <Guide eyebrow={t("ob5.before")} caption={t("ob5.beforeCaption")} />
+                  <Guide eyebrow={t("ob5.after")} caption={t("ob5.afterCaption")} />
+                </>
+              )}
             </div>
           }
           right={
@@ -630,9 +828,9 @@ function Step5({ ctx }: { ctx: Ctx }) {
 
   return (
     <>
-      <Head title={t("ob5.title")} body={t("ob5.body")} />
+      <Head title={t("ob5.title")} body={preview ? t("ob5.bodyReal") : t("ob5.body")} />
       <Split
-        left={<Guide eyebrow={t("ob5.sampleEyebrow")} caption={t("ob5.sample")} />}
+        left={realPost}
         right={
           <>
             <section className="glass flex flex-col gap-2 rounded-card p-5">

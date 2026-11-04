@@ -15,7 +15,7 @@ const CUES: Record<number, [string, string]> = { 1: ["shop", "product"], 2: ["ca
 const name = (n: number) => t(`setup.step${n}` as MessageKey);
 
 // Onboarding frame (Figma page 05 setup-*): eyebrow, 5-part bar, Back / Save and exit; navy step list on desktop.
-export function SetupShell({ step, shopId, shopName, others = [], children }: { step: number; shopId: string; shopName: string; others?: { id: string; name: string }[]; children: ReactNode }) {
+export function SetupShell({ step, savedStep, shopId, shopName, others = [], children }: { step: number; savedStep: number; shopId: string; shopName: string; others?: { id: string; name: string }[]; children: ReactNode }) {
   return (
     <div className="bg-app flex min-h-dvh">
       <aside className="flex w-56 shrink-0 flex-col gap-6 bg-navy px-6 pt-8 pb-4 leading-[1.4] text-white max-lg:hidden">
@@ -24,9 +24,9 @@ export function SetupShell({ step, shopId, shopName, others = [], children }: { 
         <ol className="flex flex-col gap-6 text-[15px]">
           {Array.from({ length: SETUP_STEPS }, (_, i) => i + 1).map((n) => (
             <li key={n} aria-current={n === step ? "step" : undefined} className={n === step ? "font-semibold" : ""}>
-              {n < step ? (
+              {n !== step && n <= savedStep ? (
                 <Link href={`/onboarding/${n}`} className="flex min-h-11 items-center hover:underline focus-visible:outline-2 focus-visible:outline-white">
-                  ✓ {t(`setup.done${n}` as MessageKey)}
+                  {n < savedStep ? `✓ ${t(`setup.done${n}` as MessageKey)}` : `${n}. ${name(n)}`}
                 </Link>
               ) : (
                 `${n}. ${name(n)}`
@@ -58,7 +58,7 @@ export function SetupShell({ step, shopId, shopName, others = [], children }: { 
               <li key={i} className={`h-[5px] flex-1 rounded-[3px] ${i < step ? "bg-blue" : "bg-border"}`} />
             ))}
           </ol>
-          <div className="flex gap-2.5 lg:hidden">
+          <div className="flex gap-2.5 lg:max-w-136">
             {step > 1 ? (
               <ButtonLink href={`/onboarding/${step - 1}`} variant="text" className="h-12 flex-1">
                 {t("setup.back")}
@@ -66,7 +66,12 @@ export function SetupShell({ step, shopId, shopName, others = [], children }: { 
             ) : (
               <span className="flex-1" />
             )}
-            <SaveAndExit shopId={shopId} step={step} className="h-12 flex-[1.27]" />
+            {step < savedStep && (
+              <ButtonLink href={`/onboarding/${step + 1}`} variant="text" className="h-12 flex-1">
+                {t("setup.next")}
+              </ButtonLink>
+            )}
+            <SaveAndExit shopId={shopId} step={step} className="h-12 flex-[1.27] lg:hidden" />
           </div>
           <BackToCompany others={others} className="lg:hidden" />
           <div className="flex items-center gap-3.5" aria-hidden="true">

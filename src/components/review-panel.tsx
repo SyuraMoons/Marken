@@ -8,8 +8,8 @@ import { InfoCard } from "./info-card";
 
 const REASONS = ["not_my_style", "wrong_product", "bad_timing", "other"] as const;
 
-// Caption choice + Approve (opens "Publish this post?", SRD A-04) + skip with reason chips (FR-TD-03, DX-05). `children` is the "why" section.
-export function ReviewPanel({ postId, scoped = false, captions, hashtags, children }: { postId: string; scoped?: boolean; captions: string[]; hashtags: string[]; children?: ReactNode }) {
+// Caption choice + Edit + skip with reason chips (FR-TD-03, DX-05). `children` is the "why" section.
+export function ReviewPanel({ postId, captions, hashtags, canSkip = true, children }: { postId: string; scoped?: boolean; captions: string[]; hashtags: string[]; canSkip?: boolean; children?: ReactNode }) {
   const [index, setIndex] = useState(0);
   const [picking, setPicking] = useState(false);
   const [skipping, setSkipping] = useState(false);
@@ -96,14 +96,16 @@ export function ReviewPanel({ postId, scoped = false, captions, hashtags, childr
       </section>
       {children}
 
-      <ButtonLink data-tour="approve" href={`/today?view=share&c=${index}${scoped ? `&post=${postId}` : ""}`}>{t("today.approve")}</ButtonLink>
-      <div className="grid grid-cols-2 gap-2.5 lg:gap-3">
-        <ButtonLink href={`/posts/${postId}/edit?c=${index}`} variant="secondary">
+      {/* No Approve: publishing to Instagram is not built yet. The owner downloads the slides instead. */}
+      <div className={`grid gap-2.5 lg:gap-3 ${canSkip ? "grid-cols-2" : ""}`}>
+        <ButtonLink data-tour="approve" href={`/posts/${postId}/edit?c=${index}`} variant="secondary">
           {t("today.edit")}
         </ButtonLink>
-        <Button variant="secondary" className="lg:border-transparent! lg:bg-transparent! lg:text-sm lg:font-normal! lg:text-link!" onClick={() => setSkipping(true)}>
-          {t("today.skip")}
-        </Button>
+        {canSkip && (
+          <Button variant="secondary" className="lg:border-transparent! lg:bg-transparent! lg:text-sm lg:font-normal! lg:text-link!" onClick={() => setSkipping(true)}>
+            {t("today.skip")}
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -17,3 +17,22 @@ export const TIME_ZONES = [
 export const TONES = ["Warm", "Playful", "Elegant", "Casual"] as const;
 export type Tone = (typeof TONES)[number];
 export const asTone = (v: string | null): Tone => (TONES.find((x) => x === v) ?? "Warm");
+
+// Step 4 question cards: "What should I never do?" presets become style rules (FR-SP-05).
+export const NEVER_PRESETS = {
+  prices: "Never show prices",
+  slang: "Never use slang",
+  emojis: "Never use emojis",
+} as const;
+export type NeverKey = keyof typeof NEVER_PRESETS;
+export const NEVER_KEYS = Object.keys(NEVER_PRESETS) as NeverKey[];
+
+// "What look do you want?" is saved as the brand kit photo style, which every scene brief already carries.
+export const LOOK_PHRASE = {
+  clean: "Clean, minimal product focus on a soft plain background.",
+  lifestyle: "Lifestyle scene showing the product in real everyday use.",
+  bold: "Bold promotional look with strong colour blocks and high contrast.",
+} as const;
+export type Look = keyof typeof LOOK_PHRASE;
+export const LOOKS = Object.keys(LOOK_PHRASE) as Look[];
+export const lookOf = (photoStyle: string): Look | null => LOOKS.find((k) => LOOK_PHRASE[k] === photoStyle.trim()) ?? null;

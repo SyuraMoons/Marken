@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { getOwnerShop } from "@/lib/data/today";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 // Owner-scoped product writes through the RLS client (FD-08).
@@ -35,8 +36,41 @@ export async function setCutoutConfirmed(id: string, confirmed: boolean): Promis
 }
 
 export async function deleteProduct(id: string): Promise<Result> {
-  if (!(await getOwnerShop()) || !z.uuid().safeParse(id).success) return { ok: false };
+  const owner = await getOwnerShop();
+  if (!owner || !z.uuid().safeParse(id).success) return { ok: false };
   const supabase = await createClient();
+  const { data: product } = await supabase.from("products").select("source_upload_id").eq("id", id).maybeSingle();
   const { error } = await supabase.from("products").delete().eq("id", id);
-  return { ok: !error };
+  if (error) return { ok: false };
+
+  // Drop the source photo too, so an upload without a product always means "not prepared yet" (onboarding step 2).
+  if (product?.source_upload_id) {
+    const admin = createAdminClient();
+    const { data: upload } = await admin
+      .from("media_uploads")
+      .select("storage_path")
+      .eq("id", product.source_upload_id)
+      .eq("shop_id", owner.shop.id)
+      .maybeSingle();
+    if (upload) {
+      await admin.from("media_uploads").delete().eq("id", product.source_upload_id).eq("shop_id", owner.shop.id);
+      await admin.storage.from("media").remove([upload.storage_path]);
+    }
+  }
+  return { ok: true };
+}
+
+// Drops a saved photo that never became a product (onboarding step 2). A photo that did is removed with its product.
+export async function removeUpload(id: string): Promise<Result> {
+  const owner = await getOwnerShop();
+  if (!owner || !z.uuid().safeParse(id).success) return { ok: false };
+  const admin = createAdminClient();
+  const { count } = await admin.from("products").select("id", { count: "exact", head: true }).eq("source_upload_id", id);
+  if (count) return { ok: false };
+  const { data: upload } = await admin.from("media_uploads").select("storage_path").eq("id", id).eq("shop_id", owner.shop.id).maybeSingle();
+  if (!upload) return { ok: false };
+  const { error } = await admin.from("media_uploads").delete().eq("id", id).eq("shop_id", owner.shop.id);
+  if (error) return { ok: false };
+  await admin.storage.from("media").remove([upload.storage_path]);
+  return { ok: true };
 }

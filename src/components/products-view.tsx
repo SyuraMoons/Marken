@@ -40,8 +40,10 @@ const STEPS = ["products.stepUpload", "products.stepCutout", "products.stepDetai
 const STEP_AT_MS = [0, 3000, 9000, 16000];
 
 // Photo being processed: a scan line sweeps the photo and a step list shows what is happening now.
-function ProcessingPhoto({ src, from = 0 }: { src?: string; from?: number }) {
-  const [step, setStep] = useState(from);
+// `from` may move forward while mounted (onboarding switches from uploading to preparing); `more` shows the other photos in the batch.
+export function ProcessingPhoto({ src, from = 0, more = [] }: { src?: string; from?: number; more?: string[] }) {
+  const [timed, setStep] = useState(from);
+  const step = Math.max(timed, from);
   useEffect(() => {
     const timers = STEP_AT_MS.map((ms, i) => (i > from ? setTimeout(() => setStep(i), ms - STEP_AT_MS[from]) : undefined));
     return () => timers.forEach((id) => id && clearTimeout(id));
@@ -56,6 +58,17 @@ function ProcessingPhoto({ src, from = 0 }: { src?: string; from?: number }) {
           <div aria-hidden="true" className="photo-shimmer absolute inset-0" />
           <div aria-hidden="true" className="photo-scan-line" />
         </div>
+        {more.length > 0 && (
+          <ul aria-hidden="true" className="grid grid-cols-5 gap-2">
+            {more.map((url, i) => (
+              <li key={url} className="photo-processing relative aspect-square overflow-hidden rounded-control bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
+                <img src={url} alt="" className="size-full object-cover" style={{ animationDelay: `${i * 300}ms` }} />
+                <div className="photo-shimmer absolute inset-0" style={{ animationDelay: `${i * 200}ms` }} />
+              </li>
+            ))}
+          </ul>
+        )}
         <figcaption className="flex flex-col gap-2">
           <span className="text-[10px] uppercase">{t("products.processingEyebrow")}</span>
           <span>{t("products.processingCaption")}</span>

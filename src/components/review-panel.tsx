@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { t, type MessageKey } from "@/lib/i18n";
+import { fromParam } from "@/lib/posts/back";
 import { ActionButton } from "./action-button";
 import { Button, ButtonLink } from "./button";
 import { InfoCard } from "./info-card";
@@ -9,7 +10,9 @@ import { InfoCard } from "./info-card";
 const REASONS = ["not_my_style", "wrong_product", "bad_timing", "other"] as const;
 
 // Caption choice + Edit + skip with reason chips (FR-TD-03, DX-05). `children` is the "why" section.
-export function ReviewPanel({ postId, captions, hashtags, canSkip = true, children }: { postId: string; scoped?: boolean; captions: string[]; hashtags: string[]; canSkip?: boolean; children?: ReactNode }) {
+export function ReviewPanel({ postId, captions, hashtags, canSkip = true, from = null, children }: { postId: string; scoped?: boolean; captions: string[]; hashtags: string[]; canSkip?: boolean; from?: string | null; children?: ReactNode }) {
+  // Edit keeps ?from= so its Save/Cancel return to Today with the "Back to create post" link intact.
+  const editHref = (i: number) => `/posts/${postId}/edit?c=${i}${fromParam(from)}`;
   const [index, setIndex] = useState(0);
   const [picking, setPicking] = useState(false);
   const [skipping, setSkipping] = useState(false);
@@ -35,7 +38,7 @@ export function ReviewPanel({ postId, captions, hashtags, canSkip = true, childr
         <InfoCard vector="voice" title={t("captionAlt.settingsTitle")}>
           {t("captionAlt.settingsBody")}
         </InfoCard>
-        <ButtonLink href={`/posts/${postId}/edit?c=${index}`} variant="text">
+        <ButtonLink href={editHref(index)} variant="text">
           {t("captionAlt.editManually")}
         </ButtonLink>
       </section>
@@ -98,7 +101,7 @@ export function ReviewPanel({ postId, captions, hashtags, canSkip = true, childr
 
       {/* No Approve: publishing to Instagram is not built yet. The owner downloads the slides instead. */}
       <div className={`grid gap-2.5 lg:gap-3 ${canSkip ? "grid-cols-2" : ""}`}>
-        <ButtonLink data-tour="approve" href={`/posts/${postId}/edit?c=${index}`} variant="secondary">
+        <ButtonLink data-tour="approve" href={editHref(index)} variant="secondary">
           {t("today.edit")}
         </ButtonLink>
         {canSkip && (

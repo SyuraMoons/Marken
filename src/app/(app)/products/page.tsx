@@ -3,13 +3,16 @@ import { Suspense } from "react";
 import { ProductsView } from "@/components/products-view";
 import { getProducts } from "@/lib/data/products";
 import { getOwnerShop } from "@/lib/data/today";
+import { FreshOnNavigate } from "@/components/fresh-on-navigate";
 
 // Products grid + add/check/edit/delete flows (DX-07, DX-09, DX-27).
 export default function ProductsPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-card bg-white" />}>
-      <Products />
-    </Suspense>
+    <FreshOnNavigate>
+      <Suspense fallback={<div className="h-64 animate-pulse rounded-card bg-white" />}>
+        <Products />
+      </Suspense>
+    </FreshOnNavigate>
   );
 }
 

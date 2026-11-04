@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import sharp from "sharp";
 import { assessCutout } from "../src/lib/studio/cutout-quality";
+import { normalizeLayers, SlideLayersSchema } from "../src/lib/studio/layers";
+import { applyTemplateLayout } from "../src/lib/studio/templates";
 import {
   decontaminateEdges,
   rasterToSoftAlpha,
@@ -120,8 +122,8 @@ test("gate rejects tiny, sparse, boxy, fragmented, ragged and cropped masks", ()
   assert.ok(assess(rect(w, h, 0, 0, 199, 199), w, h, { x1: 0, y1: 0, x2: 9, y2: 9, w: 1000, h: 1000 }).reasons.includes("too_small"));
   // sparse
   assert.ok(assess(rect(w, h, 90, 90, 100, 100), w, h).reasons.includes("sparse_mask"));
-  // box-like (everything selected)
-  assert.ok(assess(rect(w, h, 0, 0, 199, 199), w, h).reasons.includes("box_like"));
+  // box-like: everything selected and the box covers most of the photo (SAM took the background)
+  assert.ok(assess(rect(w, h, 0, 0, 199, 199), w, h, { x1: 50, y1: 50, x2: 949, y2: 949, w: 1000, h: 1000 }).reasons.includes("box_like"));
   // fragmented: two big separate blobs
   const frag = rect(w, h, 0, 0, 80, 199);
   for (let y = 0; y < h; y++) for (let x = 120; x < 190; x++) frag[y * w + x] = 1;
@@ -146,4 +148,27 @@ test("a full cutout pipeline step produces an RGBA PNG", async () => {
     .toBuffer();
   const meta = await sharp(png).metadata();
   assert.equal(meta.channels, 4);
+});
+
+test("gate passes a rectangular product (box, carton) that fills its own box", () => {
+  const w = 300;
+  const h = 400;
+  const res = assess(rect(w, h, 0, 0, w - 1, h - 1), w, h, { x1: 350, y1: 300, x2: 649, y2: 699, w: 1000, h: 1000 });
+  assert.equal(res.ok, true, res.reasons.join(","));
+});
+
+const palette = { dominant: "#5a2672", accent: "#9ae619", secondary: "#e6194b", lightNeutral: "#f3f6f1", darkNeutral: "#1f0d28" };
+
+test("big type word is never cut and stays within the editable size limit", () => {
+  const layers = applyTemplateLayout({ templateId: "big-type-behind", sceneBrief: "ice", headline: "Stay cold", bigWord: "refreshing", palette });
+  const word = layers.text.find((t) => t.id === "big-type-behind");
+  assert.equal(word?.text, "REFRESHING");
+  assert.ok(SlideLayersSchema.safeParse(layers).success, "layers pass the edit API schema");
+});
+
+test("template graphics survive normalisation and the edit API schema", () => {
+  const layers = applyTemplateLayout({ templateId: "color-block", sceneBrief: "marble", headline: "Glow", palette });
+  assert.equal(layers.background?.template, "color-block");
+  const parsed = SlideLayersSchema.parse(normalizeLayers(layers));
+  assert.deepEqual(parsed.background, { template: "color-block", dominant: palette.dominant, accent: palette.accent });
 });

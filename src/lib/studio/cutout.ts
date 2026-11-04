@@ -123,10 +123,13 @@ export class CutoutFailedError extends Error {
   }
 }
 
-/** Prompts tried in order. The first is the caller's hint, the rest are generic fallbacks. */
-const FALLBACK_HINTS = ["product", "main object"];
-/** One retry: the SAM call is cheap and a second prompt often recovers a clean mask. */
-const MAX_ATTEMPTS = 2;
+/**
+ * Prompts tried in order. The caller's hint only: `extract.ts` already retries with its own
+ * concrete hints (labelHint, segment phrase, name), and generic words like "product" return
+ * an empty answer from SAM 3.1, so a second loop here would only add paid calls.
+ */
+const FALLBACK_HINTS: string[] = [];
+const MAX_ATTEMPTS = 1;
 
 function mergeTelemetry(list: ModelCallTelemetry[]): ModelCallTelemetry {
   const last = list[list.length - 1];

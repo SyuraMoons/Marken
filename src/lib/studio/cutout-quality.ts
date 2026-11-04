@@ -37,6 +37,8 @@ export const CUTOUT_THRESHOLDS = {
   maxBoxArea: 0.95,
   minFill: 0.25,
   maxFill: 0.98,
+  /** A near-full mask is only "box_like" when its box also covers most of the photo. */
+  boxLikeMinBoxArea: 0.6,
   maxSecondaryArea: 0.15,
   minSolidity: 0.45,
   maxBorderTouch: 0.15,
@@ -142,7 +144,9 @@ export function assessCutout(input: AssessCutoutInput): CutoutAssessment {
   if (boxAreaRatio < T.minBoxArea) reasons.push("too_small");
   if (boxAreaRatio > T.maxBoxArea) reasons.push("too_large");
   if (fillRatio < T.minFill) reasons.push("sparse_mask");
-  if (fillRatio > T.maxFill) reasons.push("box_like");
+  // A clean cutout of a boxed product, carton or book fills its own box too, so a full mask
+  // alone is not a failure. It is only when SAM also took most of the photo (the background).
+  if (fillRatio > T.maxFill && boxAreaRatio > T.boxLikeMinBoxArea) reasons.push("box_like");
   if (stats.secondaryAreaRatio > T.maxSecondaryArea) reasons.push("fragmented");
   if (solidity < T.minSolidity) reasons.push("ragged");
   if (borderTouchRatio > T.maxBorderTouch) reasons.push("cropped_product");

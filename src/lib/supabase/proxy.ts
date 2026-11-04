@@ -67,7 +67,11 @@ export async function updateSession(request: NextRequest) {
     return redirectTo("/login");
   }
 
-  if (pathname === "/" || pathname === "/login") {
+  // Signed-in owners may still browse the landing page; its "Get started" links
+  // go to /login, which sends them straight into the app below.
+  if (pathname === "/") return response;
+
+  if (pathname === "/login") {
     const { shop, error } = await findActiveShop(supabase, userId);
     // On a query failure stay put rather than send an existing owner back to step 1.
     if (error) return response;

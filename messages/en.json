@@ -931,12 +931,13 @@
   "feed.calendarEyebrow": "Post calendar",
   "feed.calendarRange": "{from} – {to}",
   "feed.calendarCount": "{n} posts",
-  "feed.calendarHint": "Dates stay readable over a blurred preview. Tap a day to open its post.",
+  "feed.calendarHint": "Dates stay readable over a blurred preview. A day with several posts shows them all; tap it to see that day's posts.",
+  "feed.calendarMany": "{date}{today}: {n} posts, see them all",
   "feed.calendarNoPost": "{date}: no post",
   "feed.calendarUpcoming": "{date}: upcoming",
   "feed.calendarToday": "today",
   "feed.weekdays": "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
   "feed.bodyShort": "Every morning’s post, newest first.",
-  "feed.calendarHintShort": "Tap a day to open its post.",
+  "feed.calendarHintShort": "Tap a day to open its posts.",
   "tour.history": "History keeps every post Marken made for you, newest first, with a calendar of the last five weeks."
 }

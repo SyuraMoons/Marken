@@ -46,6 +46,7 @@ function dayLabel(date: string, today: string) {
 }
 
 const open = (id: string) => `/today?post=${id}`;
+const dayAnchor = (date: string) => `day-${date}`;
 
 // History (Figma "Calendar addition" › today-feed frames): every post as a feed, newest first, beside a calendar
 // of blurred previews. Each post opens its detail view on /today?post=<id>; Today itself shows only today's post.
@@ -105,7 +106,7 @@ export function PostFeed({
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,540fr)_minmax(0,572fr)]">
         <section aria-label={t("feed.tabPosts")} className={`flex flex-col gap-4 ${tab === "calendar" ? "max-lg:hidden" : ""}`}>
           {[...groups].map(([date, items]) => (
-            <section key={date} aria-label={dayLabel(date, today)} className="flex flex-col gap-4">
+            <section key={date} id={dayAnchor(date)} aria-label={dayLabel(date, today)} className="flex scroll-mt-6 flex-col gap-4">
               <h2 className="text-sm font-semibold text-muted">{dayLabel(date, today)}</h2>
               {items.map((p) => (
                 <FeedCard key={p.id} post={p} shopName={shopName} day={dayLabel(date, today)} />
@@ -164,14 +165,31 @@ function FeedCard({ post, shopName, day }: { post: FeedPost; shopName: string; d
   );
 }
 
+// A day's previews in one calendar cell: 1 fills it, 2 split it side by side, 3+ put the latest beside a stacked
+// pair. Blurred like the single preview; hover sharpens them.
+function DayMosaic({ posts }: { posts: FeedPost[] }) {
+  const shown = posts.slice(0, 3);
+  const tile = (p: FeedPost, extra = "") => (
+    <span key={p.id} className={`relative overflow-hidden bg-powder ${extra}`}>
+      {p.thumb && <Image src={p.thumb} alt="" fill sizes="80px" className="scale-110 object-cover blur-[1.5px] transition-[filter] duration-200 group-hover:blur-none motion-reduce:transition-none" />}
+    </span>
+  );
+  if (shown.length === 1) return <span aria-hidden="true" className="absolute inset-0 grid">{tile(shown[0])}</span>;
+  return (
+    <span aria-hidden="true" className={`absolute inset-0 grid gap-px bg-white/70 ${shown.length === 2 ? "grid-cols-2" : "grid-cols-2 grid-rows-2"}`}>
+      {shown.map((p, i) => tile(p, shown.length === 3 && i === 0 ? "row-span-2" : ""))}
+    </span>
+  );
+}
+
 // Rolling five weeks ending with the current week (Sunday first), so today and the last month always show.
 function PostCalendar({ today, posts, className = "" }: { today: string; posts: FeedPost[]; className?: string }) {
   const todayMs = toMs(today);
   const start = todayMs - (new Date(todayMs).getUTCDay() + 28) * DAY_MS;
   const end = start + 34 * DAY_MS;
-  const byDay = new Map<string, FeedPost>();
-  // Newest first, so the first post seen for a day is that day's latest.
-  for (const p of posts) if (!byDay.has(p.postDate)) byDay.set(p.postDate, p);
+  // Every post of a day, newest first (posts arrive newest first), so a day with two posts shows both.
+  const byDay = new Map<string, FeedPost[]>();
+  for (const p of posts) byDay.set(p.postDate, [...(byDay.get(p.postDate) ?? []), p]);
   const inRange = posts.filter((p) => toMs(p.postDate) >= start && toMs(p.postDate) <= end).length;
   const weekdays = t("feed.weekdays").split(",");
 
@@ -207,7 +225,7 @@ function PostCalendar({ today, posts, className = "" }: { today: string; posts: 
             String(n)
           );
           const long = fmt(ms, { weekday: "short", month: "short", day: "numeric" });
-          const post = byDay.get(date);
+          const dayPosts = byDay.get(date);
           const isToday = ms === todayMs;
           const ring = isToday ? "ring-[2.5px] ring-blue ring-inset lg:ring-3" : "";
           const cell = "relative flex h-[58px] items-center justify-center overflow-hidden rounded-[10px] text-[13px] font-bold lg:aspect-[4/5] lg:h-auto lg:text-base";
@@ -219,25 +237,38 @@ function PostCalendar({ today, posts, className = "" }: { today: string; posts: 
               </li>
             );
           }
-          if (!post) {
+          if (!dayPosts) {
             return (
               <li key={date} aria-label={t("feed.calendarNoPost", { date: long })} className={`${cell} bg-surface text-muted ${ring}`}>
                 {label}
               </li>
             );
           }
-          const status = t((STATUS[post.status] ?? STATUS.skipped).key);
+          const many = dayPosts.length > 1;
+          const thumbs = dayPosts.some((p) => p.thumb);
+          const todayNote = isToday ? `, ${t("feed.calendarToday")}` : "";
+          // One post opens it; several jump to that day's group in the feed, where every post of the day is listed.
+          const href = many ? `/posts#${dayAnchor(date)}` : open(dayPosts[0].id);
+          const aria = many
+            ? t("feed.calendarMany", { date: long, today: todayNote, n: dayPosts.length })
+            : `${long}${todayNote}: ${t((STATUS[dayPosts[0].status] ?? STATUS.skipped).key)}`;
           return (
             <li key={date}>
               <Link
-                href={open(post.id)}
-                aria-label={`${long}${isToday ? `, ${t("feed.calendarToday")}` : ""}: ${status}`}
-                className={`${cell} group bg-powder ${post.thumb ? "text-white" : "text-blue"} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue`}
+                href={href}
+                aria-label={aria}
+                className={`${cell} group bg-powder ${thumbs ? "text-white" : "text-blue"} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue`}
               >
-                {post.thumb && <Image src={post.thumb} alt="" fill sizes="80px" className="scale-110 object-cover blur-[1.5px] transition-[filter] duration-200 group-hover:blur-none motion-reduce:transition-none" />}
+                <DayMosaic posts={dayPosts} />
                 {/* No preview (still generating, or the product check failed): a light tile, so it never reads as selected. */}
-                {post.thumb && <span aria-hidden="true" className="absolute inset-0 bg-ink/28 transition-opacity duration-200 group-hover:opacity-0 motion-reduce:transition-none" />}
-                <span className={`relative ${post.thumb ? "[text-shadow:0_1px_2px_rgb(17_27_54/45%)] transition-opacity duration-200 group-hover:opacity-0 motion-reduce:transition-none" : ""}`}>{label}</span>
+                {thumbs && <span aria-hidden="true" className="absolute inset-0 bg-ink/28 transition-opacity duration-200 group-hover:opacity-0 motion-reduce:transition-none" />}
+                {/* The date sits on the photos, BeReal style. */}
+                <span className={`relative ${thumbs ? "[text-shadow:0_1px_2px_rgb(17_27_54/45%)] transition-opacity duration-200 group-hover:opacity-0 motion-reduce:transition-none" : ""}`}>{label}</span>
+                {many && (
+                  <span aria-hidden="true" className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] leading-none font-bold text-ink shadow-[0_1px_2px_rgb(17_27_54/30%)] lg:top-1.5 lg:right-1.5 lg:h-5 lg:min-w-5 lg:text-[11px]">
+                    {dayPosts.length}
+                  </span>
+                )}
                 {ring && <span aria-hidden="true" className={`absolute inset-0 rounded-[10px] ${ring}`} />}
               </Link>
             </li>

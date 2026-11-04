@@ -36,7 +36,7 @@ export function AppShell({ shopName, shops, account, children }: { shopName: str
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-15 items-center justify-between gap-2 px-5 lg:glass lg:h-auto lg:border-x-0 lg:border-t-0 lg:px-10 lg:py-[22px]">
+        <header className="relative z-20 flex h-15 items-center justify-between gap-2 px-5 lg:glass lg:h-auto lg:border-x-0 lg:border-t-0 lg:px-10 lg:py-[22px]">
           <span className="lg:hidden">
             <Logo href="/today" />
           </span>

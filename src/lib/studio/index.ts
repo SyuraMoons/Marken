@@ -232,9 +232,9 @@ export async function renderAndVerifySlide(
       : Buffer.from(input.cutout);
 
     const chosenTemplate: TemplateId | undefined = input.templateId ?? (
-      input.slideRole === "hook" ? "big-type-behind" :
-      input.slideRole === "product" ? "color-block" :
-      input.slideRole === "cta" ? "pedestal-hero" : undefined
+      input.slideRole === "hook" ? "product-poster" :
+      input.slideRole === "product" ? "product-highlight" :
+      input.slideRole === "cta" ? "product-with-name" : undefined
     );
 
     let backgroundShapes: Buffer | null = null;

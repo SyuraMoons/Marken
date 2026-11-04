@@ -21,7 +21,7 @@ export type SlidePlan = {
   headline?: string;
   subline?: string;
   bigWord?: string;
-  templateId?: "big-type-behind" | "color-block" | "pedestal-hero" | "tilted-hero";
+  templateId?: "product-highlight" | "product-poster" | "product-with-name" | "big-type-behind" | "color-block" | "pedestal-hero" | "tilted-hero";
 };
 
 export type CarouselCaptionOption = {
@@ -326,7 +326,7 @@ export async function planDailyCarousel(
     headline: s.headline?.trim() || s.text.trim(),
     subline: s.subline?.trim(),
     bigWord: s.big_word?.trim(),
-    templateId: s.template_id ?? (s.role === "hook" ? "big-type-behind" : s.role === "product" ? "color-block" : "pedestal-hero"),
+    templateId: s.template_id ?? (s.role === "hook" ? "product-poster" : s.role === "product" ? "product-highlight" : "product-with-name"),
   }));
 
   const captions: CarouselCaptionOption[] = finalPlan.caption_options.map(

@@ -46,3 +46,7 @@ next-env.d.ts
 
 # Local AI Lab scratchpad & test outputs
 scratch/
+
+# Ignore large local reference assets
+docs/references/*/
+!docs/references/README.md

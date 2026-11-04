@@ -4,7 +4,14 @@
 import { CANVAS_H, CANVAS_W, defaultTextBox, fitFontSize, type Box, type FontId, type SlideLayers, type TextLayer } from "./layers";
 import type { ProductPalette } from "./palette";
 
-export type TemplateId = "big-type-behind" | "color-block" | "pedestal-hero" | "tilted-hero";
+export type PostCategory = "product-highlight" | "product-poster" | "product-with-name";
+
+export type TemplateId =
+  | PostCategory
+  | "big-type-behind"
+  | "color-block"
+  | "pedestal-hero"
+  | "tilted-hero";
 
 export type TemplateInput = {
   templateId: TemplateId;
@@ -23,7 +30,7 @@ export type TemplateInput = {
  * Creates SVG for background graphic shapes (cards, pills, blocks) matching the template style.
  */
 export function buildTemplateBackgroundShapes(templateId: TemplateId, palette: ProductPalette): Buffer | null {
-  if (templateId === "color-block") {
+  if (templateId === "color-block" || templateId === "product-poster") {
     // Large stylish rounded rectangular card in the upper portion of the canvas (BLU style)
     const cardSvg = `
       <svg width="${CANVAS_W}" height="${CANVAS_H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}" xmlns="http://www.w3.org/2000/svg">
@@ -68,6 +75,82 @@ export function applyTemplateLayout(input: TemplateInput): SlideLayers {
   };
 
   switch (templateId) {
+    case "product-highlight": {
+      // Category 1: Product Highlight (Text-Free Aesthetic)
+      // Pure product immersion interacting with the stylized luxury environment/podium.
+      // Strictly no overlaid text, no logos, no CTA.
+      productBox = { x: 220, y: 260, width: 640, height: 920 };
+      break;
+    }
+
+    case "product-with-name": {
+      // Category 3: Product with Name (Minimalist Identification)
+      // Balanced layout stating strictly the identifying brand, collaboration, or model name.
+      // E.g. "MAISON MARGIELA - GENTLE MONSTER" or "HYDRO FLASK"
+      const brandOrName = (headline || bigWord || "BRAND PRODUCT").toUpperCase();
+      const nBox: Box = { x: 80, y: 80, width: 920, height: 90 };
+      const chosenFont: FontId = input.fontHeading ?? "dm-serif";
+      textLayers.push({
+        id: "brand-name",
+        role: "headline",
+        text: brandOrName,
+        box: nBox,
+        font: chosenFont,
+        size: fitFontSize(brandOrName, chosenFont, nBox, 54),
+        color: palette.darkNeutral,
+        align: "center",
+      });
+      productBox = { x: 250, y: 280, width: 580, height: 900 };
+      break;
+    }
+
+    case "product-poster": {
+      // Category 2: Product Poster (Campaign & Messaging - Stanley / BLU style)
+      // Graphic-heavy layout with prominent campaign headline, brand block, and punchline.
+      const cardTextBox: Box = { x: 100, y: 120, width: 880, height: 260 };
+      textLayers.push({
+        id: "headline",
+        role: "headline",
+        text: headline.toUpperCase(),
+        box: cardTextBox,
+        font: fontH,
+        size: fitFontSize(headline.toUpperCase(), fontH, cardTextBox, 88),
+        color: "#ffffff",
+        align: "center",
+      });
+
+      if (subline) {
+        const subBox: Box = { x: 120, y: 390, width: 840, height: 90 };
+        textLayers.push({
+          id: "subline",
+          role: "body",
+          text: subline.toUpperCase(),
+          box: subBox,
+          font: "bebas",
+          size: fitFontSize(subline.toUpperCase(), "bebas", subBox, 48),
+          color: palette.accent,
+          align: "center",
+        });
+      }
+
+      if (cta) {
+        const ctaBox: Box = { x: 100, y: 1210, width: 880, height: 80 };
+        textLayers.push({
+          id: "cta",
+          role: "cta",
+          text: cta,
+          box: ctaBox,
+          font: "poppins-bold",
+          size: fitFontSize(cta, "poppins-bold", ctaBox, 34),
+          color: palette.darkNeutral,
+          align: "center",
+        });
+      }
+
+      productBox = { x: 250, y: 440, width: 580, height: 760 };
+      break;
+    }
+
     case "big-type-behind": {
       // 1. Giant typography word behind product (BLU "BLU?" style)
       // E.g. "COLD", "PURE", "HYDRO" - spans broadly across the upper body

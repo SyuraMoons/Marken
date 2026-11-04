@@ -97,7 +97,7 @@ export const CarouselSlidePlanSchema = z.object({
   headline: z.string().optional(),
   subline: z.string().optional(),
   big_word: z.string().optional(),
-  template_id: z.enum(["big-type-behind", "color-block", "pedestal-hero", "tilted-hero"]).optional(),
+  template_id: z.enum(["product-highlight", "product-poster", "product-with-name", "big-type-behind", "color-block", "pedestal-hero", "tilted-hero"]).optional(),
 });
 
 /**

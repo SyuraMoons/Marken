@@ -25,7 +25,7 @@ export async function sendPostReadyEmail(input: {
       from: process.env.RESEND_FROM ?? "MARKEN <onboarding@resend.dev>",
       to: input.to,
       subject: "Your post for today is ready",
-      html: `<p>Your post${input.shopName ? ` for ${input.shopName}` : ""} is ready to review.</p><p><a href="${base}/today">Open Today and approve it</a></p>`,
+      html: `<p>Your post${input.shopName ? ` for ${input.shopName}` : ""} is ready to review.</p><p><a href="${base}/today?post=${encodeURIComponent(input.postId)}">Open the post and review it</a></p>`,
     }),
   });
   if (!res.ok) throw new Error(`resend ${res.status}`);

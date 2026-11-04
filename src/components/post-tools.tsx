@@ -34,7 +34,7 @@ export function PostTools({ postId, downloads, canDelete, compact = false }: { p
       if (!res?.ok) return setError(true);
       // On the list the card just disappears; on a post's own screen go back to the Today feed (same place as "Back to your posts").
       if (compact) router.refresh();
-      else router.push("/today");
+      else router.push("/posts");
     });
 
   return (

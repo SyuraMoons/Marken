@@ -60,14 +60,14 @@ Breaking any of these fails SRD v2.0 acceptance criteria:
 
 ## Routes and User Flow (SRD v2.0 §6 & §9)
 
-- **Flow:** Landing `/` → `/login` → `/onboarding/[step]` (**5 steps**, saved server-side per step) → `/today`. Logged-in users may browse `/`; its "Get started" link hits `/login` and its "Create your first post" CTA hits `/today`, and both send them server-side to their saved onboarding step or `/today` without signing in again (`FR-LP-03`, applied in `src/lib/supabase/proxy.ts`). Plain `/today` is the feed of every morning's post plus a calendar; `?post=<id>` opens one post.
+- **Flow:** Landing `/` → `/login` → `/onboarding/[step]` (**5 steps**, saved server-side per step) → `/today`. Logged-in users may browse `/`; its "Get started" link hits `/login` and its "Create your first post" CTA hits `/today`, and both send them server-side to their saved onboarding step or `/today` without signing in again (`FR-LP-03`, applied in `src/lib/supabase/proxy.ts`). `/today` shows today's latest post; `/posts` (History) is the feed of every post plus a post calendar, and a card or day opens it on `/today?post=<id>`.
 - **5 Onboarding Steps:**
   1. Shop basics (required): name, category, country, content language, time zone.
   2. Upload products (required): 1–10 photos (`SAM 3.1` cutout + `Muse Spark` extraction).
   3. Review (required): edit/delete/add products; owner confirms each cutout.
   4. Voice & Instagram (optional): tone, rules, live sample caption; connect IG or skip.
   5. First post + tour (optional tour): coach marks run on a sample post while the real 3-slide carousel generates, swapping to the real post when ready.
-- **Routes:** `/` · `/login` · `/onboarding/[step]` · `/today` (`?post=<id>` opens an earlier post) · `/posts` (history of generated posts) · `/posts/[id]/edit` · `/products` · `/results` (P1) · `/settings`
+- **Routes:** `/` · `/login` · `/onboarding/[step]` · `/today` (`?post=<id>` opens an earlier post) · `/posts` (History: post feed + calendar) · `/posts/[id]/edit` · `/products` · `/results` (P1) · `/settings`
 - **API:** `POST /api/shops` · `DELETE /api/shops/:id` · `POST /api/uploads` (returns a signed upload URL; the browser uploads straight to Storage) · `POST /api/shops/:id/extract` · `PATCH /api/shops/:id/onboarding` · `POST /api/shops/:id/posts/generate` · `POST /api/posts/:id/approve` · `POST /api/posts/:id/skip` · `POST /api/posts/:id/regenerate` · `GET /api/posts/:id/activity` · `GET /api/auth/instagram/callback` · cron `trends.daily` · cron `posts.daily`
 
 <!-- BEGIN:nextjs-agent-rules -->

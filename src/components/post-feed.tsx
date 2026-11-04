@@ -1,12 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ActionButton } from "@/components/action-button";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { ButtonLink } from "@/components/button";
 import { PageHeader } from "@/components/page-header";
+import { PostTools } from "@/components/post-tools";
+import { StatusScreen } from "@/components/status-screen";
 import { t, type MessageKey } from "@/lib/i18n";
 
-// The fields the feed and calendar need from one post (a subset of HistoryItem, so mock data can drive it too).
+// The fields the feed and calendar need from one post (a subset of HistoryItem).
 export type FeedPost = {
   id: string;
   status: string;
@@ -16,6 +17,9 @@ export type FeedPost = {
   hashtags: string[];
   slideCount: number;
   thumb: string | null;
+  /** Signed attachment URLs, only when every slide passed the product check (FR-FD-01). */
+  downloads: string[];
+  canDelete: boolean;
 };
 
 const STATUS: Record<string, { key: MessageKey; tone: string }> = {
@@ -43,14 +47,13 @@ function dayLabel(date: string, today: string) {
 
 const open = (id: string) => `/today?post=${id}`;
 
-// Today (Figma 01 Today › "Desktop / today-feed", "Mobile / today-feed"): every morning's post as a feed,
-// newest first, beside a calendar of blurred previews. Each post opens its detail view on /today?post=<id>.
-export function TodayFeed({
+// History (Figma "Calendar addition" › today-feed frames): every post as a feed, newest first, beside a calendar
+// of blurred previews. Each post opens its detail view on /today?post=<id>; Today itself shows only today's post.
+export function PostFeed({
   shopName,
   today,
   posts,
   tab,
-  generateUrl,
 }: {
   shopName: string;
   /** The shop's local date, YYYY-MM-DD. */
@@ -58,25 +61,37 @@ export function TodayFeed({
   /** Newest first. */
   posts: FeedPost[];
   tab: "posts" | "calendar";
-  /** Where "Run now" POSTs when there is no post today; null hides the action (preview). */
-  generateUrl: string | null;
 }) {
+  if (!posts.length) {
+    return (
+      <StatusScreen title={t("history.emptyTitle")} body={t("history.emptyBody")}>
+        <ButtonLink href="/create">{t("history.create")}</ButtonLink>
+      </StatusScreen>
+    );
+  }
+
   const groups = new Map<string, FeedPost[]>();
   for (const p of posts) groups.set(p.postDate, [...(groups.get(p.postDate) ?? []), p]);
-  const hasToday = groups.has(today);
   const busy = posts.some((p) => p.status === "generating" || p.status === "publishing");
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-7">
+    <div className="flex flex-col gap-4 lg:gap-7">
       {busy && <AutoRefresh />}
-      <PageHeader eyebrow={t("feed.eyebrow")} title={t("feed.title")} body={t("feed.body")} />
+      <header className="flex flex-col gap-1 leading-[1.4] lg:hidden">
+        <p className="text-[11px] font-semibold text-muted uppercase">{t("feed.eyebrow")}</p>
+        <h1 className="text-[28px] leading-[1.2] font-semibold">{t("feed.title")}</h1>
+        <p className="text-[15px] text-muted">{t("feed.bodyShort")}</p>
+      </header>
+      <div className="max-lg:hidden">
+        <PageHeader eyebrow={t("feed.eyebrow")} title={t("feed.title")} body={t("feed.body")} />
+      </div>
 
       {/* Mobile switches between the two columns; desktop shows both side by side. */}
       <nav aria-label={t("feed.tabs")} className="grid grid-cols-2 gap-1 rounded-control bg-surface p-1 lg:hidden">
         {(["posts", "calendar"] as const).map((key) => (
           <Link
             key={key}
-            href={key === "posts" ? "/today" : "/today?tab=calendar"}
+            href={key === "posts" ? "/posts" : "/posts?tab=calendar"}
             aria-current={tab === key ? "page" : undefined}
             replace
             scroll={false}
@@ -89,24 +104,8 @@ export function TodayFeed({
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,540fr)_minmax(0,572fr)]">
         <section aria-label={t("feed.tabPosts")} className={`flex flex-col gap-4 ${tab === "calendar" ? "max-lg:hidden" : ""}`}>
-          {!hasToday && (
-            <>
-              <h2 className="text-sm font-semibold text-muted">{t("history.today")}</h2>
-              <div className="glass flex flex-col gap-3 rounded-card border-dashed! p-5 leading-[1.4]">
-                <p className="text-lg font-semibold">{t("feed.noneTitle")}</p>
-                <p className="text-[15px] text-muted">{t("feed.noneBody")}</p>
-                {generateUrl && <ActionButton url={generateUrl}>{t("feed.noneAction")}</ActionButton>}
-              </div>
-            </>
-          )}
-          {!posts.length && (
-            <div className="flex flex-col gap-1 px-1 py-4 leading-[1.4]">
-              <p className="font-semibold">{t("feed.emptyTitle")}</p>
-              <p className="text-sm text-muted">{t("feed.emptyBody")}</p>
-            </div>
-          )}
           {[...groups].map(([date, items]) => (
-            <section key={date} aria-label={dayLabel(date, today)} className="flex flex-col gap-3">
+            <section key={date} aria-label={dayLabel(date, today)} className="flex flex-col gap-4">
               <h2 className="text-sm font-semibold text-muted">{dayLabel(date, today)}</h2>
               {items.map((p) => (
                 <FeedCard key={p.id} post={p} shopName={shopName} day={dayLabel(date, today)} />
@@ -125,7 +124,7 @@ function FeedCard({ post, shopName, day }: { post: FeedPost; shopName: string; d
   const status = STATUS[post.status] ?? STATUS.skipped;
   const making = post.status === "generating";
   return (
-    <article data-tour="feed-post" className="glass flex flex-col gap-3.5 rounded-card p-4 leading-[1.4] lg:p-5">
+    <article data-tour="feed-post" className="glass flex flex-col gap-3.5 rounded-card p-5 leading-[1.4]">
       <header className="flex items-center gap-2.5">
         <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue text-sm font-semibold text-white">
           {(shopName.trim()[0] ?? "M").toUpperCase()}
@@ -134,7 +133,7 @@ function FeedCard({ post, shopName, day }: { post: FeedPost; shopName: string; d
           <span className="truncate text-sm font-semibold">{shopName}</span>
           <span className="truncate text-xs text-muted">{post.productName ? t("feed.prepared", { day, product: post.productName }) : day}</span>
         </span>
-        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${status.tone}`}>{t(status.key)}</span>
+        <span className={`shrink-0 rounded-full px-2.5 py-[3px] text-xs font-semibold ${status.tone}`}>{t(status.key)}</span>
       </header>
 
       <Link href={open(post.id)} aria-label={t("feed.open", { date: day })} className="relative block aspect-[4/5] overflow-hidden rounded-[14px] bg-[radial-gradient(circle_at_30%_40%,#e5f0ff,#f9f9ff)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue">
@@ -154,12 +153,13 @@ function FeedCard({ post, shopName, day }: { post: FeedPost; shopName: string; d
         <>
           {post.productName && <p className="text-[11px] font-semibold text-muted uppercase">{post.productName}</p>}
           {post.caption && <p className="line-clamp-3 text-[15px] whitespace-pre-line">{post.caption}</p>}
-          {post.hashtags.length > 0 && <p className="truncate text-[13px] text-link">{post.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}</p>}
+          {post.hashtags.length > 0 && <p className="truncate text-[13px] text-blue">{post.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}</p>}
         </>
       )}
-      <ButtonLink href={open(post.id)} variant="secondary">
+      <ButtonLink href={open(post.id)} variant="secondary" className="h-12! text-[15px]! text-ink!">
         {t(making ? "feed.watch" : "feed.details")}
       </ButtonLink>
+      {(post.downloads.length > 0 || post.canDelete) && <PostTools postId={post.id} downloads={post.downloads} canDelete={post.canDelete} compact />}
     </article>
   );
 }
@@ -179,12 +179,12 @@ function PostCalendar({ today, posts, className = "" }: { today: string; posts: 
     <section data-tour="calendar" aria-label={t("feed.calendarEyebrow")} className={`glass flex flex-col gap-3 rounded-card p-4 leading-[1.4] lg:gap-4 lg:p-6 ${className}`}>
       <div className="flex items-end justify-between gap-3">
         <div className="flex flex-col gap-0.5">
-          <span className="text-[11px] font-semibold text-muted uppercase">{t("feed.calendarEyebrow")}</span>
+          <span className="text-[11px] font-semibold text-muted uppercase max-lg:hidden">{t("feed.calendarEyebrow")}</span>
           <span className="text-base font-semibold lg:text-lg">
             {t("feed.calendarRange", { from: fmt(start, { month: "short", day: "numeric" }), to: fmt(end, { month: "short", day: "numeric", year: "numeric" }) })}
           </span>
         </div>
-        <span className="text-[13px] font-medium text-muted">{t("feed.calendarCount", { n: inRange })}</span>
+        <span className="text-[13px] font-medium text-muted max-lg:hidden">{t("feed.calendarCount", { n: inRange })}</span>
       </div>
 
       <ol className="grid grid-cols-7 gap-1.5 lg:gap-2">
@@ -210,7 +210,7 @@ function PostCalendar({ today, posts, className = "" }: { today: string; posts: 
           const post = byDay.get(date);
           const isToday = ms === todayMs;
           const ring = isToday ? "ring-[2.5px] ring-blue ring-inset lg:ring-3" : "";
-          const cell = "relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-[10px] text-[13px] font-bold lg:text-base";
+          const cell = "relative flex h-[58px] items-center justify-center overflow-hidden rounded-[10px] text-[13px] font-bold lg:aspect-[4/5] lg:h-auto lg:text-base";
 
           if (ms > todayMs) {
             return (
@@ -232,18 +232,22 @@ function PostCalendar({ today, posts, className = "" }: { today: string; posts: 
               <Link
                 href={open(post.id)}
                 aria-label={`${long}${isToday ? `, ${t("feed.calendarToday")}` : ""}: ${status}`}
-                className={`${cell} group bg-powder text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue`}
+                className={`${cell} group bg-powder ${post.thumb ? "text-white" : "text-blue"} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue`}
               >
-                {post.thumb && <Image src={post.thumb} alt="" fill sizes="80px" className="scale-110 object-cover blur-[3px] transition-[filter] duration-200 group-hover:blur-none motion-reduce:transition-none" />}
-                <span aria-hidden="true" className={`absolute inset-0 transition-opacity duration-200 group-hover:opacity-0 motion-reduce:transition-none ${post.thumb ? "bg-ink/30" : "bg-blue/45"}`} />
-                <span className="relative [text-shadow:0_1px_2px_rgb(17_27_54/45%)] transition-opacity duration-200 group-hover:opacity-0 motion-reduce:transition-none">{label}</span>
+                {post.thumb && <Image src={post.thumb} alt="" fill sizes="80px" className="scale-110 object-cover blur-[1.5px] transition-[filter] duration-200 group-hover:blur-none motion-reduce:transition-none" />}
+                {/* No preview (still generating, or the product check failed): a light tile, so it never reads as selected. */}
+                {post.thumb && <span aria-hidden="true" className="absolute inset-0 bg-ink/28 transition-opacity duration-200 group-hover:opacity-0 motion-reduce:transition-none" />}
+                <span className={`relative ${post.thumb ? "[text-shadow:0_1px_2px_rgb(17_27_54/45%)] transition-opacity duration-200 group-hover:opacity-0 motion-reduce:transition-none" : ""}`}>{label}</span>
                 {ring && <span aria-hidden="true" className={`absolute inset-0 rounded-[10px] ${ring}`} />}
               </Link>
             </li>
           );
         })}
       </ol>
-      <p className="text-[13px] text-muted">{t("feed.calendarHint")}</p>
+      <p className="text-[13px] text-muted">
+        <span className="lg:hidden">{t("feed.calendarHintShort")}</span>
+        <span className="max-lg:hidden">{t("feed.calendarHint")}</span>
+      </p>
     </section>
   );
 }

@@ -911,7 +911,7 @@
   "tools.deleteKeep": "Keep it",
   "history.back": "← Back to your posts",
   "tools.download": "Download",
-  "feed.eyebrow": "Today’s post",
+  "feed.eyebrow": "History",
   "feed.title": "See your posts",
   "feed.body": "Every morning’s post, newest first. Open one to review, edit or download it.",
   "feed.tabs": "Show posts or calendar",
@@ -923,9 +923,6 @@
   "feed.details": "See details",
   "feed.watch": "Watch it being made",
   "feed.generating": "Marken is making this post now. It appears here when it is ready.",
-  "feed.noneTitle": "No post yet today",
-  "feed.noneBody": "Your daily post is prepared every morning. Want one now?",
-  "feed.noneAction": "Run now",
   "feed.open": "Open the post from {date}",
   "feed.calendarEyebrow": "Post calendar",
   "feed.calendarRange": "{from} – {to}",
@@ -935,6 +932,7 @@
   "feed.calendarUpcoming": "{date}: upcoming",
   "feed.calendarToday": "today",
   "feed.weekdays": "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
-  "feed.emptyTitle": "No posts yet",
-  "feed.emptyBody": "Posts Marken makes for you show up here, one per morning."
+  "feed.bodyShort": "Every morning’s post, newest first.",
+  "feed.calendarHintShort": "Tap a day to open its post.",
+  "tour.history": "History keeps every post Marken made for you, newest first, with a calendar of the last five weeks."
 }

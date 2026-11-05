@@ -1,6 +1,6 @@
 # MARKEN
 
-**Turn product amateur photos into social posts every morning.** MARKEN is an autonomous AI marketer that makes a daily, ready-to-share content carousel from your real product, your brand rules and today's trends. You approve it with one tap.
+**Turn amateur product photos into social posts every morning.** MARKEN is an autonomous AI marketer that makes a daily, ready-to-share content carousel from your real product, your brand rules and today's trends. You approve it with one tap.
 
 Most small medium enterprises (SMEs) owners who sell physical products on social media spend 45 to 60 minutes every morning on content: checking trends, brainstorming hooks, editing photos and writing captions. Generic AI image tools save time but redraw the product. Logos warp, labels blur, packaging changes shape, and customers stop trusting the photos. MARKEN keeps the product out of the generative model entirely: *"Your real product, never redrawn."*
 

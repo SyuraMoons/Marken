@@ -1,12 +1,12 @@
 # MARKEN
 
-**Turn product amateur photos into social posts every morning.** MARKEN is an autonomous AI marketer that makes a daily three-slide Instagram carousel from your real product, your brand rules and today's trends. You approve it with one tap.
+**Turn product amateur photos into social posts every morning.** MARKEN is an autonomous AI marketer that makes a daily, ready-to-share content carousel from your real product, your brand rules and today's trends. You approve it with one tap.
 
-Most small business owners who sell physical products on Instagram spend 45 to 60 minutes every morning on content: checking trends, brainstorming hooks, editing photos and writing captions. Generic AI image tools save time but redraw the product. Logos warp, labels blur, packaging changes shape, and customers stop trusting the photos. MARKEN keeps the product out of the generative model entirely: *"Your real product, never redrawn."*
+Most small medium enterprises (SMEs) owners who sell physical products on social media spend 45 to 60 minutes every morning on content: checking trends, brainstorming hooks, editing photos and writing captions. Generic AI image tools save time but redraw the product. Logos warp, labels blur, packaging changes shape, and customers stop trusting the photos. MARKEN keeps the product out of the generative model entirely: *"Your real product, never redrawn."*
 
 MARKEN is a mobile-first web app (PWA) with an autonomous agent pipeline behind it. The owner finishes a five-step setup, confirms a clean cutout of each product and, optionally, connects Instagram. After that, background jobs run every day without being prompted. Muse Wonder finds rising trends, Muse Spark Open scores them, Muse Spark writes a three-slide story, Muse Image paints a background scene with an empty space for the product, and `sharp` code places the confirmed cutout into that space. A fidelity check compares the product pixels on every slide with the original before the owner sees anything. The owner then gets an email, opens the post from History, toggles before/after, watches the Agent Activity Panel and approves.
 
-It is built for small business owners who sell physical products, by four students from Universitas Gadjah Mada.
+It is mainly built for SMEs owners who tends to gain their status from their products, by four students from Universitas Gadjah Mada.
 
 > Meta Global AI Developer Hackathon · Track: Indie Developer · Problem statement: Build for Your World · Entered for bonus prizes: Best Agentic Use Case, Best Creative Build.
 
